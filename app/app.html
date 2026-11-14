@@ -717,6 +717,11 @@ tbody tr:hover td { background: rgba(var(--accent-rgb), .05); }
 
 .notice { border-radius: var(--r-card); border-left: 3px solid currentColor; }
 .tooltip { background: rgba(var(--shade-rgb), .96); color: var(--ink); border: 1px solid var(--accent); border-radius: var(--r-card); box-shadow: 0 0 18px rgba(var(--accent-rgb), calc(.35 * var(--glow))); font-family: var(--font-body); font-size: 13.5px; }
+.close-lead p { margin: 0; font-size: 15.5px; line-height: 1.55; }
+.close-row { display: grid; grid-template-columns: 1fr auto auto; gap: 14px; align-items: baseline; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.close-row:last-child { border-bottom: 0; }
+.close-row small { font-size: 11.5px; color: var(--muted); font-weight: 400; }
+.close-sub { margin: 14px 0 4px; font-size: 11px; color: var(--muted); font-family: var(--font-display); letter-spacing: .12em; text-transform: var(--case-ui); }
 .help-search { padding-block: 14px; }
 .help-search .input { width: 100%; box-sizing: border-box; }
 .help-list { display: grid; gap: 8px; }
@@ -1627,7 +1632,7 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
     const bExp = budget("Vaste kosten") + budget("Variabele kosten");
     const rate = s.income > 0 ? Math.round(s.saved / s.income * 100) : null;
     const kpi = (label, value, color, sub) => `<div class="kpi" style="--k:${color}"><div class="label">${label}</div><div class="value num">${value}</div><div class="sub">${sub}</div></div>`;
-    let h = `<div class="page-head"><div><h1>Overzicht</h1><p>${s.count} transacties in ${esc(monthName(ui.month))}</p></div><div class="actions">${periodSeg()}${monthSwitch()}</div></div>${notices()}${priceNotice()}`;
+    let h = `<div class="page-head"><div><h1>Overzicht</h1><p>${s.count} transacties in ${esc(monthName(ui.month))}</p></div><div class="actions"><button class="btn" data-act="close-open" type="button">📋 Maandafsluiting</button>${periodSeg()}${monthSwitch()}</div></div>${closeNotice()}${notices()}${priceNotice()}`;
     const dense = zichtList(state).length >= 4;   // 8+ kaders op één lijn: compacter
     h += `<section class="kpis${multiAcc() ? " acc-row" : ""}${dense ? " dense" : ""}">
       ${kpi("Inkomsten", `<span class="pos">${eur0(s.income)}</span>`, "var(--pos)", budget("Inkomen") ? "gepland " + eur0(budget("Inkomen")) : "&nbsp;")}
@@ -1650,6 +1655,44 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
     h += goalsWide();
     h += `<div class="stack">${chartsCard()}${transferCard()}</div>`;
     h += `<div class="grid-2"><div class="stack"><section class="card" id="cat-card">${catChart(s)}</section>${groupCards(s)}${debtCard()}${uncatHtml}</div><div class="stack">${(state.plans.length || detectRecurring(state).length) ? soonCard(14, true) : ""}${carryCard()}</div></div>`;
+    return h;
+  }
+
+  /* ---------- maandafsluiting (stap 13a) ---------- */
+  const prevYm = () => shiftMonth(todayYm(), -1);
+  // na afloop van een maand één keer een melding, tot je ze bekeken hebt (of "Later" klikt voor deze sessie)
+  function closeNotice() {
+    const pm = prevYm(); if (ui.closeLater || (state.closeSeen || "") >= pm || !monthSummary(state, pm).count) return "";
+    return `<div class="notice info"><span>📋 De <b>maandafsluiting van ${esc(monthName(pm))}</b> staat klaar: wat ging er in en uit, wat viel op, hoeveel spaarde je.</span><span style="display:flex;gap:8px"><button class="btn small" data-act="close-later" type="button">Later</button><button class="btn small primary" data-act="close-open" data-ym="${pm}" type="button">Bekijken</button></span></div>`;
+  }
+  function viewClose() {
+    const ym = ui.month, r = monthClose(state, ym);
+    if ((state.closeSeen || "") < ym && ym <= prevYm()) { state.closeSeen = ym; save(); }
+    const head = `<div class="page-head"><div><h1>Maandafsluiting</h1><p>${esc(monthName(ym))}${ym >= todayYm() ? " · deze maand is nog niet voorbij" : ""}</p></div><div class="actions"><button class="btn" data-act="goto-overview" type="button">← Overzicht</button>${monthSwitch()}</div></div>`;
+    if (!r.count) return head + `<section class="card"><p class="muted" style="margin:0">Geen transacties in ${esc(monthName(ym))}.</p></section>`;
+    // vergelijking: ▲/▼ met kleur volgens goed/slecht (meer uitgaven = slecht)
+    const delta = (now, ref, goodUp) => { if (ref === null || ref === undefined) return ""; const d = Math.round(now - ref); if (Math.abs(d) < 1) return `<span class="muted">gelijk</span>`;
+      const good = goodUp ? d > 0 : d < 0; return `<span class="${good ? "pos" : "neg"}">${d > 0 ? "▲" : "▼"} ${eur0(Math.abs(d))}</span>`; };
+    const kpi = (label, k, color, goodUp, cls) => { const c = r.cmp[k];
+      return `<div class="kpi" style="--k:${color}"><div class="label">${label}</div><div class="value num"><span class="${cls(c.now)}">${k === "net" ? (c.now >= 0 ? "+" : "−") : ""}${eur0(Math.abs(c.now))}</span></div>
+        <div class="sub">${c.avg !== null ? `gem. ${eur0(c.avg)} ${delta(c.now, c.avg, goodUp)}` : "nog geen vergelijking"}${c.lastYear !== null ? `<br>vorig jaar ${eur0(c.lastYear)} ${delta(c.now, c.lastYear, goodUp)}` : ""}</div></div>`; };
+    // één zin als samenvatting
+    const n = r.cmp.net, more = n.avg !== null ? Math.round(n.now - n.avg) : null;
+    const lead = `${n.now >= 0 ? `Je hield <b class="pos">${eur0(n.now)}</b> over` : `Je gaf <b class="neg">${eur0(-n.now)}</b> meer uit dan er binnenkwam`}${r.rate !== null && n.now > 0 ? ` (${r.rate}% van je inkomen)` : ""}.${more !== null && Math.abs(more) >= 10 ? ` Dat is ${eur0(Math.abs(more))} ${more > 0 ? "beter" : "minder goed"} dan je gemiddelde van de vorige ${r.prevMonths} maanden.` : ""}${r.over.length ? ` ${r.over.length} budget${r.over.length === 1 ? "" : "ten"} overschreden.` : r.prevMonths ? " Alle budgetten gerespecteerd." : ""}`;
+    let h = head + `<section class="card close-lead"><p>${lead}</p></section>`;
+    h += `<section class="kpis">${kpi("Inkomsten", "income", "var(--pos)", true, () => "pos")}${kpi("Uitgaven", "expenses", "var(--neg)", false, () => "neg")}${kpi("Gespaard", "saved", "var(--gold)", true, () => "gold")}${kpi("Overgehouden", "net", "var(--gold)", true, v => v >= 0 ? "pos" : "neg")}</section>`;
+    const topCard = `<section class="card"><div class="card-head"><h2>Grootste uitgaven</h2></div><div class="table-wrap"><table><tbody>${r.top.map(t => `<tr><td class="muted num" style="width:58px;white-space:nowrap">${fmtDate(t.date).slice(0, 5)}</td><td>${esc(t.desc)}<div class="muted" style="font-size:12px">${esc(t.cat)}</div></td><td class="r num amount neg">${signed(t.amount)}</td></tr>`).join("")}</tbody></table></div></section>`;
+    const catRows = r.cats.map(c => `<div class="close-row"><span>${esc(c.cat)}</span><span class="muted num">${eur0(c.now)} <small>i.p.v. ±${eur0(c.avg)}</small></span><b class="num ${c.diff > 0 ? "neg" : "pos"}">${c.diff > 0 ? "▲ +" : "▼ −"}${eur0(Math.abs(c.diff))}${c.pct !== null ? ` <small>(${c.pct > 0 ? "+" : ""}${c.pct}%)</small>` : ""}</b></div>`).join("");
+    const overRows = r.over.map(o => `<div class="close-row"><span>${esc(o.cat)}</span><span class="muted num">${eur0(o.spent)} <small>van ${eur0(o.available)}</small></span><b class="num neg">+${eur0(o.over)}</b></div>`).join("");
+    const opvallend = `<section class="card"><div class="card-head"><h2>Wat viel op</h2><span class="hint">t.o.v. je gemiddelde</span></div>
+      ${catRows || `<p class="muted" style="margin:0 0 6px">${r.prevMonths >= 2 ? "Geen grote verschillen met andere maanden." : "Nog te weinig maanden om te vergelijken."}</p>`}
+      ${overRows ? `<h3 class="close-sub">Budget overschreden</h3>${overRows}` : ""}
+      ${r.prices.length ? `<h3 class="close-sub">Duurder geworden</h3>${r.prices.map(p => `<div class="close-row"><span>${esc(p.title)}</span><span class="muted num">${eur(p.old)} → ${eur(p.now)}</span><b class="num neg">+${p.pct}%</b></div>`).join("")}` : ""}</section>`;
+    const spaar = r.sav ? `<section class="card"><div class="card-head"><h2>Sparen</h2><a class="hint" href="#spaar">Naar Spaar</a></div>
+      <p style="margin:0 0 8px">Deze maand <b class="num ${r.sav.total < 0 ? "neg" : "gold"}">${r.sav.total < 0 ? "−" : "+"}${eur(Math.abs(r.sav.total))}</b> naar je spaarrekening${r.sav.total < 0 ? " (meer opgenomen dan gestort)" : ""}.</p>
+      ${r.sav.goals.map(g => `<div class="close-row"><span>${esc(g.name)}</span><span></span><b class="num ${g.v < 0 ? "neg" : "gold"}">${g.v < 0 ? "−" : "+"}${eur(Math.abs(g.v))}</b></div>`).join("")}</section>` : "";
+    const todo = `<section class="card"><div class="card-head"><h2>Nog te doen</h2></div>${r.uncat ? `<div class="close-row"><span>${r.uncat} transactie${r.uncat === 1 ? "" : "s"} te categoriseren</span><span></span><button class="btn small" data-act="show-uncat" type="button">Bekijken</button></div>` : `<p class="pos" style="margin:0">✓ Alles gecategoriseerd</p>`}</section>`;
+    h += `<div class="grid-2"><div class="stack">${topCard}${todo}</div><div class="stack">${opvallend}${spaar}</div></div>`;
     return h;
   }
 
@@ -3131,6 +3174,10 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
       "<b>Android:</b> menu ⋮ → <b>App installeren</b> of <b>Toevoegen aan startscherm</b>.",
       "<b>iPhone (Safari):</b> deelknop □↑ → <b>Zet op beginscherm</b>.",
       "Je gegevens blijven op het toestel zelf; ze gaan nergens naartoe." ] },
+    { id: "afsluiting", icon: "📋", show: [["overzicht", '[data-act="close-open"]'], null, null], title: "Maandafsluiting", tab: "overzicht", steps: [
+      "Klik op het <b>Overzicht</b> op <b>📋 Maandafsluiting</b>. Na afloop van een maand verschijnt er ook vanzelf een melding.",
+      "Je ziet wat er in en uit ging, vergeleken met je gemiddelde van de vorige 6 maanden en met vorig jaar, je grootste uitgaven, wat opviel (categorieën, overschreden budgetten, prijsstijgingen) en hoeveel je spaarde.",
+      "Met ‹ en › blader je naar een andere maand." ] },
     { id: "undo", icon: "↶", title: "Iets per ongeluk gewist?", tab: "", steps: [
       "Na elke wisactie verschijnt onderaan <b>↶ Ongedaan maken</b>. Klik erop en alles staat terug.",
       "Te laat? Druk op <b>Ctrl+Z</b> (Mac: Cmd+Z), tot 20 stappen terug.",
@@ -3185,6 +3232,7 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
     { sel: '#btn-import, [data-act="pick-csv"]', t: "CSV importeren", x: "Lees de transacties van je bank in (ING of Belfius). Je kan ook een bestand in het venster slepen.", topic: "csv", steps: true },
     { sel: "#btn-profile", t: "Profiel", x: "Je rekeningen, startsaldo's, kredietkaarten en alle instellingen: thema, back-up, OneDrive, pincode, tutorial…" },
     { sel: "#btn-install", t: "Installeren", x: "Zet de planner als programma op je pc of gsm. Je gegevens blijven op je toestel.", topic: "install" },
+    { sel: '[data-act="close-open"]', t: "Maandafsluiting", x: "Een samenvatting van de maand: in en uit tegenover je gemiddelde, grootste uitgaven, wat opviel en hoeveel je spaarde.", topic: "afsluiting" },
     { sel: '[data-act="period-month"], [data-act="period-year"]', t: "Maand of jaar", x: "Wissel tussen het overzicht van één maand en het jaaroverzicht met de heatmap per categorie." },
     { sel: '[data-act="prev-month"], [data-act="next-month"], [data-act="prev-year"], [data-act="next-year"]', t: "Vorige / volgende", x: "Blader naar een andere maand of een ander jaar." },
     { sel: '[data-act="chart-view"]', t: "Soort grafiek", x: "Kies wat de grafiek toont: saldoverwachting per rekening, vermogen, uitgaven per categorie of inkomen & uitgaven. Je keuze wordt onthouden." },
@@ -3308,7 +3356,7 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
     if (tab && location.hash !== "#" + tab) { location.hash = tab; setTimeout(go, 450); } else go();
   }
 
-  const VIEWS = { help: viewHelp, overzicht: viewOverview, transacties: viewTransactions, budget: viewBudget, regels: viewRules, spaardoelen: viewGoals, spaar: viewSavings, planner: viewPlanner, leningen: viewLoans, profiel: viewProfile };
+  const VIEWS = { afsluiting: viewClose, help: viewHelp, overzicht: viewOverview, transacties: viewTransactions, budget: viewBudget, regels: viewRules, spaardoelen: viewGoals, spaar: viewSavings, planner: viewPlanner, leningen: viewLoans, profiel: viewProfile };
   const route = () => { const r = location.hash.slice(1); return VIEWS[r] ? r : "overzicht"; };
   function render() {
     setSav(ui.sav);   // de spaarfuncties rekenen voor de spaarrekening die op het tabblad Spaar gekozen is
@@ -3320,7 +3368,7 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
     document.querySelectorAll("#nav a").forEach(a => { if (a.getAttribute("href") === "#" + r) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
     if (focusId) { const el = document.getElementById(focusId); if (el) { el.focus(); try { el.setSelectionRange(selStart, selStart); } catch (e) {} } }
     renderSide(r);
-    const cur = document.querySelector(`#nav a[href="#${r}"]`); $("#nav-cur").textContent = cur ? cur.firstChild.textContent.trim() : r === "profiel" ? "Profiel" : r === "help" ? "Help" : ""; navOpen(false);
+    const cur = document.querySelector(`#nav a[href="#${r}"]`); $("#nav-cur").textContent = cur ? cur.firstChild.textContent.trim() : r === "profiel" ? "Profiel" : r === "help" ? "Help" : r === "afsluiting" ? "Maandafsluiting" : ""; navOpen(false);
     $("#btn-profile").classList.toggle("active", r === "profiel"); updateProfileLabel();
     afterRender(r + (r === "overzicht" ? ui.period : ""));
     tutPaint();
@@ -3554,6 +3602,9 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
       case "pin-open": pinDialog(); break;
       case "install": installApp(); break;
       case "theme-open": themeDialog(); break;
+      case "close-open": if (el.dataset.ym) ui.month = el.dataset.ym; else if (ui.month >= todayYm()) ui.month = prevYm(); ui.period = "maand"; location.hash = "afsluiting"; break;
+      case "close-later": ui.closeLater = true; render(); break;
+      case "goto-overview": location.hash = "overzicht"; break;
       case "help-open": location.hash = "help"; window.scrollTo(0, 0); break;
       case "help-show": helpShow(el.dataset.topic, +el.dataset.i); break;
       case "help-topic": { const id = el.dataset.topic; location.hash = "help"; setTimeout(() => { const d = $("#help-" + id); if (d) { d.open = true; d.scrollIntoView({ block: "center" }); } }, 150); break; }

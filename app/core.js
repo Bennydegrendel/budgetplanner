@@ -960,4 +960,52 @@ function toCsv(state) {
   return "﻿" + lines.join("\r\n");
 }
 
-if (typeof module !== "undefined") module.exports = { belfiusDesc, catByName, parentOf, groupOf, mainCats, subsOf, savKeys, activeSav, setSav, withSav, goalSav, savGoals, savAll, syncSavConfs, cardMatch, applyCards, transferFlows, OWN_CAT, ownTransfer, applyOwnTransfers, ownConflicts, MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
+/* ---------- maandafsluiting (stap 13a) ----------
+   Samenvatting van één maand: vergelijking met het gemiddelde van de 6 maanden ervoor (met gegevens)
+   en met dezelfde maand vorig jaar, grootste uitgaven, opvallende categorieën, budget overschreden,
+   prijsstijgingen, sparen per doel en wat nog te doen is. Pure rekenwerk, geen opmaak. */
+const COST_TYPES = ["Vaste kosten", "Variabele kosten"];
+function monthClose(state, ym) {
+  const r2 = x => Math.round(x * 100) / 100;
+  const s = monthSummary(state, ym), prevs = [];
+  for (let i = 1; i <= 6; i++) { const m = addMonths(ym, -i), x = monthSummary(state, m); if (x.count) prevs.push(x); }
+  const ly = monthSummary(state, addMonths(ym, -12));
+  const avg = f => prevs.length ? r2(prevs.reduce((a, p) => a + f(p), 0) / prevs.length) : null;
+  // "gespaard" = wat echt naar de spaarrekening(en) ging (zoals het Gespaard-kader op het Overzicht), anders de categorieën van het type Sparen
+  const sm = hasSavings(state) ? savAll(state) : null;
+  const savedIn = (m, x) => sm ? r2(sm.moves.filter(v => v.date.startsWith(m) && v.src !== "transfer").reduce((a, v) => a + v.effect, 0)) : x.saved;
+  const prevYms = []; for (let i = 1; i <= 6; i++) { const m = addMonths(ym, -i); if (monthSummary(state, m).count) prevYms.push(m); }
+  const cmp = {};
+  for (const k of ["income", "expenses", "net"]) cmp[k] = { now: s[k], avg: avg(p => p[k]), lastYear: ly.count ? ly[k] : null };
+  cmp.saved = { now: savedIn(ym, s), avg: prevYms.length ? r2(prevYms.reduce((a, m) => a + savedIn(m, monthSummary(state, m)), 0) / prevYms.length) : null, lastYear: ly.count ? savedIn(addMonths(ym, -12), ly) : null };
+  const toSav = t => savKeys(state).some(k => withSav(state, k, () => isSavMove(state, t)));
+  // grootste uitgaven (geen sparen, overboekingen of inkomsten)
+  const top = expandTx(budgetTx(state).filter(t => t.date.startsWith(ym)))
+    .filter(t => t.amount < 0 && !["Sparen", "Overboeking", "Inkomen"].includes(typeOf(state, t.cat)) && !toSav(t))
+    .sort((a, b) => a.amount - b.amount).slice(0, 5)
+    .map(t => ({ id: t.id, date: t.date, desc: t.desc, cat: t.cat, amount: t.amount }));
+  // categorieën die duidelijk afwijken van hun gemiddelde (min. € 25 én 20 %)
+  const cats = [];
+  if (prevs.length >= 2) for (const c of mainCats(state).filter(c => COST_TYPES.includes(c.type))) {
+    const now = r2(-(s.byCat[c.name] || 0)), av = avg(p => -(p.byCat[c.name] || 0)), diff = r2(now - av);
+    if (Math.abs(diff) >= 25 && (av <= 0 || Math.abs(diff) / av >= 0.2)) cats.push({ cat: c.name, now, avg: av, diff, pct: av > 0 ? Math.round(diff / av * 100) : null });
+  }
+  cats.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
+  // budget overschreden
+  const env = envelopes(state, ym), over = [];
+  for (const c of mainCats(state)) { const e = env[c.name]; if (e && e.available > 0 && e.spent > e.available + 0.005) over.push({ cat: c.name, spent: e.spent, available: e.available, over: r2(e.spent - e.available) }); }
+  over.sort((a, b) => b.over - a.over);
+  // prijsstijgingen die deze maand voor het eerst gezien werden
+  const prices = priceChanges(state).filter(p => p.date.startsWith(ym));
+  // sparen per doel (stortingen en opnames, geen verplaatsingen tussen doelen)
+  let sav = null;
+  if (sm) {
+    const moves = sm.moves.filter(m => m.date.startsWith(ym) && m.src !== "transfer"), per = new Map();
+    for (const m of moves) per.set(m.goal || "Vrij sparen", r2((per.get(m.goal || "Vrij sparen") || 0) + m.effect));
+    sav = { total: r2(moves.reduce((a, m) => a + m.effect, 0)), goals: [...per].map(([name, v]) => ({ name, v })).sort((a, b) => b.v - a.v) };
+  }
+  return { ym, summary: s, count: s.count, prevMonths: prevs.length, cmp, top, cats: cats.slice(0, 6), over, prices, sav,
+    uncat: s.uncatCount, rate: s.income > 0 ? Math.round(s.net / s.income * 100) : null };
+}
+
+if (typeof module !== "undefined") module.exports = { monthClose, belfiusDesc, catByName, parentOf, groupOf, mainCats, subsOf, savKeys, activeSav, setSav, withSav, goalSav, savGoals, savAll, syncSavConfs, cardMatch, applyCards, transferFlows, OWN_CAT, ownTransfer, applyOwnTransfers, ownConflicts, MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
