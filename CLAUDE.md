@@ -45,6 +45,7 @@ ING CSV-import (ontdubbelen), automatisch categoriseren (regels + leren van keuz
 - ING's omzetnummer begint elk jaar opnieuw → ontdubbelsleutel = `rekening|omzetnummer|datum`.
 - Spaarankers: bewegingen op de ankerdag zelf expliciet bijhouden (`anchor.included`).
 - Kleine bedragen niet afronden naar € 0 (helper `eurS`).
+- Het **startsaldo is een ijkpunt**, geen begin: `balanceAt()` rekent vooruit én terug. Het saldo van vandaag (met de datum van de laatst ingelezen transactie) ingeven mag dus. Op vraag van Benny enkel uitgelegd in Help, tutorialballonnen en Toon me; de schermen zelf bleven ongewijzigd.
 - Microsoft Graph remt af bij veel schrijfacties kort na elkaar → altijd opnieuw proberen met pauze.
 - Een persoonlijke OneDrive weigerde via de Claude-koppeling het teruglezen van `.json` (401) – `.txt` werkte. Bij rechtstreekse Graph-toegang (stap 5) opnieuw testen.
 
