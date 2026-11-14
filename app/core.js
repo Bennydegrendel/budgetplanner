@@ -414,7 +414,8 @@ function monthSummary(state, ym) {
   return s;
 }
 
-function goalProgress(state, g) {
+function goalProgress(state, g) { return withSav(state, goalSav(state, g), () => goalProgressOne(state, g)); }
+function goalProgressOne(state, g) {
   const deposited = Math.round(savMoves(state).filter(m => m.goal === g.name).reduce((s, m) => s + m.effect, 0) * 100) / 100;
   const total = Math.round(((+g.start || 0) + deposited) * 100) / 100;
   const target = +g.target || 0;
@@ -629,7 +630,36 @@ function creditStatus(state, cr) {
 }
 
 /* ---------- spaarrekening (afgeleid uit de zichtrekening) ---------- */
-function savConf(state) { if (!state.savings) state.savings = { iban: "", anchor: null, entries: [], pending: [], transfers: [] }; const s = state.savings; s.entries = s.entries || []; s.pending = s.pending || []; s.transfers = s.transfers || []; return s; }
+/* ---------- meerdere spaarrekeningen (stap 8d) ----------
+   state.savings = de eerste spaarrekening (zoals altijd), state.savingsMore = de andere, elk { iban, anchor, entries, pending, transfers }.
+   De spaarfuncties hieronder rekenen telkens voor ÉÉN "actieve" spaarrekening (SAV_ACTIVE = rekeningnummer zonder spaties).
+   withSav() zet die tijdelijk; savAll() telt alle spaarrekeningen samen. Een doel hoort bij g.sav (leeg = de eerste). */
+let SAV_ACTIVE = "";
+function emptySav(iban) { return { iban: iban || "", anchor: null, entries: [], pending: [], transfers: [] }; }
+function fixSav(s) { s.entries = s.entries || []; s.pending = s.pending || []; s.transfers = s.transfers || []; return s; }
+function syncSavConfs(state) {
+  if (!state.savings) state.savings = emptySav(); fixSav(state.savings);
+  state.savingsMore = (state.savingsMore || []).map(fixSav);
+  const have = () => [state.savings.iban, ...state.savingsMore.map(x => x.iban)].map(normIban).filter(Boolean);
+  // een spaarrekening die enkel als rekeningnummer op het tabblad Spaar stond, krijgt ook een plaats in de rekeningenlijst (naam aanpasbaar in Profiel)
+  state.accounts = state.accounts || {};
+  for (const sc of [state.savings, ...state.savingsMore]) { const n = normIban(sc.iban); if (n && !Object.keys(state.accounts).some(k => normIban(k) === n)) state.accounts[fmtIban(n)] = { type: "spaar", name: "Spaarrekening" }; }
+  for (const k of Object.keys(state.accounts || {})) {
+    if (state.accounts[k].type !== "spaar" || have().includes(normIban(k))) continue;
+    if (!normIban(state.savings.iban)) state.savings.iban = k; else state.savingsMore.push(emptySav(k));
+  }
+}
+function savKeys(state) { syncSavConfs(state); return [normIban(state.savings.iban), ...state.savingsMore.map(x => normIban(x.iban))]; }
+function activeSav(state) { const keys = savKeys(state); return keys.includes(SAV_ACTIVE) ? SAV_ACTIVE : keys[0]; }
+function setSav(key) { SAV_ACTIVE = normIban(key); }
+function withSav(state, key, fn) { const keep = SAV_ACTIVE; SAV_ACTIVE = normIban(key); try { return fn(); } finally { SAV_ACTIVE = keep; } }
+function goalSav(state, g) { const keys = savKeys(state), k = normIban(g && g.sav); return k && keys.includes(k) ? k : keys[0]; }
+function savGoals(state) { const k = activeSav(state); return state.goals.filter(g => goalSav(state, g) === k); }
+function savConf(state) {
+  syncSavConfs(state); const k = activeSav(state);
+  if (k === normIban(state.savings.iban)) return state.savings;
+  return state.savingsMore.find(x => normIban(x.iban) === k) || state.savings;
+}
 function normIban(x) { return String(x || "").replace(/\s/g, "").toUpperCase(); }
 function makeRef(name, taken) {
   let base = "SP-" + String(name || "DOEL").toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9]/g, "").slice(0, 12);
@@ -643,13 +673,15 @@ function isSavMove(state, t) {
   const sc = savConf(state), ib = normIban(sc.iban);
   if (ib && normIban(t.counterparty) === ib) return true;
   if (ib && txText(t).replace(/\s/g, "").includes(ib)) return true;
-  if (refGoal(state, t)) return true;
-  return state.goals.some(g => g.name === t.cat);
+  const gs = savGoals(state), s = txText(t);
+  if (gs.some(g => g.ref && s.includes(g.ref.toUpperCase()))) return true;
+  return gs.some(g => g.name === t.cat);
 }
 function moveGoal(state, t) {
   if (t.goal !== undefined && t.goal !== null && t.goal !== "") return t.goal;
   if (t.goal === "") return null;               // bewust niet toegewezen
-  return refGoal(state, t) || (state.goals.some(g => g.name === t.cat) ? t.cat : null);
+  const gs = savGoals(state), s = txText(t), r = gs.find(g => g.ref && s.includes(g.ref.toUpperCase()));
+  return r ? r.name : gs.some(g => g.name === t.cat) ? t.cat : null;
 }
 /* Alle bewegingen op de spaarrekening: uit je zichtrekening (effect = −bedrag) en manuele ingaven (rente, premies, correcties). */
 function savMoves(state) {
@@ -660,7 +692,8 @@ function savMoves(state) {
   const tr = sc.transfers.flatMap(x => [{ date: x.date, effect: -x.amount, goal: x.from, src: "transfer", leg: "out", e: x, checked: true, auto: false }, { date: x.date, effect: +x.amount, goal: x.to, src: "transfer", leg: "in", e: x, checked: true, auto: false }]);
   return [...bank, ...man, ...tr].sort((a, b) => b.date.localeCompare(a.date));
 }
-function hasSavings(state) { const sc = savConf(state); return !!(sc.iban || sc.anchor || sc.entries.length || savMoves(state).length); }
+function hasSavingsOne(state) { const sc = savConf(state); return !!(sc.iban || sc.anchor || sc.entries.length || savMoves(state).length); }
+function hasSavings(state) { return savKeys(state).some(k => withSav(state, k, () => hasSavingsOne(state))); }
 function moveId(m) { return m.src === "bank" ? m.t.id : m.src === "transfer" ? m.e.id + "|" + m.leg : m.e.id; }
 /* Telt een beweging al mee in het afgestemde saldo? Vóór de afstemdatum: ja. Op dezelfde dag: alleen als ze al bekend was
    toen je afstemde (anders is ze daarna gebeurd of later geïmporteerd). */
@@ -684,7 +717,7 @@ function savingsBalance(state) {
 }
 function savingsSummary(state) {
   const bal = savingsBalance(state), mv = savMoves(state);
-  const goals = state.goals.map(g => ({ g, p: goalProgress(state, g) }));
+  const goals = savGoals(state).map(g => ({ g, p: goalProgress(state, g) }));
   const allocated = Math.round(goals.reduce((s, x) => s + x.p.total, 0) * 100) / 100;
   const y = String(new Date().getFullYear());
   return { bal, goals, moves: mv, allocated, unallocated: bal.set ? Math.round((bal.total - allocated) * 100) / 100 : null,
@@ -692,8 +725,19 @@ function savingsSummary(state) {
     inYear: mv.filter(m => m.src !== "transfer" && m.date.startsWith(y) && m.effect > 0).reduce((s, m) => s + m.effect, 0),
     outYear: mv.filter(m => m.src !== "transfer" && m.date.startsWith(y) && m.effect < 0).reduce((s, m) => s - m.effect, 0) };
 }
+/* Alle spaarrekeningen samen (Overzicht, Vermogen, gsm). parts = per spaarrekening { key, s } met s = savingsSummary. */
+function savAll(state) {
+  const parts = savKeys(state).map(k => ({ key: k, s: withSav(state, k, () => savingsSummary(state)) }));
+  const setParts = parts.filter(x => x.s.bal.set), sum = f => Math.round(parts.reduce((a, x) => a + f(x.s), 0) * 100) / 100;
+  return { parts,
+    bal: { set: setParts.length > 0, total: setParts.length ? Math.round(setParts.reduce((a, x) => a + x.s.bal.total, 0) * 100) / 100 : null },
+    goals: parts.flatMap(x => x.s.goals), moves: parts.flatMap(x => x.s.moves.map(m => Object.assign({ sav: x.key }, m))).sort((a, b) => b.date.localeCompare(a.date)),
+    allocated: sum(s => s.allocated), unallocated: parts.every(x => x.s.bal.set) ? sum(s => s.unallocated || 0) : null,
+    toCheck: sum(s => s.toCheck), open: sum(s => s.open), inYear: sum(s => s.inYear), outYear: sum(s => s.outYear) };
+}
 /* Geplande opnames/stortingen die intussen in je bankafschrift staan, worden afgevinkt. */
-function resolvePending(state) {
+function resolvePending(state) { return savKeys(state).reduce((n, k) => n + withSav(state, k, () => resolvePendingOne(state)), 0); }
+function resolvePendingOne(state) {
   const sc = savConf(state), mv = savMoves(state).filter(m => m.src === "bank"); let n = 0;
   sc.pending = sc.pending.filter(p => {
     const hit = mv.find(m => m.goal === p.goal && Math.abs(Math.abs(m.effect) - p.amount) < 0.005 && Math.sign(m.effect) === (p.type === "opname" ? -1 : 1) && m.date >= addDays(p.date, -5));
@@ -873,4 +917,4 @@ function toCsv(state) {
   return "﻿" + lines.join("\r\n");
 }
 
-if (typeof module !== "undefined") module.exports = { cardMatch, applyCards, transferFlows, OWN_CAT, ownTransfer, applyOwnTransfers, ownConflicts, MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
+if (typeof module !== "undefined") module.exports = { savKeys, activeSav, setSav, withSav, goalSav, savGoals, savAll, syncSavConfs, cardMatch, applyCards, transferFlows, OWN_CAT, ownTransfer, applyOwnTransfers, ownConflicts, MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
