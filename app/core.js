@@ -334,6 +334,29 @@ function spaarList(state) {
 function fmtIban(a) { return normIban(a).replace(/(.{4})/g, "$1 ").trim(); }
 function accName(state, acc) { const a = state.accounts && state.accounts[accKey(state, acc)]; return (a && a.name) || fmtIban(acc); }
 
+/* ---------- overboekingen tussen eigen zichtrekeningen (stap 8c-1) ----------
+   Een transactie waarvan de tegenpartij een van je eigen zichtrekeningen is, is geen inkomen of uitgave
+   maar een verplaatsing. Geeft de sleutel van die andere rekening terug, of null. */
+const OWN_CAT = "Eigen rekeningen";
+function ownTransfer(state, t) {
+  if (!t || !t.counterparty || !t.account) return null;
+  const cp = normIban(t.counterparty); if (!cp || cp === normIban(t.account)) return null;
+  return zichtList(state).find(k => normIban(k) === cp) || null;
+}
+/* Te categoriseren eigen overboekingen → categorie OWN_CAT (type Overboeking, wordt zo nodig aangemaakt).
+   Overboekingen die de gebruiker zelf al een andere (niet-overboeking) categorie gaf, worden NIET veranderd. */
+function applyOwnTransfers(state) {
+  const own = budgetTx(state).filter(t => !(t.splits && t.splits.length) && ownTransfer(state, t));
+  let set = 0;
+  for (const t of own) if (t.cat === UNCAT) {
+    if (!state.categories.some(x => x.name === OWN_CAT)) state.categories.push({ name: OWN_CAT, type: "Overboeking", budget: null });
+    t.cat = OWN_CAT; set++;
+  }
+  return set;
+}
+/* Eigen overboekingen met een categorie die geen overboeking is (tellen dan dubbel). */
+function ownConflicts(state) { return budgetTx(state).filter(t => ownTransfer(state, t) && t.cat !== UNCAT && typeOf(state, t.cat) !== "Overboeking" && !(t.splits && t.splits.length)); }
+
 function typeOf(state, cat) {
   const c = state.categories.find(x => x.name === cat);
   return c ? c.type : "Onbekend";
@@ -821,4 +844,4 @@ function toCsv(state) {
   return "﻿" + lines.join("\r\n");
 }
 
-if (typeof module !== "undefined") module.exports = { MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
+if (typeof module !== "undefined") module.exports = { OWN_CAT, ownTransfer, applyOwnTransfers, ownConflicts, MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
