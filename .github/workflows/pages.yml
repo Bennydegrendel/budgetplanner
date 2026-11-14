@@ -1,0 +1,59 @@
+# Zet de app online op GitHub Pages.
+# Loopt vanzelf zodra er iets nieuws op "main" komt (= een versie vrijgeven),
+# of met de hand via het tabblad Actions → "App online zetten" → Run workflow.
+name: App online zetten
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Nooit twee publicaties tegelijk; een lopende wordt wel afgewerkt.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  bouwen:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Code ophalen
+        uses: actions/checkout@v4
+
+      - name: Controleren dat core.js laadt
+        run: node -e "require('./app/core.js'); console.log('core.js laadt')"
+
+      - name: index.html bouwen (app.html + core.js)
+        run: python3 tools/build.py app
+
+      - name: Websitemap samenstellen
+        run: |
+          mkdir _site
+          cp -r app/. _site/
+          # bronbestanden zitten al in index.html, die hoeven niet online
+          rm -f _site/app.html _site/core.js _site/.gitkeep
+          ls -la _site
+
+      - name: Pages voorbereiden
+        uses: actions/configure-pages@v5
+
+      - name: Websitemap doorgeven
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  publiceren:
+    needs: bouwen
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Online zetten
+        id: deployment
+        uses: actions/deploy-pages@v4

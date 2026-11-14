@@ -56,6 +56,12 @@ Daarnaast hangt v1.0 af van `window.claude` (alleen beschikbaar binnen claude.ai
 
 Wie Claude wil gebruiken, gebruikt de versie op claude.ai. Geen API-sleutel-optie inbouwen tenzij Benny erom vraagt.
 
+## Werkversie en vrijgeven (zoals revisies)
+
+- Werken gebeurt op een **werkbranch** (`claude/…`). Dat is de werktekening: niemand anders ziet ze.
+- **`main` = de vrijgegeven versie.** Alles wat op `main` komt, zet `.github/workflows/pages.yml` automatisch online op `https://bennydegrendel.github.io/budgetplanner/`.
+- Vrijgeven = de werkbranch samenvoegen in `main` via een pull request, pas nadat Benny getest heeft. Nooit rechtstreeks op `main` pushen zonder zijn akkoord.
+
 ## Afwijkingen in de standalone app (op vraag van Benny)
 
 - **Blanco start:** een nieuwe gebruiker krijgt geen standaardcategorieën, -regels of -spaardoelen (`DEFAULT_*` in `core.js` zijn leeg).

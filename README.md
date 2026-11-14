@@ -18,6 +18,12 @@ python tools/build.py claude-versie   # -> claude-versie/budgetplanner.html
 python tools/build.py app             # -> app/index.html
 ```
 
+## Online
+
+De app staat op https://bennydegrendel.github.io/budgetplanner/ .
+Elke wijziging op `main` wordt automatisch gebouwd en online gezet (`.github/workflows/pages.yml`).
+Werken gebeurt op een aparte branch; samenvoegen in `main` = een nieuwe versie vrijgeven.
+
 ## Wat er in v1.0 zit
 
 - ING CSV-import met ontdubbelen en automatisch categoriseren
