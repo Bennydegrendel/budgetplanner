@@ -56,12 +56,23 @@ Daarnaast hangt v1.0 af van `window.claude` (alleen beschikbaar binnen claude.ai
 
 Wie Claude wil gebruiken, gebruikt de versie op claude.ai. Geen API-sleutel-optie inbouwen tenzij Benny erom vraagt.
 
+## Werkversie en vrijgeven (zoals revisies)
+
+- Werken gebeurt op een **werkbranch** (`claude/…`). Dat is de werktekening: niemand anders ziet ze.
+- **`main` = de vrijgegeven versie.** Alles wat op `main` komt, zet `.github/workflows/pages.yml` automatisch online op `https://bennydegrendel.github.io/budgetplanner/`.
+- Vrijgeven = de werkbranch samenvoegen in `main` via een pull request, pas nadat Benny getest heeft. Nooit rechtstreeks op `main` pushen zonder zijn akkoord.
+
+## Afwijkingen in de standalone app (op vraag van Benny)
+
+- **Blanco start:** een nieuwe gebruiker krijgt geen standaardcategorieën, -regels of -spaardoelen (`DEFAULT_*` in `core.js` zijn leeg).
+- **Regels → "Transacties analyseren":** `suggestRules(state)` in `core.js` stelt regels voor (uit eigen keuzes, een lijst bekende Belgische bedrijven `RULE_HINTS`, en terugkerende onbekende tegenpartijen). Niets wordt toegepast tot de gebruiker aanvinkt en goedkeurt; ontbrekende categorieën worden pas dan aangemaakt.
+
 ## Stappenplan standalone app
 
 Werk ze in volgorde af. Na elke stap: commit, korte uitleg, en wacht op Benny voor de volgende.
 
 - [x] **Stap 0 – Opsplitsen.** v1.0 in `claude-versie/`, `tools/build.py`, dit dossier.
-- [ ] **Stap 1 – Kopie zonder Claude.** Kopieer `claude-versie/app.html` en `core.js` naar `app/`. Verwijder de drie Claude-functies, de OneDrive-via-Claude-code (back-upmenu-item, automatische cloud-back-up, gsm-samenvatting uploaden/ophalen) en alle afhankelijkheid van `window.claude`. Downloads via de browser. Alles moet lokaal werken door `app/index.html` te openen. Test in de browser dat er geen fouten in de console staan.
+- [x] **Stap 1 – Kopie zonder Claude.** Kopieer `claude-versie/app.html` en `core.js` naar `app/`. Verwijder de drie Claude-functies, de OneDrive-via-Claude-code (back-upmenu-item, automatische cloud-back-up, gsm-samenvatting uploaden/ophalen) en alle afhankelijkheid van `window.claude`. Downloads via de browser. Alles moet lokaal werken door `app/index.html` te openen. Test in de browser dat er geen fouten in de console staan.
 - [ ] **Stap 2 – Online via GitHub Pages.** Publiceer `app/` (bv. via een GitHub Actions-workflow of Pages vanuit een map). Adres: `https://bennydegrendel.github.io/budgetplanner/`. Leg Benny uit wat er gebeurt.
 - [ ] **Stap 3 – Installeerbaar (PWA).** `manifest.webmanifest` (naam "Budgetplanner", kort "Budget", zwarte achtergrond, themakleur `#00e5ff`), iconen in 192/512 px + maskable (roze €-logo), en een service worker voor offline gebruik. Test installeren op pc en gsm.
 - [ ] **Stap 4 – Gegevens overzetten.** Duidelijke import van een v1.0-back-up (`.json`), met controle en een samenvatting ("x transacties, y categorieën…"). Benny exporteert uit de claude.ai-versie en importeert in de app.
