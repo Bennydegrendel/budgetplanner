@@ -62,6 +62,11 @@
   --font-display: "Orbitron", "Segoe UI", system-ui, sans-serif;
   --font-body: "Rajdhani", "Segoe UI", system-ui, sans-serif;
   --font-mono: "Share Tech Mono", ui-monospace, "Consolas", monospace;
+  /* vorm en karakter (per thema anders, zie de thema-blokken) */
+  --r-card: 0; --r-btn: 0; --r-field: 0; --r-pill: 0; --r-bar: 0; --r-sm: 0;
+  --case-title: uppercase; --case-ui: uppercase; --title-spacing: .06em;
+  --glow: 1; --corner: .8;
+  --font-hero: var(--font-display); --hero-size: 24px; --body-size: 15.5px; --body-weight: 500;
   --notch: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
   --notch-sm: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
   color-scheme: dark;
@@ -488,7 +493,7 @@ body.eye-off main .num:not(.dt) { filter: blur(7px); user-select: none; }
 
 /* ================= CYBERPUNK ================= */
 body {
-  font-size: 15.5px; font-weight: 500; letter-spacing: .01em;
+  font-size: var(--body-size); font-weight: var(--body-weight); letter-spacing: .01em;
   background:
     linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0 / 100% 34px,
     linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0 / 34px 100%,
@@ -499,88 +504,88 @@ body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-i
   background: repeating-linear-gradient(to bottom, transparent 0 2px, rgba(var(--shade-rgb), .22) 2px 3px); opacity: var(--scan); }
 ::selection { background: var(--magenta); color: var(--on-accent); }
 .num, .amount, .amt, td.cell, .totals, .gauge-legend b, .facts b, .month span { font-family: var(--font-mono); letter-spacing: 0; }
-h1, h2, h3 { letter-spacing: .06em; text-transform: uppercase; }
-.page-head h1 { font-size: 24px; font-weight: 700; text-shadow: 0 0 14px rgba(var(--accent-rgb), .45); }
-.page-head h1::after { content: ""; display: block; width: 64px; height: 3px; margin-top: 8px; background: linear-gradient(90deg, var(--magenta), var(--accent)); box-shadow: 0 0 10px rgba(var(--magenta-rgb), .6); }
+h1, h2, h3 { letter-spacing: var(--title-spacing); text-transform: var(--case-title); }
+.page-head h1 { font-family: var(--font-hero); font-size: var(--hero-size); font-weight: 700; text-shadow: 0 0 14px rgba(var(--accent-rgb), calc(.45 * var(--glow))); }
+.page-head h1::after { content: ""; display: block; width: 64px; height: 3px; margin-top: 8px; background: linear-gradient(90deg, var(--magenta), var(--accent)); box-shadow: 0 0 10px rgba(var(--magenta-rgb), calc(.6 * var(--glow))); }
 .page-head p { font-size: 14.5px; }
 
-header { background: rgba(var(--panel-rgb), .9); backdrop-filter: blur(8px); border-bottom: 1px solid rgba(var(--accent-rgb), .35); box-shadow: 0 0 22px rgba(var(--accent-rgb), .12); }
-.brand { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .1em; font-size: 15px; text-shadow: 0 0 10px rgba(var(--accent-rgb), .5); }
-.brand-mark { background: var(--magenta); color: var(--on-accent); border-radius: 0; clip-path: var(--notch-sm); box-shadow: 0 0 12px var(--magenta); }
-nav a { text-transform: uppercase; letter-spacing: .06em; font-weight: 600; font-size: 13px; padding-left: 8px; padding-right: 8px; }
+header { background: rgba(var(--panel-rgb), .9); backdrop-filter: blur(8px); border-bottom: 1px solid rgba(var(--accent-rgb), .35); box-shadow: 0 0 22px rgba(var(--accent-rgb), calc(.12 * var(--glow))); }
+.brand { font-family: var(--font-hero); text-transform: var(--case-ui); letter-spacing: .1em; font-size: 15px; text-shadow: 0 0 10px rgba(var(--accent-rgb), calc(.5 * var(--glow))); }
+.brand-mark { background: var(--magenta); color: var(--on-accent); border-radius: var(--r-sm); clip-path: var(--notch-sm); box-shadow: 0 0 12px var(--magenta); }
+nav a { text-transform: var(--case-ui); letter-spacing: .06em; font-weight: 600; font-size: 13px; padding-left: 8px; padding-right: 8px; }
 .brand-text { display: none; }
 @media (max-width: 1100px) { nav a { padding-left: 5px; padding-right: 5px; font-size: 12px; letter-spacing: .03em; } .bar { gap: 10px; } }
 nav a:hover { color: var(--accent); }
-nav a[aria-current="page"] { color: var(--accent); border-bottom-color: var(--accent); text-shadow: 0 0 10px rgba(var(--accent-rgb), .7); }
+nav a[aria-current="page"] { color: var(--accent); border-bottom-color: var(--accent); text-shadow: 0 0 10px rgba(var(--accent-rgb), calc(.7 * var(--glow))); }
 
 .card, .kpi, .drop {
   background: linear-gradient(180deg, var(--head-top), var(--head-bottom));
-  border: 1px solid var(--line); border-radius: 0; clip-path: var(--notch); position: relative;
+  border: 1px solid var(--line); border-radius: var(--r-card); clip-path: var(--notch); position: relative;
 }
-.card::after, .kpi::after { content: ""; position: absolute; left: 0; top: 0; width: 18px; height: 18px; border-top: 2px solid var(--accent); border-left: 2px solid var(--accent); opacity: .8; pointer-events: none; }
-.card h2, .kpi .label { font-family: var(--font-display); font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.card::after, .kpi::after { content: ""; position: absolute; left: 0; top: 0; width: 18px; height: 18px; border-top: 2px solid var(--accent); border-left: 2px solid var(--accent); opacity: var(--corner); pointer-events: none; }
+.card h2, .kpi .label { font-family: var(--font-display); font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: var(--case-ui); color: var(--accent); }
 .kpi .label { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kpi::before { width: 3px; box-shadow: 0 0 12px var(--k, transparent); }
-.kpi .value, .loan-big { font-family: var(--font-display); font-weight: 700; letter-spacing: .02em; text-shadow: 0 0 12px rgba(var(--ink-rgb), .18); }
-.kpi .value .pos, .loan-big.pos, .value .pos { text-shadow: 0 0 14px rgba(var(--pos-rgb), .55); }
-td.amount.pos, .amount.pos, b.pos, .num.pos { text-shadow: 0 0 8px rgba(var(--pos-rgb), .55); }
-td.amount.neg, .amount.neg, b.neg, .num.neg { text-shadow: 0 0 8px rgba(var(--neg-rgb), .55); }
-.kpi .value .neg { text-shadow: 0 0 14px rgba(var(--neg-rgb), .55); }
+.kpi .value, .loan-big { font-family: var(--font-display); font-weight: 700; letter-spacing: .02em; text-shadow: 0 0 12px rgba(var(--ink-rgb), calc(.18 * var(--glow))); }
+.kpi .value .pos, .loan-big.pos, .value .pos { text-shadow: 0 0 14px rgba(var(--pos-rgb), calc(.55 * var(--glow))); }
+td.amount.pos, .amount.pos, b.pos, .num.pos { text-shadow: 0 0 8px rgba(var(--pos-rgb), calc(.55 * var(--glow))); }
+td.amount.neg, .amount.neg, b.neg, .num.neg { text-shadow: 0 0 8px rgba(var(--neg-rgb), calc(.55 * var(--glow))); }
+.kpi .value .neg { text-shadow: 0 0 14px rgba(var(--neg-rgb), calc(.55 * var(--glow))); }
 .gold { color: var(--gold); }
-.kpi .value .gold { text-shadow: 0 0 10px rgba(var(--gold-rgb), .75), 0 0 26px rgba(var(--amber-rgb), .35); }
-.section-title h2 { font-family: var(--font-display); color: var(--magenta); text-shadow: 0 0 12px rgba(var(--magenta-rgb), .5); font-size: 16px; }
+.kpi .value .gold { text-shadow: 0 0 10px rgba(var(--gold-rgb), calc(.75 * var(--glow))), 0 0 26px rgba(var(--amber-rgb), calc(.35 * var(--glow))); }
+.section-title h2 { font-family: var(--font-display); color: var(--magenta); text-shadow: 0 0 12px rgba(var(--magenta-rgb), calc(.5 * var(--glow))); font-size: 16px; }
 
-.btn { border-radius: 0; clip-path: var(--notch-sm); text-transform: uppercase; letter-spacing: .07em; font-weight: 600; font-size: 13px; border-color: rgba(var(--accent-rgb), .45); background: rgba(var(--accent-rgb), .06); }
-.btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(var(--accent-rgb), .12); box-shadow: inset 0 0 12px rgba(var(--accent-rgb), .25); }
-.btn.primary { background: var(--magenta); border-color: var(--magenta); color: var(--on-accent); box-shadow: 0 0 16px rgba(var(--magenta-rgb), .45); }
+.btn { border-radius: var(--r-btn); clip-path: var(--notch-sm); text-transform: var(--case-ui); letter-spacing: .07em; font-weight: 600; font-size: 13px; border-color: rgba(var(--accent-rgb), .45); background: rgba(var(--accent-rgb), .06); }
+.btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(var(--accent-rgb), .12); box-shadow: inset 0 0 12px rgba(var(--accent-rgb), calc(.25 * var(--glow))); }
+.btn.primary { background: var(--magenta); border-color: var(--magenta); color: var(--on-accent); box-shadow: 0 0 16px rgba(var(--magenta-rgb), calc(.45 * var(--glow))); }
 .btn.primary:hover { filter: brightness(1.12); color: var(--on-accent); background: var(--magenta); }
 .btn.ghost { background: transparent; border-color: transparent; }
 .btn.small { font-size: 12px; }
 .btn[disabled] { opacity: .5; cursor: default; }
 
-.input, select.cat, input.cell, .month, .seg { border-radius: 0; }
+.input, select.cat, input.cell, .month, .seg { border-radius: var(--r-field); }
 .input, .month, .seg, .seg button { background: var(--field); border-color: var(--line); }
-.input:focus, select.cat:focus, input.cell:focus { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 0 12px rgba(var(--accent-rgb), .3); outline: none; }
+.input:focus, select.cat:focus, input.cell:focus { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 0 12px rgba(var(--accent-rgb), calc(.3 * var(--glow))); outline: none; }
 select option, select optgroup { background: var(--surface); color: var(--ink); }
-.seg button[aria-pressed="true"] { background: rgba(var(--accent-rgb), .14); color: var(--accent); text-shadow: 0 0 8px rgba(var(--accent-rgb), .6); }
-.seg button, .month span { text-transform: uppercase; letter-spacing: .06em; }
-input[type="date"] { color-scheme: dark; }
+.seg button[aria-pressed="true"] { background: rgba(var(--accent-rgb), .14); color: var(--accent); text-shadow: 0 0 8px rgba(var(--accent-rgb), calc(.6 * var(--glow))); }
+.seg button, .month span { text-transform: var(--case-ui); letter-spacing: .06em; }
+input[type="date"] { color-scheme: inherit; }
 input[type="checkbox"] { accent-color: var(--magenta); }
 
-th { font-family: var(--font-display); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); border-bottom-color: rgba(var(--accent-rgb), .3); }
+th { font-family: var(--font-display); font-size: 10.5px; letter-spacing: .12em; text-transform: var(--case-ui); color: var(--muted); border-bottom-color: rgba(var(--accent-rgb), .3); }
 tbody tr:hover td { background: rgba(var(--accent-rgb), .05); }
-.chip { border-radius: 0; border: 1px solid currentColor; background: transparent; text-transform: uppercase; letter-spacing: .05em; font-size: 11px; }
+.chip { border-radius: var(--r-pill); border: 1px solid currentColor; background: transparent; text-transform: var(--case-ui); letter-spacing: .05em; font-size: 11px; }
 .chip.warn { background: var(--warn-soft); } .chip.pos { background: var(--pos-soft); } .chip.neg { background: var(--neg-soft); }
-.type-pill { border-radius: 0; border: 1px solid currentColor; text-transform: uppercase; letter-spacing: .05em; }
+.type-pill { border-radius: var(--r-pill); border: 1px solid currentColor; text-transform: var(--case-ui); letter-spacing: .05em; }
 
-.track, .gauge, .debt-bar { border-radius: 0; }
-.fill { border-radius: 0; box-shadow: 0 0 10px rgba(var(--accent-rgb), .55); }
-.fill.over { box-shadow: 0 0 10px rgba(var(--neg-rgb), .7); }
-.goal .fill { box-shadow: 0 0 10px rgba(var(--pos-rgb), .55); }
-.gauge span, .debt-bar .owed { border-radius: 0; box-shadow: 0 0 10px rgba(var(--neg-rgb), .6); }
-.debt-bar .free { box-shadow: 0 0 10px rgba(var(--pos-rgb), .45); opacity: .9; }
+.track, .gauge, .debt-bar { border-radius: var(--r-bar); }
+.fill { border-radius: var(--r-bar); box-shadow: 0 0 10px rgba(var(--accent-rgb), calc(.55 * var(--glow))); }
+.fill.over { box-shadow: 0 0 10px rgba(var(--neg-rgb), calc(.7 * var(--glow))); }
+.goal .fill { box-shadow: 0 0 10px rgba(var(--pos-rgb), calc(.55 * var(--glow))); }
+.gauge span, .debt-bar .owed { border-radius: var(--r-bar); box-shadow: 0 0 10px rgba(var(--neg-rgb), calc(.6 * var(--glow))); }
+.debt-bar .free { box-shadow: 0 0 10px rgba(var(--pos-rgb), calc(.45 * var(--glow))); opacity: .9; }
 .budget-tick { background: var(--magenta); box-shadow: 0 0 6px var(--magenta); }
 .legend i.tick { background: var(--magenta); }
 .chart text, .trend text { font-family: var(--font-mono); }
-.chart path[fill^="var"], .trend path[fill^="var"] { filter: drop-shadow(0 0 4px rgba(var(--accent-rgb), .25)); }
+.chart path[fill^="var"], .trend path[fill^="var"] { filter: drop-shadow(0 0 4px rgba(var(--accent-rgb), calc(.25 * var(--glow)))); }
 .chart path[stroke^="var"] { filter: drop-shadow(0 0 5px currentColor); }
 
-.notice { border-radius: 0; border-left: 3px solid currentColor; }
-.tooltip { background: rgba(var(--shade-rgb), .96); color: var(--ink); border: 1px solid var(--accent); border-radius: 0; box-shadow: 0 0 18px rgba(var(--accent-rgb), .35); font-family: var(--font-body); font-size: 13.5px; }
-.toast { background: rgba(var(--panel-rgb), .96); color: var(--accent); border: 1px solid var(--accent); border-radius: 0; box-shadow: 0 0 20px rgba(var(--accent-rgb), .4); text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
-.menu-list { background: var(--panel); border-color: var(--accent); border-radius: 0; box-shadow: 0 0 20px rgba(var(--accent-rgb), .25); }
-.menu-list button { border-radius: 0; }
+.notice { border-radius: var(--r-card); border-left: 3px solid currentColor; }
+.tooltip { background: rgba(var(--shade-rgb), .96); color: var(--ink); border: 1px solid var(--accent); border-radius: var(--r-card); box-shadow: 0 0 18px rgba(var(--accent-rgb), calc(.35 * var(--glow))); font-family: var(--font-body); font-size: 13.5px; }
+.toast { background: rgba(var(--panel-rgb), .96); color: var(--accent); border: 1px solid var(--accent); border-radius: var(--r-card); box-shadow: 0 0 20px rgba(var(--accent-rgb), calc(.4 * var(--glow))); text-transform: var(--case-ui); letter-spacing: .05em; font-weight: 600; }
+.menu-list { background: var(--panel); border-color: var(--accent); border-radius: var(--r-card); box-shadow: 0 0 20px rgba(var(--accent-rgb), calc(.25 * var(--glow))); }
+.menu-list button { border-radius: var(--r-sm); }
 .menu-list button:hover { background: rgba(var(--accent-rgb), .1); color: var(--accent); }
-dialog { background: var(--panel); border: 1px solid var(--accent); border-radius: 0; clip-path: var(--notch); box-shadow: 0 0 40px rgba(var(--accent-rgb), .25); }
+dialog { background: var(--panel); border: 1px solid var(--accent); border-radius: var(--r-card); clip-path: var(--notch); box-shadow: 0 0 40px rgba(var(--accent-rgb), calc(.25 * var(--glow))); }
 dialog h3 { font-family: var(--font-display); color: var(--accent); }
 dialog::backdrop { background: rgba(var(--shade-rgb), .8); }
-dialog textarea { border-radius: 0; background: var(--bg); }
+dialog textarea { border-radius: var(--r-field); background: var(--bg); }
 .drop { border: 1px dashed var(--accent); }
 .drop.over { background: rgba(var(--accent-rgb), .08); }
-body.dragging::after { border-radius: 0; background: rgba(var(--panel-rgb), .9); color: var(--accent); font-family: var(--font-display); text-transform: uppercase; letter-spacing: .1em; text-shadow: 0 0 14px var(--accent); }
+body.dragging::after { border-radius: var(--r-card); background: rgba(var(--panel-rgb), .9); color: var(--accent); font-family: var(--font-display); text-transform: var(--case-ui); letter-spacing: .1em; text-shadow: 0 0 14px var(--accent); }
 
 .heat td.cell.cur { box-shadow: inset 0 -2px 0 var(--magenta); }
-.foot { font-family: var(--font-mono); text-transform: uppercase; letter-spacing: .08em; font-size: 11px; }
+.foot { font-family: var(--font-mono); text-transform: var(--case-ui); letter-spacing: .08em; font-size: 11px; }
 a.hint, .legend a { color: var(--accent); }
 @media (prefers-reduced-motion: reduce) { body::before { display: none; } }
 </style>
@@ -1091,7 +1096,7 @@ a.hint, .legend a { color: var(--accent); }
     if (d.soon.length) h += `<section class="card"><div class="card-head"><h2>Binnenkort</h2></div><div class="soon-list">${d.soon.map(x => { const late = x.d < todayS(); return `<div class="row-i" style="grid-template-columns:62px 1fr auto"><span class="num dt ${late ? "neg" : x.d <= addD(todayS(), 3) ? "gold" : "muted"}" style="font-size:12.5px">${late ? "te laat" : x.d === todayS() ? "vandaag" : fmtDate(x.d).slice(0, 5)}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.t)}${x.auto ? ' <span class="muted" style="font-size:11px">verwacht</span>' : ""}</span><span class="num ${x.k > 0 ? "pos" : "neg"}">${x.a ? (x.k > 0 ? "+" : "−") + eur0(x.a) : ""}</span></div>`; }).join("")}</div></section>`;
     if (d.fc) { const pts = d.fc.pts, W = 340, H = 80, mx = Math.max(...pts, d.fc.warn), mn = Math.min(...pts, d.fc.warn, 0), x = i => i / (pts.length - 1) * W, y = v => 4 + (mx - v) / ((mx - mn) || 1) * (H - 8);
       let p = `M0,${y(pts[0])}`; pts.forEach((v, i) => { if (i) p += `H${x(i).toFixed(1)}V${y(v).toFixed(1)}`; });
-      h += `<section class="card"><div class="card-head"><h2>Saldoverwachting</h2><span class="hint">45 dagen</span></div><div class="pl-sum" style="margin:0 0 6px"><span>Laagste <b class="num ${d.fc.low < d.fc.warn ? "neg" : ""}">${eur0(d.fc.low)}</b> op ${fmtDate(d.fc.lowD).slice(0, 5)}</span></div><svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;overflow:visible"><line x1="0" x2="${W}" y1="${y(d.fc.warn)}" y2="${y(d.fc.warn)}" stroke="var(--neg)" stroke-dasharray="4 4" opacity=".7"/><path d="${p}" fill="none" stroke="var(--accent)" stroke-width="2" style="filter:drop-shadow(0 0 4px rgba(var(--accent-rgb), .8))"/></svg></section>`; }
+      h += `<section class="card"><div class="card-head"><h2>Saldoverwachting</h2><span class="hint">45 dagen</span></div><div class="pl-sum" style="margin:0 0 6px"><span>Laagste <b class="num ${d.fc.low < d.fc.warn ? "neg" : ""}">${eur0(d.fc.low)}</b> op ${fmtDate(d.fc.lowD).slice(0, 5)}</span></div><svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;overflow:visible"><line x1="0" x2="${W}" y1="${y(d.fc.warn)}" y2="${y(d.fc.warn)}" stroke="var(--neg)" stroke-dasharray="4 4" opacity=".7"/><path d="${p}" fill="none" stroke="var(--accent)" stroke-width="2" style="filter:drop-shadow(0 0 4px rgba(var(--accent-rgb), calc(.8 * var(--glow))))"/></svg></section>`; }
     if (d.goals.length) h += `<section class="card"><div class="card-head"><h2>Spaardoelen</h2>${d.sav.bal !== null ? `<span class="hint">Spaar <b class="gold num">${eur0(d.sav.bal)}</b></span>` : ""}</div>${d.goals.map(g => `<div class="lite-goal"><div class="gw-top"><span class="gw-name"><i style="background:${SERIES[g.c % SERIES.length]}"></i>${esc(g.n)}</span><b class="gold num">${eurS(g.tot)}${g.tg ? `<span class="muted" style="font-weight:400"> / ${eur0(g.tg)}</span>` : ""}</b></div><div class="gw-bar"><span style="width:${((g.pct || 0) * 100).toFixed(1)}%"></span></div></div>`).join("")}</section>`;
     if (d.cats.length) { const mx = Math.max(1, ...d.cats.map(c => Math.max(c.s, c.b))); h += `<section class="card"><div class="card-head"><h2>Uitgaven per categorie</h2></div><div class="cats">${d.cats.map(c => `<div class="cat-row" style="grid-template-columns:110px 1fr 74px"><span class="name">${esc(c.n)}</span><span class="track"><span class="fill${c.b && c.s > c.b ? " over" : ""}" style="width:${(c.s / mx * 100).toFixed(1)}%"></span>${c.b ? `<span class="budget-tick" style="left:calc(${(c.b / mx * 100).toFixed(1)}% - 1px)"></span>` : ""}</span><span class="amt num">${eur0(c.s)}</span></div>`).join("")}</div></section>`; }
     h += `<section class="card"><div class="card-head"><h2>Vermogen</h2></div><div class="gw-amt num" style="margin:0;color:${d.nw.tot >= 0 ? "var(--pos)" : "var(--neg)"};text-shadow:0 0 12px currentColor">${d.nw.tot < 0 ? "−" : ""}${eur0(Math.abs(d.nw.tot))}</div><div class="pl-sum" style="margin-top:6px"><span>Rekening <b class="num">${eur0(d.nw.z)}</b></span><span>Spaar <b class="gold num">${eur0(d.nw.s)}</b></span><span>Schulden <b class="neg num">−${eur0(d.nw.l + d.nw.c)}</b></span></div>
@@ -1234,7 +1239,7 @@ a.hint, .legend a { color: var(--accent); }
     for (let v = bot; v <= top + 1e-9; v += step) g += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${Math.abs(v) >= 1000 ? (v / 1000).toLocaleString("nl-BE") + "k" : v}</text>`;
     g += `<line x1="${L}" x2="${W - R}" y1="${y(warn)}" y2="${y(warn)}" stroke="var(--neg)" stroke-dasharray="4 4" opacity=".8"/><text x="${W - R}" y="${y(warn) - 4}" text-anchor="end" style="fill:var(--neg)">grens ${eur0(warn)}</text>`;
     let d = `M${x(0)},${y(f.pts[0].value)}`; f.pts.forEach((p, i) => { if (i) d += `H${x(i).toFixed(1)}V${y(p.value).toFixed(1)}`; });
-    g += `<path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2" style="filter:drop-shadow(0 0 5px rgba(var(--accent-rgb), .8))"/>`;
+    g += `<path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2" style="filter:drop-shadow(0 0 5px rgba(var(--accent-rgb), calc(.8 * var(--glow))))"/>`;
     const li = f.pts.indexOf(f.low);
     g += `<circle cx="${x(li)}" cy="${y(f.low.value)}" r="4.5" fill="${f.low.value < warn ? "var(--neg)" : "var(--gold)"}" stroke="var(--bg)" stroke-width="1.5"/>`;
     f.pts.forEach((p, i) => { if (p.items.length) g += `<circle cx="${x(i)}" cy="${y(p.value)}" r="2.5" fill="var(--accent)"/>`; g += `<rect x="${x(i) - iw / f.pts.length / 2}" y="${T}" width="${iw / f.pts.length}" height="${ih}" fill="transparent" data-tip="${esc(`<b>${fmtDate(p.date)}</b><br>Verwacht saldo: ${eur(p.value)}${p.items.map(it => `<br>${it.plan.kind === "inkomst" ? "+" : "−"}${eur(it.plan.amount || 0)} ${esc(it.plan.title)}`).join("")}`)}"/>`; });
@@ -1296,7 +1301,7 @@ a.hint, .legend a { color: var(--accent); }
       const W = 240, H = 44, X = k => k / (months.length - 1) * W, Y = v => H - (v - mn) / (mx - mn) * (H - 4) - 2;
       const line = vals.map((v, k) => (k ? "L" : "M") + X(k).toFixed(1) + "," + Y(v).toFixed(1)).join("");
       const tipPts = vals.map((v, k) => `<rect x="${(X(k) - W / 24).toFixed(1)}" y="0" width="${(W / 12).toFixed(1)}" height="${H}" fill="transparent" data-tip="${esc(`<b>${esc(g.name)}</b> · ${esc(monthName(months[k]))}<br>${eur(v)}`)}"/>`).join("");
-      const spark = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">${showT ? `<line x1="0" x2="${W}" y1="${Y(p.target)}" y2="${Y(p.target)}" stroke="var(--magenta)" stroke-dasharray="3 3" opacity=".6"/>` : ""}<path d="${line}L${W},${H}L0,${H}Z" fill="rgba(var(--gold-rgb), .10)"/><path d="${line}" fill="none" stroke="var(--gold)" stroke-width="1.6" vector-effect="non-scaling-stroke" style="filter:drop-shadow(0 0 3px rgba(var(--gold-rgb), .8))"/><circle cx="${X(11)}" cy="${Y(vals[11])}" r="2.6" fill="var(--gold)"/>${tipPts}</svg>`;
+      const spark = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">${showT ? `<line x1="0" x2="${W}" y1="${Y(p.target)}" y2="${Y(p.target)}" stroke="var(--magenta)" stroke-dasharray="3 3" opacity=".6"/>` : ""}<path d="${line}L${W},${H}L0,${H}Z" fill="rgba(var(--gold-rgb), .10)"/><path d="${line}" fill="none" stroke="var(--gold)" stroke-width="1.6" vector-effect="non-scaling-stroke" style="filter:drop-shadow(0 0 3px rgba(var(--gold-rgb), calc(.8 * var(--glow))))"/><circle cx="${X(11)}" cy="${Y(vals[11])}" r="2.6" fill="var(--gold)"/>${tipPts}</svg>`;
       const pct = p.pct !== null ? Math.round(p.pct * 100) : null;
       return `<div class="gw" data-act="goto-spaar" style="cursor:pointer">
         <div class="gw-top"><span class="gw-name"><i style="background:${col}"></i>${esc(g.name)}</span><span class="gw-ref">${esc(g.ref || "")}</span></div>
@@ -1821,7 +1826,7 @@ a.hint, .legend a { color: var(--accent); }
     let d = `M${x(pts[0].date).toFixed(1)},${y(pts[0].value).toFixed(1)}`;
     for (let k = 1; k < pts.length; k++) d += `H${x(pts[k].date).toFixed(1)}V${y(pts[k].value).toFixed(1)}`;
     d += `H${(L + iw).toFixed(1)}`;
-    g += `<path d="${d}V${y(Math.max(0, bot))}H${x(pts[0].date)}Z" fill="rgba(var(--gold-rgb), .08)"/><path d="${d}" fill="none" stroke="var(--gold)" stroke-width="2" style="filter:drop-shadow(0 0 5px rgba(var(--gold-rgb), .7))"/>`;
+    g += `<path d="${d}V${y(Math.max(0, bot))}H${x(pts[0].date)}Z" fill="rgba(var(--gold-rgb), .08)"/><path d="${d}" fill="none" stroke="var(--gold)" stroke-width="2" style="filter:drop-shadow(0 0 5px rgba(var(--gold-rgb), calc(.7 * var(--glow))))"/>`;
     const span = (t1 - t0) / 864e5, years = [...new Set(pts.map(p => p.date.slice(0, 4)))];
     const lab = span > 540 ? years.map(yy => yy + "-01-01").filter(dd => new Date(dd).getTime() >= t0) : [];
     lab.forEach(dd => g += `<text x="${x(dd)}" y="${H - 6}" text-anchor="middle">${dd.slice(0, 4)}</text>`);
@@ -2404,7 +2409,7 @@ a.hint, .legend a { color: var(--accent); }
     const x = i => L + i / (n - 1 || 1) * iw, y = v => T + (top - v) / top * ih;
     let g = ""; for (let v = 0; v <= top + 1e-9; v += step) g += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end">${v >= 1000 ? (v / 1000).toLocaleString("nl-BE") + "k" : v}</text>`;
     const path = c => c.map((v, i) => (i ? "L" : "M") + x(i).toFixed(1) + "," + y(v).toFixed(1)).join("");
-    g += `<path d="${path(base.curve)}" fill="none" stroke="var(--muted)" stroke-width="2" stroke-dasharray="5 4"/><path d="${path(snow.curve)}" fill="none" stroke="var(--gold)" stroke-width="2" style="filter:drop-shadow(0 0 4px rgba(var(--gold-rgb), .7))"/><path d="${path(aval.curve)}" fill="none" stroke="var(--accent)" stroke-width="2" style="filter:drop-shadow(0 0 4px rgba(var(--accent-rgb), .8))"/>`;
+    g += `<path d="${path(base.curve)}" fill="none" stroke="var(--muted)" stroke-width="2" stroke-dasharray="5 4"/><path d="${path(snow.curve)}" fill="none" stroke="var(--gold)" stroke-width="2" style="filter:drop-shadow(0 0 4px rgba(var(--gold-rgb), calc(.7 * var(--glow))))"/><path d="${path(aval.curve)}" fill="none" stroke="var(--accent)" stroke-width="2" style="filter:drop-shadow(0 0 4px rgba(var(--accent-rgb), calc(.8 * var(--glow))))"/>`;
     for (let yr = 1; yr * 12 < n; yr++) g += `<text x="${x(yr * 12)}" y="${H - 6}" text-anchor="middle">+${yr} jaar</text>`;
     for (let i = 0; i < n; i += Math.max(1, Math.round(n / 60))) g += `<rect x="${x(i) - iw / n}" y="${T}" width="${2 * iw / n}" height="${ih}" fill="transparent" data-tip="${esc(`<b style="text-transform:capitalize">${esc(when(i))}</b><br>Zoals nu: ${eur0(base.curve[i] ?? 0)}<br>Lawine: ${eur0(aval.curve[i] ?? 0)}<br>Sneeuwbal: ${eur0(snow.curve[i] ?? 0)}`)}"/>`;
     const row = (lab, r, col) => `<tr><td><span style="display:inline-block;width:10px;height:3px;background:${col};vertical-align:middle;margin-right:8px"></span>${lab}</td><td class="num" style="text-transform:capitalize">${r.never ? "—" : esc(when(r.months))}</td><td class="r num">${r.never ? "—" : r.months + " mnd"}</td><td class="r num neg">${eur(r.interest)}</td><td class="r num ${r === base ? "muted" : "pos"}">${r === base ? "—" : (base.months - r.months > 0 ? (base.months - r.months) + " mnd sneller · " : "") + eur(Math.max(0, base.interest - r.interest)) + " minder rente"}</td></tr>`;
