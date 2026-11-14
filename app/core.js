@@ -115,29 +115,57 @@ function learnedMap(state) {
 }
 
 /* Parseert een ING-CSV. Geeft {rows, error}. */
+/* Parseert een bank-CSV van ING of Belfius (stap 8f). Geeft {rows, error, bank}.
+   ING: kolomtitels op de eerste regel. Belfius: eerst enkele uitlegregels, dan de kolomtitels.
+   De titelregel wordt gezocht: de eerste regel met "Boekingsdatum" én "Bedrag". */
 function parseBankCsv(text) {
   const lines = text.replace(/\r\n?/g, "\n").split("\n").filter(l => l.trim() !== "");
-  if (lines.length < 2) return { rows: [], error: "Het bestand bevat geen transacties." };
-  const sep = (lines[0].match(/;/g) || []).length >= (lines[0].match(/,/g) || []).length ? ";" : ",";
-  const head = splitCsvLine(lines[0], sep).map(h => h.toLowerCase());
-  const col = n => head.indexOf(n.toLowerCase());
-  const c = {
+  if (lines.length < 2) return { rows: [], error: "Het bestand bevat geen transacties.", bank: null };
+  let hi = lines.findIndex((l, n) => n < 30 && /boekingsdatum/i.test(l) && /bedrag/i.test(l));
+  if (hi < 0) hi = 0;
+  const hl = lines[hi], sep = (hl.match(/;/g) || []).length >= (hl.match(/,/g) || []).length ? ";" : ",";
+  const head = splitCsvLine(hl, sep).map(h => h.toLowerCase().replace(/^﻿/, "").trim());
+  const col = (...names) => { for (const n of names) { const k = head.indexOf(n.toLowerCase()); if (k >= 0) return k; } return -1; };
+  const belfius = col("Naam tegenpartij bevat") >= 0 || col("Rekeninguittrekselnummer", "Afschriftnummer") >= 0 || (col("Rekening") >= 0 && col("Transactie") >= 0 && col("Mededelingen") >= 0);
+  const c = belfius ? {
+    acc: col("Rekening"), stmt: col("Rekeninguittrekselnummer", "Afschriftnummer", "Uittrekselnummer"), txn: col("Transactienummer"),
+    date: col("Boekingsdatum"), amount: col("Bedrag"), cp: col("Rekening tegenpartij"), name: col("Naam tegenpartij bevat", "Naam tegenpartij"),
+    tx: col("Transactie", "Omschrijving"), msg: col("Mededelingen", "Mededeling"),
+  } : {
     acc: col("Rekeningnummer"), omzet: col("Omzetnummer"), date: col("Boekingsdatum"), amount: col("Bedrag"),
     desc: col("Omschrijving"), cp: col("Rekening tegenpartij"), detail: col("Detail van de omzet"), msg: col("Bericht"),
   };
-  if (c.date < 0 || c.amount < 0 || c.desc < 0)
-    return { rows: [], error: "Dit lijkt geen ING-export: de kolommen Boekingsdatum, Bedrag en Omschrijving ontbreken." };
+  if (c.date < 0 || c.amount < 0 || (belfius ? c.tx < 0 && c.name < 0 : c.desc < 0))
+    return { rows: [], error: "Dit lijkt geen export van ING of Belfius: de kolommen Boekingsdatum, Bedrag en Omschrijving (of Transactie) ontbreken.", bank: null };
   const rows = [];
-  for (let i = 1; i < lines.length; i++) {
+  for (let i = hi + 1; i < lines.length; i++) {
     const v = splitCsvLine(lines[i], sep); const g = k => (c[k] >= 0 ? v[c[k]] || "" : "");
     const date = parseDate(g("date")), amount = parseAmount(g("amount"));
     if (!date || amount === null) continue;
-    rows.push({
-      date, amount, account: g("acc"), omzet: g("omzet"), counterparty: g("cp"),
-      raw: g("desc").slice(0, 600), search: [g("desc"), g("detail"), g("msg"), g("cp")].join(" "),
-    });
+    if (belfius) {
+      const stmt = g("stmt").trim(), txn = g("txn").trim();
+      rows.push({ date, amount, account: g("acc"), omzet: stmt || txn ? `B${stmt}-${txn}` : "", counterparty: g("cp"),
+        raw: [g("tx"), g("msg")].filter(Boolean).join(" · ").slice(0, 600), desc: belfiusDesc(g("name"), g("tx"), g("msg"), amount),
+        search: [g("name"), g("tx"), g("msg"), g("cp")].join(" ") });
+    } else {
+      rows.push({ date, amount, account: g("acc"), omzet: g("omzet"), counterparty: g("cp"),
+        raw: g("desc").slice(0, 600), search: [g("desc"), g("detail"), g("msg"), g("cp")].join(" ") });
+    }
   }
-  return { rows, error: null };
+  return { rows, error: null, bank: belfius ? "Belfius" : "ING" };
+}
+/* Leesbare omschrijving voor Belfius, in dezelfde stijl als bij ING: "Van/Naar naam · mededeling" of de winkelnaam. */
+function belfiusDesc(name, tx, msg, amount) {
+  name = (name || "").trim(); msg = (msg || "").replace(/\s+/g, " ").trim(); tx = (tx || "").replace(/\s+/g, " ").trim();
+  if (name) return ((/overschrijving|storting|instantoverschrijving/i.test(tx) || !/betaling|aankoop|bancontact|maestro|domicili/i.test(tx)) ? (amount < 0 ? "Naar " : "Van ") : "") + name + (msg && msg.length < 60 ? " · " + msg : "");
+  if (/betaling|aankoop|debetkaart|bancontact|maestro/i.test(tx)) {
+    // Winkelnaam uit kaartbetalingen: vaste woorden, kaartnummer, datum en uur wegfilteren, stoppen bij de postcode.
+    const shop = tx.replace(/\b(betaling|aankoop|met|debetkaart|kredietkaart|kaart|bancontact|maestro|contactloos|nummer|nr|via|om|op|uur)\b/gi, " ")
+      .replace(/\b[\dX]{4}(\s+[\dX]{2,4}){1,3}\b/gi, " ").replace(/\b\d{1,2}[\/.-]\d{1,2}([\/.-]\d{2,4})?\b/g, " ")
+      .replace(/\b\d{1,2}[.:hu]\d{2}\b/gi, " ").replace(/^[\s\-:,]+/, "").replace(/^\s*-\s*/, "").split(/\s\d{4}\s|\s(BE|NL|FR|LU|DE)(\s|$)/)[0].replace(/\s+/g, " ").trim();
+    if (shop.length >= 2) return shop.slice(0, 60);
+  }
+  return tx.slice(0, 120) || msg.slice(0, 120);
 }
 
 /* Omzetnummers van ING beginnen elk jaar opnieuw: datum hoort bij de sleutel. */
@@ -151,7 +179,7 @@ function mergeRows(state, rows) {
   for (const r of rows) {
     const k = r.omzet ? `${r.account}|${r.omzet}|${r.date}` : null;
     if (k && seen.has(k)) { dup++; continue; }
-    const desc = cleanDescription(r.raw);
+    const desc = r.desc || cleanDescription(r.raw);
     const sav = isSavAcc(state, r.account);
     const rg = sav ? null : refGoal(state, { search: r.search, raw: r.raw, desc });
     let cat = sav ? SAV_CAT : rg && state.categories.some(x => x.name === rg) ? rg : categorize(r.search, state.rules);
@@ -932,4 +960,4 @@ function toCsv(state) {
   return "﻿" + lines.join("\r\n");
 }
 
-if (typeof module !== "undefined") module.exports = { catByName, parentOf, groupOf, mainCats, subsOf, savKeys, activeSav, setSav, withSav, goalSav, savGoals, savAll, syncSavConfs, cardMatch, applyCards, transferFlows, OWN_CAT, ownTransfer, applyOwnTransfers, ownConflicts, MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
+if (typeof module !== "undefined") module.exports = { belfiusDesc, catByName, parentOf, groupOf, mainCats, subsOf, savKeys, activeSav, setSav, withSav, goalSav, savGoals, savAll, syncSavConfs, cardMatch, applyCards, transferFlows, OWN_CAT, ownTransfer, applyOwnTransfers, ownConflicts, MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
