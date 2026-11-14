@@ -637,6 +637,25 @@ tbody tr:hover td { background: rgba(var(--accent-rgb), .05); }
 
 .notice { border-radius: var(--r-card); border-left: 3px solid currentColor; }
 .tooltip { background: rgba(var(--shade-rgb), .96); color: var(--ink); border: 1px solid var(--accent); border-radius: var(--r-card); box-shadow: 0 0 18px rgba(var(--accent-rgb), calc(.35 * var(--glow))); font-family: var(--font-body); font-size: 13.5px; }
+.help-search { padding-block: 14px; }
+.help-search .input { width: 100%; box-sizing: border-box; }
+.help-list { display: grid; gap: 8px; }
+.help-item[hidden] { display: none !important; }
+details.help-item { border: 1px solid var(--line); border-radius: var(--r-btn); padding: 0 14px; background: rgba(var(--accent-rgb), .03); }
+details.help-item[open] { border-color: rgba(var(--accent-rgb), .55); padding-bottom: 12px; }
+details.help-item summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 10px; padding: 11px 0; font-weight: 600; }
+details.help-item summary::-webkit-details-marker { display: none; }
+details.help-item summary::after { content: "+"; margin-left: auto; color: var(--accent); font-family: var(--font-mono); }
+details.help-item[open] summary::after { content: "−"; }
+.help-ic { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: var(--r-sm); background: rgba(var(--accent-rgb), .12); color: var(--accent); font-size: 14px; flex: none; }
+.help-steps { margin: 2px 0 10px; padding-left: 0; list-style: none; counter-reset: st; display: grid; gap: 8px; }
+.help-steps li { counter-increment: st; display: grid; grid-template-columns: 26px 1fr; gap: 10px; align-items: start; line-height: 1.45; }
+.help-steps li::before { content: counter(st); display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--accent); color: var(--accent); font: 600 12px var(--font-mono); margin-top: 1px; }
+.help-tabs { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px 22px; }
+.help-tab p { margin: 4px 0 0; color: var(--muted); font-size: 13.5px; line-height: 1.45; }
+.help-tab a { text-decoration: none; color: var(--accent); }
+.help-keys { display: flex; flex-wrap: wrap; gap: 8px 26px; font-size: 13.5px; }
+kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: var(--r-sm); font: 600 12px var(--font-mono); color: var(--ink); background: var(--field); text-align: center; }
 .toast-undo { margin-left: 10px; background: none; border: 1px solid currentColor; color: inherit; font: inherit; padding: 3px 9px; border-radius: var(--r-btn); cursor: pointer; text-transform: none; }
 .toast-undo:hover { background: rgba(var(--accent-rgb), .15); }
 .toast { background: rgba(var(--panel-rgb), .96); color: var(--accent); border: 1px solid var(--accent); border-radius: var(--r-card); box-shadow: 0 0 20px rgba(var(--accent-rgb), calc(.4 * var(--glow))); text-transform: var(--case-ui); letter-spacing: .05em; font-weight: 600; }
@@ -2283,6 +2302,7 @@ if (typeof module !== "undefined") module.exports = { belfiusDesc, catByName, pa
   const lite = { data: null, status: "", busy: false, news: null };
   function liteMode() {
     if (location.hash === "#mobiel") return true;
+    if (location.hash === "#help") return false;   // de helppagina altijd volledig tonen, ook op de gsm
     let pref = ""; try { pref = sessionStorage.getItem(KEY + ".full") || ""; } catch (e) {}
     return window.matchMedia && matchMedia("(max-width: 700px)").matches && pref !== "1";
   }
@@ -2343,7 +2363,7 @@ if (typeof module !== "undefined") module.exports = { belfiusDesc, catByName, pa
     h += `<section class="card"><div class="card-head"><h2>Laatste transacties</h2></div><div class="soon-list">${d.tx.map(x => `<div class="row-i" style="grid-template-columns:48px 1fr auto"><span class="num dt muted" style="font-size:12px">${fmtDate(x.d).slice(0, 5)}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.s)}<br><span class="muted" style="font-size:11.5px">${esc(x.c)}</span></span><span class="num ${x.a >= 0 ? "pos" : "neg"}">${signed(x.a)}</span></div>`).join("")}</div></section>`;
     return h + liteFoot();
   }
-  function liteFoot() { return `<p class="foot">Alleen bekijken · wijzigen doe je op je pc${lite.data && lite.data.src === "bestand" ? "<br>Bijwerken: ⟳ en kies budgetplanner-mobiel.txt in OneDrive" : ""}<br><button class="btn small ghost" data-act="lite-full" type="button">Volledige planner openen</button><br><button class="btn small ghost" data-act="theme-open" type="button">🎨 Thema</button>${isStandalone() ? "" : `<br><button class="btn small ghost" data-act="install" type="button">⤓ App installeren</button>`}</p>`; }
+  function liteFoot() { return `<p class="foot">Alleen bekijken · wijzigen doe je op je pc${lite.data && lite.data.src === "bestand" ? "<br>Bijwerken: ⟳ en kies budgetplanner-mobiel.txt in OneDrive" : ""}<br><button class="btn small ghost" data-act="lite-full" type="button">Volledige planner openen</button><br><button class="btn small ghost" data-act="theme-open" type="button">🎨 Thema</button> <button class="btn small ghost" data-act="help-open" type="button">? Help</button>${isStandalone() ? "" : `<br><button class="btn small ghost" data-act="install" type="button">⤓ App installeren</button>`}</p>`; }
 
   /* ---------- pincode ---------- */
   async function sha(t) { const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join(""); }
@@ -3855,7 +3875,110 @@ if (typeof module !== "undefined") module.exports = { belfiusDesc, catByName, pa
   }
 
   /* ---------- router & render ---------- */
-  const VIEWS = { overzicht: viewOverview, transacties: viewTransactions, budget: viewBudget, regels: viewRules, spaardoelen: viewGoals, spaar: viewSavings, planner: viewPlanner, leningen: viewLoans, profiel: viewProfile };
+  /* ---------- help (stap 10b) ----------
+     Alle uitleg op één plaats. Komt er een knop of scherm bij: hier (en later in de tutorialballonnen) mee bijwerken. */
+  const HELP_TOPICS = [
+    { id: "start", icon: "🚀", title: "De eerste keer starten", tab: "profiel", steps: [
+      "Download in je bankapp (Home'Bank of de ING-app, of Belfius Direct Net) je transacties als <b>CSV-bestand</b>.",
+      "Klik bovenaan op <b>↑ CSV importeren</b> en kies het bestand, of sleep het in het venster.",
+      "Nieuw rekeningnummer? Geef de rekening een naam en kies <b>zichtrekening</b> of <b>spaarrekening</b>.",
+      "Ga naar <b>Profiel</b> en vul bij elke zichtrekening het <b>startsaldo</b> in (zie hieronder).",
+      "Ga naar <b>Regels</b> → <b>🔍 Transacties analyseren</b> en vink de voorstellen aan die kloppen.",
+      "Zet in <b>Budget</b> een bedrag bij je categorieën. Klaar: het <b>Overzicht</b> vult zich." ] },
+    { id: "csv", icon: "↑", title: "Transacties importeren (CSV)", tab: "transacties", steps: [
+      "Download je transacties als CSV in je bankapp. De app herkent zelf of het ING of Belfius is.",
+      "Klik op <b>↑ CSV importeren</b> (bovenaan) en kies één of meer bestanden.",
+      "Overlappende bestanden zijn geen probleem: transacties die er al in staan, worden overgeslagen.",
+      "Het venster <b>Import klaar</b> toont hoeveel er nieuw zijn en hoeveel je nog moet categoriseren." ] },
+    { id: "saldo", icon: "€", title: "Startsaldo instellen", tab: "profiel", steps: [
+      "Ga naar <b>Profiel</b> → <b>Zichtrekeningen</b>.",
+      "Kies bij <b>Startsaldo op</b> een datum, bij voorkeur de dag vóór je oudste ingelezen transactie.",
+      "Vul het saldo van die dag in (zie je bankafschrift). De app rekent vanaf daar elke dag verder.",
+      "Klopt het saldo nu niet met je bank? Dan ontbreekt er meestal een CSV of staat de datum verkeerd." ] },
+    { id: "cat", icon: "🏷", title: "Transacties categoriseren", tab: "transacties", steps: [
+      "Op het <b>Overzicht</b> staat <b>Nog te categoriseren</b>, gegroepeerd per winkel of persoon. Eén keuze geldt voor de hele groep.",
+      "In <b>Transacties</b> kies je de categorie in de keuzelijst van elke regel. De app onthoudt je keuze voor dezelfde tegenpartij.",
+      "Wil je het vast laten verlopen: maak in <b>Regels</b> een regel (trefwoord → categorie).",
+      "Eén betaling over twee categorieën? Gebruik <b>⑂</b> (splitsen) in de transactielijst." ] },
+    { id: "budget", icon: "▦", title: "Budget instellen", tab: "budget", steps: [
+      "Ga naar <b>Budget</b>. Elke categorie heeft een <b>soort</b>: Inkomen, Vaste kosten, Variabele kosten, Sparen of Overboeking.",
+      "Vul per categorie een bedrag in, per maand of per jaar.",
+      "Vink <b>Meenemen</b> aan als wat je niet uitgeeft naar de volgende maand mag (bv. kleding).",
+      "Op het <b>Overzicht</b> toont de balk wat je uitgaf en de streep wat je mag uitgeven." ] },
+    { id: "deel", icon: "⑃", title: "Een deelbudget maken", tab: "budget", steps: [
+      "Ga naar <b>Budget</b> → <b>⑃ + Deelbudget</b>. Maak een nieuwe categorie of zet een bestaande om.",
+      "Geef het deelbudget een bedrag, bv. € 400 voor het gezamenlijke huishouden.",
+      "Voeg in het blad van het deelbudget subcategorieën toe met <b>+ Subcategorie</b> en verdeel het bedrag.",
+      "<b>Nog te verdelen</b> toont wat er overblijft. Uitgaven tellen in de subcategorie én in het deelbudget." ] },
+    { id: "spaar", icon: "◎", title: "Een spaardoel aanmaken", tab: "spaardoelen", steps: [
+      "Ga naar <b>Spaardoelen</b> → <b>+ Spaardoel</b>. Geef een naam, doelbedrag en eventueel een datum.",
+      "Elk doel krijgt een referentie <b>SP-…</b>. Zet die in de mededeling van je overschrijving naar je spaarrekening.",
+      "Na de volgende CSV-import komt de storting vanzelf bij het juiste doel.",
+      "In <b>Spaar</b> zie je alle bewegingen en kan je geld tussen doelen <b>⇄ verplaatsen</b>." ] },
+    { id: "plan", icon: "📅", title: "Betalingen plannen", tab: "planner", steps: [
+      "Ga naar <b>Planner</b> → <b>+ Planning</b>. Vul in wat het is, het bedrag, de datum en hoe vaak het terugkomt.",
+      "Kies de rekening waarvan het betaald wordt. Zo klopt de saldoverwachting per rekening.",
+      "Vaste betalingen die de app zelf herkent, zet je met <b>In planner</b> erbij.",
+      "Met <b>📅 Naar agenda</b> zet je de herinneringen in je agenda (Outlook, Google…)." ] },
+    { id: "onedrive", icon: "☁", title: "Automatische back-up naar OneDrive", tab: "profiel", steps: [
+      "Werkt op de pc in <b>Edge</b> of <b>Chrome</b>. Ga naar <b>Profiel</b> → <b>OneDrive-back-up</b>.",
+      "Kies één keer een map in je OneDrive-map, bv. <i>OneDrive\\Budgetplanner</i>.",
+      "De app schrijft daar een back-up en een gsm-samenvatting, na elke import en één keer per dag.",
+      "Na een herstart vraagt de browser soms opnieuw toestemming: klik dan op <b>Hervatten</b>.",
+      "Op de gsm: tik op <b>⟳</b> en kies <b>budgetplanner-mobiel.txt</b> uit OneDrive." ] },
+    { id: "backup", icon: "↓", title: "Back-up maken of naar een ander toestel", tab: "profiel", steps: [
+      "Ga naar <b>Profiel</b> → <b>Back-up exporteren</b>. Je krijgt één .json-bestand met al je gegevens.",
+      "Op het andere toestel (of na <b>Alles wissen</b>): <b>Profiel</b> → <b>Back-up terugzetten</b> en kies dat bestand.",
+      "De app toont eerst een samenvatting. Pas na je bevestiging worden de gegevens vervangen." ] },
+    { id: "install", icon: "⤓", title: "De app installeren", tab: "profiel", steps: [
+      "<b>Pc (Edge/Chrome):</b> klik op <b>⤓ Installeren</b> bovenaan, of op het installatie-icoon in de adresbalk.",
+      "<b>Android:</b> menu ⋮ → <b>App installeren</b> of <b>Toevoegen aan startscherm</b>.",
+      "<b>iPhone (Safari):</b> deelknop □↑ → <b>Zet op beginscherm</b>.",
+      "Je gegevens blijven op het toestel zelf; ze gaan nergens naartoe." ] },
+    { id: "undo", icon: "↶", title: "Iets per ongeluk gewist?", tab: "", steps: [
+      "Na elke wisactie verschijnt onderaan <b>↶ Ongedaan maken</b>. Klik erop en alles staat terug.",
+      "Te laat? Druk op <b>Ctrl+Z</b> (Mac: Cmd+Z), tot 20 stappen terug.",
+      "Dit werkt zolang de app open is. Daarna is je back-up het vangnet." ] },
+    { id: "thema", icon: "🎨", title: "Thema kiezen", tab: "profiel", steps: [
+      "Ga naar <b>Profiel</b> → <b>Thema</b>: Cyberpunk, Synthwave, Matrix of Oceaan, telkens donker of licht.",
+      "De keuze geldt per toestel: je gsm mag een ander thema hebben dan je pc." ] },
+    { id: "gsm", icon: "📱", title: "De gsm-weergave", tab: "", steps: [
+      "Op een smal scherm toont de app een <b>samenvatting</b>: saldo, budget, binnenkort te betalen en spaardoelen.",
+      "Het oogje 👁 verbergt de bedragen (handig op de bus).",
+      "<b>Volledige planner openen</b> (onderaan) geeft je alle tabbladen, ook op de gsm." ] },
+  ];
+  const HELP_TABS = [
+    ["overzicht", "Overzicht", "Je maand of jaar in één oogopslag: inkomsten, uitgaven, saldo per rekening, de grafieken (saldoverwachting, vermogen, per categorie, inkomen & uitgaven), uitgaven per categorie tegenover je budget en wat binnenkort betaald moet worden. Wissel bovenaan tussen <b>Maand</b> en <b>Jaar</b>."],
+    ["transacties", "Transacties", "Alle ingelezen bewegingen per maand. Zoeken, filteren op categorie, label of rekening, de categorie aanpassen, labels (#) geven, splitsen (⑂) of een transactie manueel toevoegen."],
+    ["budget", "Budget", "Je categorieën met hun soort en budget per maand of per jaar. Volgorde aanpassen met ▲▼, overschot <b>meenemen</b> naar de volgende maand en <b>deelbudgetten</b> maken."],
+    ["regels", "Regels", "Trefwoord → categorie: zo worden nieuwe transacties vanzelf ingedeeld. <b>🔍 Transacties analyseren</b> stelt regels voor. <b>Splitsregels</b> halen vast een stuk van een betaling naar een andere categorie."],
+    ["spaardoelen", "Spaardoelen", "Waarvoor je spaart, met doelbedrag, datum en een referentie SP-… voor je overschrijvingen."],
+    ["spaar", "Spaar", "De bewegingen op je spaarrekening(en): stortingen, opnames, rente en verplaatsingen tussen doelen. Hier stem je ook het saldo af met je bank."],
+    ["planner", "Planner", "Kalender met geplande betalingen en inkomsten, herinneringen en herkende vaste betalingen. Hieruit komt de saldoverwachting."],
+    ["leningen", "L&K", "Leningen en kredieten: openstaand saldo, afbetalingsplan en een simulator om te zien wat extra aflossen oplevert."],
+    ["profiel", "Profiel", "Je rekeningen (zicht, spaar, kredietkaarten) met naam, kleur en startsaldo, en alle instellingen: thema, pincode, OneDrive, back-up, Excel, installeren, help en alles wissen."],
+  ];
+  function viewHelp() {
+    const tabName = t => (HELP_TABS.find(x => x[0] === t) || [])[1] || "";
+    const plain = h => h.replace(/<[^>]+>/g, "").toLowerCase();
+    let h = `<div class="page-head"><div><h1>Help</h1><p>Uitleg en stappenplannen · open deze pagina altijd met <kbd>F1</kbd></p></div></div>
+      <section class="card help-search"><input class="input" id="help-q" type="search" placeholder="Zoek in de help, bv. startsaldo, OneDrive, splitsen…" aria-label="Zoeken in de help" autocomplete="off"><p class="muted" id="help-none" hidden style="margin:10px 0 0">Niets gevonden. Probeer een ander woord.</p></section>`;
+    h += `<section class="card"><div class="card-head"><h2>Stappenplannen</h2><span class="hint">Klik om open te klappen</span></div><div class="help-list">` + HELP_TOPICS.map(t =>
+      `<details class="help-item" id="help-${t.id}" data-q="${esc(plain(t.title + " " + t.steps.join(" ")))}"><summary><span class="help-ic">${t.icon}</span>${esc(t.title)}</summary>
+        <ol class="help-steps">${t.steps.map(x => `<li><span>${x}</span></li>`).join("")}</ol>${t.tab ? `<a class="hint" href="#${t.tab}">→ Naar ${esc(tabName(t.tab))}</a>` : ""}</details>`).join("") + `</div></section>`;
+    h += `<section class="card"><div class="card-head"><h2>De tabbladen</h2></div><div class="help-tabs">` + HELP_TABS.map(([k, n, x]) =>
+      `<div class="help-item help-tab" data-q="${esc(plain(n + " " + x))}"><a href="#${k}"><b>${esc(n)}</b></a><p>${x}</p></div>`).join("") + `</div></section>`;
+    h += `<section class="card help-item" data-q="sneltoetsen toetsen f1 ctrl z escape"><div class="card-head"><h2>Sneltoetsen (pc)</h2></div><div class="help-keys">
+      <span><kbd>F1</kbd> deze helppagina</span><span><kbd>Ctrl</kbd>+<kbd>Z</kbd> laatste wisactie ongedaan maken</span><span><kbd>Esc</kbd> venster of menu sluiten</span></div></section>`;
+    return h;
+  }
+  function helpFilter(q) {
+    q = q.trim().toLowerCase(); let any = false;
+    document.querySelectorAll("#main .help-item").forEach(el => { const hit = !q || q.split(/\s+/).every(w => el.dataset.q.includes(w)); el.hidden = !hit; if (hit) any = true; if (el.tagName === "DETAILS") el.open = !!q && hit; });
+    const none = $("#help-none"); if (none) none.hidden = any;
+  }
+
+  const VIEWS = { help: viewHelp, overzicht: viewOverview, transacties: viewTransactions, budget: viewBudget, regels: viewRules, spaardoelen: viewGoals, spaar: viewSavings, planner: viewPlanner, leningen: viewLoans, profiel: viewProfile };
   const route = () => { const r = location.hash.slice(1); return VIEWS[r] ? r : "overzicht"; };
   function render() {
     setSav(ui.sav);   // de spaarfuncties rekenen voor de spaarrekening die op het tabblad Spaar gekozen is
@@ -3867,7 +3990,7 @@ if (typeof module !== "undefined") module.exports = { belfiusDesc, catByName, pa
     document.querySelectorAll("#nav a").forEach(a => { if (a.getAttribute("href") === "#" + r) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
     if (focusId) { const el = document.getElementById(focusId); if (el) { el.focus(); try { el.setSelectionRange(selStart, selStart); } catch (e) {} } }
     renderSide(r);
-    const cur = document.querySelector(`#nav a[href="#${r}"]`); $("#nav-cur").textContent = cur ? cur.firstChild.textContent.trim() : r === "profiel" ? "Profiel" : ""; navOpen(false);
+    const cur = document.querySelector(`#nav a[href="#${r}"]`); $("#nav-cur").textContent = cur ? cur.firstChild.textContent.trim() : r === "profiel" ? "Profiel" : r === "help" ? "Help" : ""; navOpen(false);
     $("#btn-profile").classList.toggle("active", r === "profiel"); updateProfileLabel();
     afterRender(r + (r === "overzicht" ? ui.period : ""));
   }
@@ -3924,7 +4047,7 @@ if (typeof module !== "undefined") module.exports = { belfiusDesc, catByName, pa
     h += `</tbody></table></div><div style="margin-top:12px"><button class="btn" data-act="card-add" type="button">+ Kredietkaart toevoegen</button></div></section>`;
     const items = [["theme-open", "🎨", "Thema", "Cyberpunk, Synthwave, Matrix of Oceaan · donker of licht"], ["folder-open", "☁", "OneDrive-back-up", "Automatisch een kopie + gsm-samenvatting"],
       ["export-json", "↓", "Back-up exporteren", "Alles in één .json-bestand"], ["import-json", "↑", "Back-up terugzetten", "Een eerder geëxporteerd bestand laden"],
-      ["export-csv", "⊞", "Transacties naar Excel", ".csv met puntkomma, opent in Excel"], ["pin-open", "🔒", "Pincode", "De planner afschermen met een code"],
+      ["export-csv", "⊞", "Transacties naar Excel", ".csv met puntkomma, opent in Excel"], ["pin-open", "🔒", "Pincode", "De planner afschermen met een code"], ["help-open", "?", "Help", "Uitleg en stappenplannen · F1"],
       ...(isStandalone() ? [] : [["install", "⤓", "App installeren", "Als programma op je pc of gsm"]]), ["reset", "✕", "Alles wissen", "Verwijdert alle gegevens in deze browser", "danger"]];
     h += `<section class="card"><div class="card-head"><h2>Instellingen</h2></div><div class="pf-grid">${items.map(([act, ic, t, sub, cls]) => `<button type="button" class="pf-item${cls ? " " + cls : ""}" data-act="${act}"><b>${ic} ${t}</b><small>${sub}</small></button>`).join("")}</div></section>`;
     return h;
@@ -4100,6 +4223,7 @@ if (typeof module !== "undefined") module.exports = { belfiusDesc, catByName, pa
       case "pin-open": pinDialog(); break;
       case "install": installApp(); break;
       case "theme-open": themeDialog(); break;
+      case "help-open": location.hash = "help"; window.scrollTo(0, 0); break;
       case "acc-add": accAddDialog(el.dataset.type); break;
       case "card-add": cardAddDialog(); break;
       case "card-del": { const id = el.closest("tr").dataset.card, k = (state.cards || []).find(x => x.id === id);
@@ -4360,6 +4484,9 @@ if (typeof module !== "undefined") module.exports = { belfiusDesc, catByName, pa
     tip.style.left = x + "px"; tip.style.top = y + "px";
   });
   document.addEventListener("keydown", e => { if (e.key === "Escape") { hideTip(); navOpen(false); } });
+  // F1 = helppagina (de browser-help onderdrukken)
+  document.addEventListener("keydown", e => { if (e.key !== "F1") return; e.preventDefault(); if ($("#dlg").open) $("#dlg").close(); location.hash = "help"; window.scrollTo(0, 0); });
+  document.addEventListener("input", e => { if (e.target.id === "help-q") helpFilter(e.target.value); });
   // Ctrl+Z (Cmd+Z op Mac) = laatste wisactie ongedaan maken, behalve tijdens het typen in een veld
   document.addEventListener("keydown", e => {
     if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.key.toLowerCase() !== "z" || e.target.closest("input, textarea, select, [contenteditable]") || $("#dlg").open) return;
