@@ -717,15 +717,20 @@ body.lite .lite-head { position: sticky; top: 0; z-index: 5; margin: -14px -14px
 .acc-pick button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .acc-mini { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--c); box-shadow: 0 0 5px var(--c); margin-right: 7px; vertical-align: middle; flex: none; }
 td.desc > .acc-mini { float: left; margin-top: 7px; }
-.acc-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
-.acc-card { all: unset; box-sizing: border-box; cursor: pointer; display: grid; gap: 4px; padding: 12px 16px; border: 1px solid var(--line); border-left: 3px solid var(--c); border-radius: var(--r-card); clip-path: var(--notch-sm); background: rgba(var(--panel-rgb), .6); transition: border-color .2s ease, background-color .2s ease; }
-.acc-card:hover { border-color: var(--c); background: rgba(var(--accent-rgb), .06); } .acc-card:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.acc-card-name { display: flex; align-items: center; gap: 8px; font-family: var(--font-display); font-size: 12px; letter-spacing: .08em; text-transform: var(--case-ui); color: var(--muted); }
-.acc-card-name i { width: 10px; height: 10px; border-radius: 50%; background: var(--c); box-shadow: 0 0 6px var(--c); }
-.acc-card-bal { font-family: var(--font-figure); font-size: 22px; font-weight: 700; }
-.acc-card-io { font-size: 12.5px; }
 .lite-accs { display: grid; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); text-align: left; }
 .lite-accs > div { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; }
+.linkbtn { all: unset; cursor: pointer; color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.linkbtn:focus-visible { outline: 2px solid var(--accent); }
+.kpis.acc-row .kpi { container-type: inline-size; }
+.kpis.acc-row .kpi .label { white-space: normal; overflow: visible; line-height: 1.3; font-size: clamp(8px, 7.6cqi, 12px); overflow-wrap: anywhere; }
+.kpis.acc-row.dense .kpi { padding: 12px 10px 12px 12px; } .kpis.acc-row.dense .kpi .label { font-size: clamp(8px, 7cqi, 12px); letter-spacing: .02em; }
+.kpis.acc-row.dense .kpi .value { font-size: clamp(12px, 12cqi, 26px); } .kpis.acc-row.dense .kpi .sub { font-size: 11px; }
+.kpis.acc-row .kpi .value { font-size: clamp(15px, 13.5cqi, 26px); }
+.kpis.acc-row .kpi .label .acc-mini { margin-right: 6px; }
+.kpis.acc-row .kpi .chip { white-space: normal; font-size: 10.5px; letter-spacing: .02em; line-height: 1.35; max-width: 100%; flex-wrap: wrap; column-gap: 4px; row-gap: 0; }
+.kpis.acc-row.dense .kpi .chip { font-size: 9.5px; padding: 2px 5px; }
+
+@media (min-width: 701px) { .kpis.acc-row { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); } }
 /* ================= ANIMATIES (stap 6c) =================
    Kort en spaarzaam. Alles valt weg bij "minder beweging" (zie onderaan).
    #main.enter wordt kort gezet als je van tabblad wisselt of de app opent. */
@@ -2216,7 +2221,8 @@ if (typeof module !== "undefined") module.exports = { MAX_ZICHT, accKey, zichtLi
     const rate = s.income > 0 ? Math.round(s.saved / s.income * 100) : null;
     const kpi = (label, value, color, sub) => `<div class="kpi" style="--k:${color}"><div class="label">${label}</div><div class="value num">${value}</div><div class="sub">${sub}</div></div>`;
     let h = `<div class="page-head"><div><h1>Overzicht</h1><p>${s.count} transacties in ${esc(monthName(ui.month))}</p></div><div class="actions">${periodSeg()}${monthSwitch()}</div></div>${notices()}${priceNotice()}`;
-    h += `<section class="kpis">
+    const dense = zichtList(state).length >= 4;   // 8+ kaders op één lijn: compacter
+    h += `<section class="kpis${multiAcc() ? " acc-row" : ""}${dense ? " dense" : ""}">
       ${kpi("Inkomsten", `<span class="pos">${eur0(s.income)}</span>`, "var(--pos)", budget("Inkomen") ? "gepland " + eur0(budget("Inkomen")) : "&nbsp;")}
       ${kpi("Uitgaven", `<span class="neg">${eur0(s.expenses)}</span>`, "var(--neg)", bExp ? `${Math.round(s.expenses / bExp * 100)}% van budget ${eur0(bExp)}` : `vast ${eur0(s.fixed)} · variabel ${eur0(s.variable)}`)}
       ${(() => {
@@ -2225,12 +2231,14 @@ if (typeof module !== "undefined") module.exports = { MAX_ZICHT, accKey, zichtLi
         return kpi("Gespaard", `<span class="${m < 0 ? "neg" : "gold"}">${m < 0 ? "−" : ""}${eurS(Math.abs(m))}</span>`, "var(--gold)", `deze maand · totaal <span class="gold num">${eur(sm.bal.set ? sm.bal.total : sm.allocated)}</span>`);
       })()}
       ${kpi("Netto deze maand", `<span class="${s.net >= 0 ? "pos" : "neg"}">${s.net >= 0 ? "+" : "−"}${eur0(Math.abs(s.net))}</span>`, s.net >= 0 ? "var(--pos)" : "var(--neg)", s.uncatCount ? `<span class="chip warn">${s.uncatCount} te categoriseren · <button type="button" data-act="show-uncat">bekijken</button></span>` : `<span class="chip pos">alles gecategoriseerd</span>`)}
-      ${(() => { const b = balanceAt(state, ui.month);
+      ${multiAcc() ? accStats(ui.month).map(x => kpi(`<i class="acc-mini" style="--c:${x.color}"></i>${esc(x.name)}`,
+          x.bal === null ? `<span class="muted">—</span>` : `<span class="${x.bal >= 0 ? "gold" : "neg"}">${x.bal < 0 ? "−" : ""}${(dense ? fmt0 : fmt).format(Math.abs(x.bal))}</span>`, x.color,
+          x.bal === null ? (dense ? `<button class="linkbtn" data-act="goto-profile" type="button">startsaldo</button>` : `<button class="btn small" data-act="goto-profile" type="button">Startsaldo ingeven</button>`) : `op ${fmtDate(endOfMonth(ui.month))} · <button class="linkbtn" data-act="acc-open" data-acc="${esc(x.acc)}" type="button">transacties</button>`)).join("") : ""}
+      ${multiAcc() ? "" : (() => { const b = balanceAt(state, ui.month);
         const lbl = multiAcc() ? "Saldo alle rekeningen" : "Saldo op rekening";
         return b.set ? kpi(lbl, `<span class="${b.total >= 0 ? "gold" : "neg"}">${b.total < 0 ? "−" : ""}${fmt.format(Math.abs(b.total))}</span>`, b.total >= 0 ? "var(--gold)" : "var(--neg)", `op ${fmtDate(endOfMonth(ui.month))}${b.per.some(p => p.before) ? " · teruggerekend" : ""}`)
           : kpi(lbl, `<span class="muted">—</span>`, "var(--line)", `<button class="btn small" data-act="goto-balance" type="button">Startsaldo ingeven</button>`); })()}
     </section>`;
-    h += accCards();
     const uncatHtml = s.uncatCount ? uncatCard(ui.month) : "";
     h += goalsWide();
     h += `<div class="grid-2">${forecastCard()}${netWorthCard()}</div>`;
@@ -3612,13 +3620,6 @@ if (typeof module !== "undefined") module.exports = { MAX_ZICHT, accKey, zichtLi
         out: Math.round(tx.filter(t => t.amount < 0).reduce((s, t) => s + t.amount, 0) * 100) / 100, n: tx.length };
     });
   }
-  function accCards() {
-    if (!multiAcc()) return "";
-    return `<section class="acc-cards">${accStats(ui.month).map(x => `<button type="button" class="acc-card" data-act="acc-open" data-acc="${esc(x.acc)}" style="--c:${x.color}" title="Transacties van ${esc(x.name)}">
-      <span class="acc-card-name"><i></i>${esc(x.name)}</span>
-      <span class="acc-card-bal num ${x.bal !== null && x.bal < 0 ? "neg" : ""}">${x.bal === null ? `<span class="muted" style="font-size:13px">startsaldo ontbreekt</span>` : (x.bal < 0 ? "−" : "") + eur(Math.abs(x.bal))}</span>
-      <span class="acc-card-io num"><span class="pos">+${eur0(x.inn)}</span> · <span class="neg">−${eur0(Math.abs(x.out))}</span> <span class="muted">deze maand</span></span></button>`).join("")}</section>`;
-  }
   function accSide() {
     if (!multiAcc()) return "";
     const st = accStats(todayYm()), tot = st.filter(x => x.bal !== null).reduce((a, x) => a + x.bal, 0);
@@ -3713,6 +3714,7 @@ if (typeof module !== "undefined") module.exports = { MAX_ZICHT, accKey, zichtLi
       case "theme-open": themeDialog(); break;
       case "acc-add": accAddDialog(el.dataset.type); break;
       case "acc-pick": ui.acc = el.dataset.acc || ""; render(); break;
+      case "goto-profile": location.hash = "profiel"; break;
       case "acc-open": ui.acc = el.dataset.acc; ui.txAll = false; ui.txCat = ""; ui.txSearch = ""; location.hash = "transacties"; break;
       case "acc-color": { const acc = el.closest("tr").dataset.acc, a = state.accounts[acc]; const cur = Number.isInteger(a.color) ? a.color : Math.max(0, zichtList(state).indexOf(acc)); a.color = (cur + 1) % ACC_COLORS.length; save(); render(); break; }
       case "acc-del": { const acc = el.closest("tr").dataset.acc; if (state.transactions.some(t => normIban(t.account) === normIban(acc))) break;
