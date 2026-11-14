@@ -26,6 +26,7 @@ Doel van de standalone app: **overal installeerbaar bij iedereen** (Windows, Mac
 - `app.html` = uitzicht, bediening en grafieken (SVG met de hand). Bevat de plek `/*__CORE__*/`.
 - Bouwen: `python tools/build.py app` → `app/index.html` (app.html met core.js ingevoegd). Voor de bevroren versie: `python tools/build.py claude-versie`.
 - **Opslag:** IndexedDB, database `"budgetplanner"`, store `"kv"`, sleutel `"state"` (JSON-string), met localStorage als terugval (sleutel `budgetplanner.v1`). In de PWA blijft dit zo; de gegevens horen bij het webadres (origin) van de app.
+- **PWA (stap 3):** `app/manifest.webmanifest` (naam, iconen, kleuren), `app/sw.js` (service worker: app *network-first* met bewaarde kopie voor offline, Google Fonts *cache-first*; bewaart nooit gegevens), iconen in `app/icons/` (opnieuw maken: `node tools/iconen.js`). Manifest en service worker worden alleen geladen via http(s), niet als los bestand. Knop/menu-item **App installeren** + `navigator.storage.persist()` na de eerste gegevens.
 - Back-up exporteren/importeren = één `.json`-bestand met de volledige `state`. Hiermee zet Benny zijn gegevens over van de claude.ai-versie naar de app (stap 4).
 
 ### Stijl (cyberpunk – behouden)

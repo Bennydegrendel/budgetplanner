@@ -4,6 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Budgetplanner</title>
+<meta name="description" content="Persoonlijke budgetplanner. Je gegevens blijven op je eigen toestel.">
+<meta name="theme-color" content="#00e5ff">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Budget">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<script>
+  // Het manifest ("typeplaatje" voor installeren) alleen laden als de app via een webadres draait;
+  // als los bestand (file://) geeft de browser er anders een foutmelding op.
+  if (/^https?:$/.test(location.protocol)) { const l = document.createElement("link"); l.rel = "manifest"; l.href = "manifest.webmanifest"; document.head.appendChild(l); }
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700;800&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
@@ -474,11 +487,13 @@ a.hint, .legend a { color: var(--accent); }
     </nav>
     <div class="actions">
       <button class="btn primary" id="btn-import" type="button" title="CSV van je bank importeren">↑ <span class="label-long">CSV importeren</span><span class="label-short" hidden>CSV</span></button>
+      <button class="btn" id="btn-install" data-act="install" type="button" style="display:none" title="Als programma installeren">⤓ <span class="label-long">Installeren</span></button>
       <div class="menu" id="backup-menu">
         <button class="btn" type="button" id="btn-backup" aria-haspopup="true" aria-expanded="false">Back-up ▾</button>
         <div class="menu-list" role="menu">
           <button type="button" data-act="export-json" role="menuitem">Back-up exporteren<small>Alles in één .json-bestand</small></button>
           <button type="button" data-act="import-json" role="menuitem">Back-up terugzetten<small>Laad een eerder geëxporteerd .json-bestand</small></button>
+          <button type="button" data-act="install" role="menuitem" id="mi-install">App installeren<small>Als programma op je pc of gsm, werkt ook offline</small></button>
           <button type="button" data-act="pin-open" role="menuitem">Pincode<small>De planner afschermen met een code</small></button>
           <button type="button" data-act="export-csv" role="menuitem">Transacties naar Excel<small>.csv met puntkomma, opent in Excel</small></button>
           <button type="button" data-act="reset" role="menuitem" class="danger">Alles wissen<small>Verwijdert alle gegevens in deze browser</small></button>
@@ -648,6 +663,7 @@ a.hint, .legend a { color: var(--accent); }
       savAdded += 0;
     }
     const sug = 0; const resolved = resolvePending(state); applyAllSplitRules(state);
+    if (added) askPersist();
     const newSav = savMoves(state).filter(m => m.src === "bank" && !m.checked && m.date >= (minD || "0")).length;
     save();
     if (maxD) { ui.month = maxD.slice(0, 7); ui.year = +maxD.slice(0, 4); }
@@ -685,6 +701,41 @@ a.hint, .legend a { color: var(--accent); }
       });
     return false;
   }
+  /* ---------- installeren als app (PWA) ---------- */
+  let installPrompt = null;   // de browser geeft dit als hij rechtstreeks kan installeren (Edge, Chrome, Android)
+  const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true;
+  function updateInstallUi() {
+    const b = $("#btn-install"); if (b) b.style.display = installPrompt && !isStandalone() ? "" : "none";
+    const m = $("#mi-install"); if (m) m.style.display = isStandalone() ? "none" : "";
+  }
+  window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); installPrompt = e; updateInstallUi(); });
+  window.addEventListener("appinstalled", () => { installPrompt = null; updateInstallUi(); toast("Budgetplanner is geïnstalleerd. Je vindt hem bij je programma's."); });
+  async function installApp() {
+    if (installPrompt) { installPrompt.prompt(); try { await installPrompt.userChoice; } catch (e) {} installPrompt = null; updateInstallUi(); return; }
+    const ua = navigator.userAgent;
+    const ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+    const android = /Android/.test(ua), firefox = /Firefox|FxiOS/.test(ua);
+    const macSafari = /Macintosh/.test(ua) && !ios && /Safari/.test(ua) && !/Chrome|Chromium|Edg|Firefox/.test(ua);
+    let how;
+    if (isStandalone()) how = "De planner draait al als geïnstalleerde app.";
+    else if (location.protocol === "file:") how = "Een los bestand kan niet als app geïnstalleerd worden. Open de planner via zijn webadres en kies daar <b>App installeren</b>.";
+    else if (ios) how = "Tik op de <b>Deel-knop</b> (vierkantje met een pijl omhoog) en kies <b>Zet op beginscherm</b>.";
+    else if (android) how = "Tik op het menu <b>⋮</b> rechtsboven en kies <b>App installeren</b> of <b>Toevoegen aan startscherm</b>.";
+    else if (macSafari) how = "Kies in de menubalk <b>Archief → Voeg toe aan Dock</b>.";
+    else if (firefox) how = "Firefox kan geen apps installeren. Open dit adres in <b>Edge</b> of <b>Chrome</b> en kies daar <b>App installeren</b>.";
+    else how = "Klik rechts in de adresbalk op het icoontje <b>App beschikbaar / Installeren</b>, of open het browsermenu <b>⋯</b> en kies <b>Apps → Deze site als app installeren</b>.";
+    dialog(`<h3>App installeren</h3><p>Zo krijg je de Budgetplanner als programma: met een eigen icoon en een eigen venster, en hij opent ook zonder internet.</p><p>${how}</p>
+      <p class="muted" style="font-size:12.5px;margin:10px 0 0">Je gegevens blijven op dit toestel, in deze browser. Updates komen vanzelf.</p>
+      <div class="row"><button class="btn primary" data-close type="button">OK</button></div>`);
+  }
+  // offline werken: de service worker bewaart een kopie van de app (niet van je gegevens)
+  if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol))
+    window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(e => console.warn("Offline werken niet beschikbaar:", e)));
+  // de browser vragen je gegevens niet zomaar op te ruimen als de schijf vol raakt
+  function askPersist() {
+    try { if (navigator.storage && navigator.storage.persist) navigator.storage.persisted().then(p => { if (!p) return navigator.storage.persist(); }).catch(() => {}); } catch (e) {}
+  }
+
   async function exportJson() {
     const stamp = new Date().toISOString().slice(0, 10);
     const snapshot = Object.assign({}, state, { exportedAt: new Date().toISOString() });
@@ -702,7 +753,7 @@ a.hint, .legend a { color: var(--accent); }
       confirmDlg("Back-up terugzetten?", `Dit vervangt je huidige gegevens door de back-up met ${data.transactions.length} transacties.`, "Terugzetten", () => {
         state = Object.assign(newState(), data); delete state.exportedAt; save();
         ui.month = state.transactions.length ? state.transactions[0].date.slice(0, 7) : todayYm();
-        render(); toast("Back-up teruggezet");
+        render(); askPersist(); toast("Back-up teruggezet");
       });
     } catch (e) { toast("Dit is geen geldige back-up van de budgetplanner."); }
   }
@@ -776,7 +827,7 @@ a.hint, .legend a { color: var(--accent); }
     h += `<section class="card"><div class="card-head"><h2>Laatste transacties</h2></div><div class="soon-list">${d.tx.map(x => `<div class="row-i" style="grid-template-columns:48px 1fr auto"><span class="num dt muted" style="font-size:12px">${fmtDate(x.d).slice(0, 5)}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.s)}<br><span class="muted" style="font-size:11.5px">${esc(x.c)}</span></span><span class="num ${x.a >= 0 ? "pos" : "neg"}">${signed(x.a)}</span></div>`).join("")}</div></section>`;
     return h + liteFoot();
   }
-  function liteFoot() { return `<p class="foot">Alleen bekijken · wijzigen doe je op je pc<br><button class="btn small ghost" data-act="lite-full" type="button">Volledige planner openen</button></p>`; }
+  function liteFoot() { return `<p class="foot">Alleen bekijken · wijzigen doe je op je pc<br><button class="btn small ghost" data-act="lite-full" type="button">Volledige planner openen</button>${isStandalone() ? "" : `<br><button class="btn small ghost" data-act="install" type="button">⤓ App installeren</button>`}</p>`; }
 
   /* ---------- pincode ---------- */
   async function sha(t) { const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join(""); }
@@ -2168,6 +2219,7 @@ a.hint, .legend a { color: var(--accent); }
       case "lite-full": try { sessionStorage.setItem(KEY + ".full", "1"); } catch (x) {} if (location.hash === "#mobiel") location.hash = "overzicht"; else render(); break;
       case "price-ok": state.ignoredPrice = state.ignoredPrice || []; state.ignoredPrice.push(el.dataset.key); save(); render(); break;
       case "pin-open": pinDialog(); break;
+      case "install": installApp(); break;
       case "export-csv": offerFile(`transacties-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(state), "text/csv"); break;
       case "reset": confirmDlg("Alles wissen?", "Alle transacties, budgetten, regels en spaardoelen in deze browser worden verwijderd. Exporteer eerst een back-up als je ze wilt bewaren.", "Alles wissen", () => { state = newState(); save(); render(); toast("Alles gewist"); }, true); break;
       case "prev-month": ui.month = shiftMonth(ui.month, -1); render(); break;
@@ -2397,6 +2449,7 @@ a.hint, .legend a { color: var(--accent); }
   $("#main").innerHTML = `<p class="muted" style="padding:40px 0;text-align:center">Gegevens laden…</p>`;
   loadState().then(st => { state = st; ui.month = state.transactions.length ? state.transactions[0].date.slice(0, 7) : todayYm();
       const start = () => {
+        updateInstallUi(); if (state.transactions.length) askPersist();
         if (liteMode()) { liteLoadCache(); render(); setTimeout(() => liteRefresh(false), 600); return; }
         render(); };
       if (state.pin && state.pin.hash && !isUnlocked()) { $("#main").innerHTML = ""; showLock(start); } else start();
