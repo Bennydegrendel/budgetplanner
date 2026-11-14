@@ -128,13 +128,13 @@
 }
 [data-theme="matrix"][data-mode="dark"] {
   --glow: 1;
-  --bg: #000300; --surface: #020b02; --ink: #c6ffc6; --muted: #5e8c5e; --line: #0e2a0e;
-  --accent: #00ff41; --magenta: #39ff14; --pos: #00ff41; --neg: #ff3b3b; --gold: #d4ff00; --warn: #e6ff4d;
-  --accent-rgb: 0, 255, 65; --magenta-rgb: 57, 255, 20; --pos-rgb: 0, 255, 65; --neg-rgb: 255, 59, 59;
-  --gold-rgb: 212, 255, 0; --warn-rgb: 230, 255, 77; --muted-rgb: 94, 140, 94; --ink-rgb: 198, 255, 198; --amber-rgb: 200, 255, 0;
-  --bar: #00ff41; --bar-track: #061806; --s1: #00ff41; --s2: #9dff9d; --s3: #d4ff00; --s4: #00c8ff;
-  --panel: #010801; --panel-rgb: 0, 8, 0; --scan: .45; --on-accent: #000000; --gold-dark: #6b8000; --field: rgba(0, 8, 0, .9);
-  --head-top: rgba(2, 14, 2, .96); --head-bottom: rgba(0, 6, 0, .96); --grid-line: rgba(0, 255, 65, .04); --backdrop: rgba(0, 10, 0, .6); --menu-shadow: 0 8px 24px rgba(0, 0, 0, .5);
+  --bg: #000000; --surface: #000000; --ink: #00e63a; --muted: #008f11; --line: #0b3d14;
+  --accent: #00ff41; --magenta: #00ff41; --pos: #00ff41; --neg: #ff3333; --gold: #b8ffc4; --warn: #7dff8f;
+  --accent-rgb: 0, 255, 65; --magenta-rgb: 0, 255, 65; --pos-rgb: 0, 255, 65; --neg-rgb: 255, 51, 51;
+  --gold-rgb: 184, 255, 196; --warn-rgb: 125, 255, 143; --muted-rgb: 0, 143, 17; --ink-rgb: 0, 230, 58; --amber-rgb: 0, 255, 65;
+  --bar: #00ff41; --bar-track: #031a07; --s1: #00ff41; --s2: #008f11; --s3: #b8ffc4; --s4: #00b82e;
+  --panel: #000000; --panel-rgb: 0, 0, 0; --scan: .45; --on-accent: #000000; --gold-dark: #3d8f4a; --field: #000000;
+  --head-top: rgba(0, 0, 0, .96); --head-bottom: rgba(0, 0, 0, .96); --grid-line: rgba(0, 255, 65, .035); --backdrop: rgba(0, 0, 0, .75); --menu-shadow: 0 8px 24px rgba(0, 0, 0, .6);
   color-scheme: dark;
 }
 [data-theme="matrix"][data-mode="light"] {
@@ -207,6 +207,7 @@
 [data-theme="synthwave"] .page-head h1::after { height: 4px; border-radius: 999px; background: linear-gradient(90deg, var(--gold), var(--accent), var(--magenta)); }
 [data-theme="synthwave"] .card, [data-theme="synthwave"] .kpi { border-color: rgba(var(--magenta-rgb), .28); box-shadow: 0 10px 32px rgba(var(--magenta-rgb), calc(.10 * var(--glow))); }
 [data-theme="synthwave"] .card h2 { color: var(--magenta); }
+[data-theme="synthwave"] .card, [data-theme="synthwave"] .kpi { background: rgba(var(--panel-rgb), .84); }
 /* Matrix: terminal. Titel als opdrachtregel met cursor, alles monospace, compacter */
 [data-theme="matrix"] .page-head h1 { line-height: 1; }
 [data-theme="matrix"] .page-head h1::before { content: "> "; color: var(--muted); }
@@ -217,7 +218,7 @@
 [data-theme="matrix"] .kpi .value { font-family: var(--font-mono); }
 [data-theme="matrix"] .kpi .chip { font-size: 10px; letter-spacing: 0; white-space: normal; }
 /* Oceaan: zacht en rond, luchtig, rustige schaduwen in plaats van neon */
-[data-theme="oceaan"] .card, [data-theme="oceaan"] .kpi { background: var(--surface); box-shadow: 0 8px 30px rgba(var(--shade-rgb), .22); }
+[data-theme="oceaan"] .card, [data-theme="oceaan"] .kpi { background: rgba(var(--panel-rgb), .80); box-shadow: 0 8px 30px rgba(var(--shade-rgb), .22); }
 [data-theme="oceaan"][data-mode="light"] .card, [data-theme="oceaan"][data-mode="light"] .kpi { box-shadow: 0 6px 24px rgba(var(--ink-rgb), .07); }
 [data-theme="oceaan"] .page-head h1 { font-weight: 700; }
 [data-theme="oceaan"] .page-head h1::after { height: 4px; border-radius: 999px; width: 48px; }
@@ -725,27 +726,47 @@ dialog[open] { animation: fx-pop .18s ease-out; }
 @keyframes fx-blink { 50% { opacity: 0; } }
 [data-theme="matrix"] .page-head h1::after { animation: fx-blink 1.05s steps(1, end) infinite; }
 
-/* Achtergrondlaag voor Synthwave en Oceaan (bewogen met transform = door de grafische kaart, zuinig) */
+/* Achtergrondlaag voor Synthwave en Oceaan (bewogen met transform = door de grafische kaart, zuinig).
+   #fx::before / #fx::after / #fx > i = losse lagen; welke wat doet, hangt af van het thema. */
 #fx { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; display: none; }
+#fx > i { position: absolute; display: block; }
 [data-theme="synthwave"] #fx, [data-theme="oceaan"] #fx { display: block; }
-/* Synthwave: neonvloer aan de horizon die langzaam naar je toe schuift */
-@keyframes fx-floor { from { transform: perspective(340px) rotateX(64deg) translateY(0); } to { transform: perspective(340px) rotateX(64deg) translateY(44px); } }
-[data-theme="synthwave"] #fx::before { content: ""; position: absolute; left: -60%; right: -60%; bottom: -30%; height: 75%;
-  background: linear-gradient(rgba(var(--magenta-rgb), .38) 1.5px, transparent 1.5px) 0 0 / 100% 44px,
-              linear-gradient(90deg, rgba(var(--magenta-rgb), .30) 1.5px, transparent 1.5px) 0 0 / 44px 100%;
-  -webkit-mask-image: linear-gradient(to top, var(--bg) 25%, transparent 85%); mask-image: linear-gradient(to top, var(--bg) 25%, transparent 85%);
-  transform-origin: 50% 100%; animation: fx-floor 6s linear infinite; }
-/* Oceaan: zachte lichtvlekken die traag deinen */
-@keyframes fx-tide { to { transform: translate(8vmax, 5vmax) scale(1.12); } }
-[data-theme="oceaan"] #fx::before, [data-theme="oceaan"] #fx::after { content: ""; position: absolute; width: 75vmax; height: 75vmax; border-radius: 50%; }
-[data-theme="oceaan"] #fx::before { left: -25vmax; top: -40vmax; background: radial-gradient(circle, rgba(var(--accent-rgb), .16), transparent 65%); animation: fx-tide 18s ease-in-out infinite alternate; }
-[data-theme="oceaan"] #fx::after { right: -30vmax; bottom: -45vmax; background: radial-gradient(circle, rgba(var(--magenta-rgb), .12), transparent 65%); animation: fx-tide 23s ease-in-out infinite alternate-reverse; }
+
+/* Synthwave: gestreepte zon aan de horizon + neonvloer die naar je toe rolt */
+@keyframes fx-floor { from { transform: perspective(420px) rotateX(70deg) translateY(0); } to { transform: perspective(420px) rotateX(70deg) translateY(48px); } }
+@keyframes fx-sun { from { transform: translateX(-50%) scale(1); filter: brightness(1); } to { transform: translateX(-50%) scale(1.05); filter: brightness(1.25); } }
+[data-theme="synthwave"] #fx::before { content: ""; position: absolute; left: 50%; bottom: 13%; width: min(46vmin, 520px); aspect-ratio: 1; border-radius: 50%;
+  background: linear-gradient(180deg, var(--gold) 5%, var(--accent) 45%, var(--magenta) 90%);
+  -webkit-mask-image: linear-gradient(to bottom, var(--bg) 48%, transparent 48%), repeating-linear-gradient(to bottom, transparent 0 7px, var(--bg) 7px 15px);
+  mask-image: linear-gradient(to bottom, var(--bg) 48%, transparent 48%), repeating-linear-gradient(to bottom, transparent 0 7px, var(--bg) 7px 15px);
+  box-shadow: 0 0 80px rgba(var(--magenta-rgb), calc(.55 * var(--glow))); opacity: .75;
+  animation: fx-sun 4s ease-in-out infinite alternate; }
+[data-theme="synthwave"] #fx > i:nth-of-type(1) { left: -80%; right: -80%; bottom: 0; height: 120%;
+  background: linear-gradient(rgba(var(--magenta-rgb), .75) 2px, transparent 2px) 0 0 / 100% 48px,
+              linear-gradient(90deg, rgba(var(--accent-rgb), .55) 2px, transparent 2px) 0 0 / 48px 100%,
+              linear-gradient(to top, rgba(var(--magenta-rgb), .18), transparent);
+  -webkit-mask-image: linear-gradient(to top, var(--bg) 35%, transparent 95%); mask-image: linear-gradient(to top, var(--bg) 35%, transparent 95%);
+  transform-origin: 50% 100%; animation: fx-floor 2.2s linear infinite; }
+[data-theme="synthwave"][data-mode="light"] #fx::before { opacity: .55; }
+
+/* Oceaan: golven die onderaan voorbij rollen + lichtvlekken die deinen */
+@keyframes fx-tide { to { transform: translate(12vmax, 8vmax) scale(1.18); } }
+@keyframes fx-wave { to { transform: translateX(-50%); } }
+[data-theme="oceaan"] #fx::before, [data-theme="oceaan"] #fx::after { content: ""; position: absolute; width: 70vmax; height: 70vmax; border-radius: 50%; }
+[data-theme="oceaan"] #fx::before { left: -22vmax; top: -34vmax; background: radial-gradient(circle, rgba(var(--accent-rgb), .32), transparent 62%); animation: fx-tide 9s ease-in-out infinite alternate; }
+[data-theme="oceaan"] #fx::after { right: -26vmax; bottom: -30vmax; background: radial-gradient(circle, rgba(var(--magenta-rgb), .26), transparent 62%); animation: fx-tide 12s ease-in-out infinite alternate-reverse; }
+[data-theme="oceaan"] #fx > i { left: 0; bottom: 0; width: 200%; height: 150px;
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 150' preserveAspectRatio='none'><path d='M0 60 C100 20 200 20 300 60 S500 100 600 60 S750 20 800 60 V150 H0Z'/></svg>");
+  mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 150' preserveAspectRatio='none'><path d='M0 60 C100 20 200 20 300 60 S500 100 600 60 S750 20 800 60 V150 H0Z'/></svg>");
+  -webkit-mask-size: 50% 100%; mask-size: 50% 100%; -webkit-mask-repeat: repeat-x; mask-repeat: repeat-x; }
+[data-theme="oceaan"] #fx > i:nth-of-type(1) { background: linear-gradient(to top, rgba(var(--accent-rgb), .30), rgba(var(--accent-rgb), .12)); animation: fx-wave 14s linear infinite; }
+[data-theme="oceaan"] #fx > i:nth-of-type(2) { height: 110px; background: linear-gradient(to top, rgba(var(--magenta-rgb), .26), rgba(var(--magenta-rgb), .08)); animation: fx-wave 9s linear infinite reverse; }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; } #fx { display: none !important; } }
 </style>
 </head>
 <body>
-<div id="fx" aria-hidden="true"></div>
+<div id="fx" aria-hidden="true"><i></i><i></i></div>
 <header>
   <div class="bar">
     <div class="brand" title="Budgetplanner"><span class="brand-mark" aria-hidden="true">€</span><span class="brand-text">Budgetplanner</span></div>
