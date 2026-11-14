@@ -667,6 +667,10 @@ body.tut [data-tut]:hover { outline: 1px dashed rgba(var(--accent-rgb), .8); out
 #tut-tip .help-steps li::before { width: 17px; height: 17px; font-size: 10.5px; }
 #tut-tip small { display: block; margin-top: 6px; color: var(--muted); font-size: 11.5px; }
 .tut-banner { margin-bottom: 14px; }
+#spot { position: fixed; z-index: 24; display: none; pointer-events: none; border: 2px solid var(--accent); border-radius: var(--r-btn); box-shadow: 0 0 0 4px rgba(var(--accent-rgb), .18), 0 0 22px rgba(var(--accent-rgb), calc(.9 * var(--glow) + .2)); animation: spot-pulse 1.2s ease-in-out infinite; }
+@keyframes spot-pulse { 50% { box-shadow: 0 0 0 9px rgba(var(--accent-rgb), .06), 0 0 30px rgba(var(--accent-rgb), calc(.9 * var(--glow) + .2)); } }
+.help-show { margin-left: 6px; font-size: 12.5px; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { #spot { animation: none; } }
 .toast-undo { margin-left: 10px; background: none; border: 1px solid currentColor; color: inherit; font: inherit; padding: 3px 9px; border-radius: var(--r-btn); cursor: pointer; text-transform: none; }
 .toast-undo:hover { background: rgba(var(--accent-rgb), .15); }
 .toast { background: rgba(var(--panel-rgb), .96); color: var(--accent); border: 1px solid var(--accent); border-radius: var(--r-card); box-shadow: 0 0 20px rgba(var(--accent-rgb), calc(.4 * var(--glow))); text-transform: var(--case-ui); letter-spacing: .05em; font-weight: 600; }
@@ -886,7 +890,7 @@ dialog[open] { animation: fx-pop .18s ease-out; }
 <input type="file" id="file-json" accept=".json,.gz,application/json,application/gzip" hidden>
 <input type="file" id="file-lite" hidden>
 <div class="tooltip" id="tip" role="tooltip"></div>
-<div id="tut-tip" role="tooltip"></div>
+<div id="tut-tip" role="tooltip"></div><div id="spot" aria-hidden="true"></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <dialog id="dlg"></dialog>
 
@@ -2466,7 +2470,7 @@ if (typeof module !== "undefined") module.exports = { belfiusDesc, catByName, pa
     const uncatHtml = s.uncatCount ? uncatCard(ui.month) : "";
     h += goalsWide();
     h += `<div class="stack">${chartsCard()}${transferCard()}</div>`;
-    h += `<div class="grid-2"><div class="stack"><section class="card">${catChart(s)}</section>${groupCards(s)}${debtCard()}${uncatHtml}</div><div class="stack">${(state.plans.length || detectRecurring(state).length) ? soonCard(14, true) : ""}${carryCard()}</div></div>`;
+    h += `<div class="grid-2"><div class="stack"><section class="card" id="cat-card">${catChart(s)}</section>${groupCards(s)}${debtCard()}${uncatHtml}</div><div class="stack">${(state.plans.length || detectRecurring(state).length) ? soonCard(14, true) : ""}${carryCard()}</div></div>`;
     return h;
   }
 
@@ -3891,59 +3895,59 @@ if (typeof module !== "undefined") module.exports = { belfiusDesc, catByName, pa
   /* ---------- help (stap 10b) ----------
      Alle uitleg op één plaats. Komt er een knop of scherm bij: hier (en later in de tutorialballonnen) mee bijwerken. */
   const HELP_TOPICS = [
-    { id: "start", icon: "🚀", title: "De eerste keer starten", tab: "profiel", steps: [
+    { id: "start", show: [null, ["overzicht", "#btn-import"], null, ["profiel", "#pf-zicht"], ["regels", '[data-act="rules-analyze"]'], ["budget", '[data-act="cat-budget"]']], icon: "🚀", title: "De eerste keer starten", tab: "profiel", steps: [
       "Download in je bankapp (Home'Bank of de ING-app, of Belfius Direct Net) je transacties als <b>CSV-bestand</b>.",
       "Klik bovenaan op <b>↑ CSV importeren</b> en kies het bestand, of sleep het in het venster.",
       "Nieuw rekeningnummer? Geef de rekening een naam en kies <b>zichtrekening</b> of <b>spaarrekening</b>.",
       "Ga naar <b>Profiel</b> en vul bij elke zichtrekening het <b>startsaldo</b> in (zie hieronder).",
       "Ga naar <b>Regels</b> → <b>🔍 Transacties analyseren</b> en vink de voorstellen aan die kloppen.",
       "Zet in <b>Budget</b> een bedrag bij je categorieën. Klaar: het <b>Overzicht</b> vult zich." ] },
-    { id: "csv", icon: "↑", title: "Transacties importeren (CSV)", tab: "transacties", steps: [
+    { id: "csv", show: [null, ["", "#btn-import"], null, null], icon: "↑", title: "Transacties importeren (CSV)", tab: "transacties", steps: [
       "Download je transacties als CSV in je bankapp. De app herkent zelf of het ING of Belfius is.",
       "Klik op <b>↑ CSV importeren</b> (bovenaan) en kies één of meer bestanden.",
       "Overlappende bestanden zijn geen probleem: transacties die er al in staan, worden overgeslagen.",
       "Het venster <b>Import klaar</b> toont hoeveel er nieuw zijn en hoeveel je nog moet categoriseren." ] },
-    { id: "saldo", icon: "€", title: "Startsaldo instellen", tab: "profiel", steps: [
+    { id: "saldo", show: [["profiel", "#pf-zicht"], ["profiel", '[data-act="bal-date"]'], ["profiel", '[data-act="bal-amount"]'], null], icon: "€", title: "Startsaldo instellen", tab: "profiel", steps: [
       "Ga naar <b>Profiel</b> → <b>Zichtrekeningen</b>.",
       "Kies bij <b>Startsaldo op</b> een datum, bij voorkeur de dag vóór je oudste ingelezen transactie.",
       "Vul het saldo van die dag in (zie je bankafschrift). De app rekent vanaf daar elke dag verder.",
       "Klopt het saldo nu niet met je bank? Dan ontbreekt er meestal een CSV of staat de datum verkeerd." ] },
-    { id: "cat", icon: "🏷", title: "Transacties categoriseren", tab: "transacties", steps: [
+    { id: "cat", show: [["overzicht", "#uncat"], ["transacties", '[data-act="set-cat"]'], ["regels", '[data-act="add-rule"]'], ["transacties", '[data-act="split-tx"]']], icon: "🏷", title: "Transacties categoriseren", tab: "transacties", steps: [
       "Op het <b>Overzicht</b> staat <b>Nog te categoriseren</b>, gegroepeerd per winkel of persoon. Eén keuze geldt voor de hele groep.",
       "In <b>Transacties</b> kies je de categorie in de keuzelijst van elke regel. De app onthoudt je keuze voor dezelfde tegenpartij.",
       "Wil je het vast laten verlopen: maak in <b>Regels</b> een regel (trefwoord → categorie).",
       "Eén betaling over twee categorieën? Gebruik <b>⑂</b> (splitsen) in de transactielijst." ] },
-    { id: "budget", icon: "▦", title: "Budget instellen", tab: "budget", steps: [
+    { id: "budget", show: [["budget", '[data-act="cat-type"]'], ["budget", '[data-act="cat-budget"]'], ["budget", '[data-act="cat-roll"]'], ["overzicht", "#cat-card"]], icon: "▦", title: "Budget instellen", tab: "budget", steps: [
       "Ga naar <b>Budget</b>. Elke categorie heeft een <b>soort</b>: Inkomen, Vaste kosten, Variabele kosten, Sparen of Overboeking.",
       "Vul per categorie een bedrag in, per maand of per jaar.",
       "Vink <b>Meenemen</b> aan als wat je niet uitgeeft naar de volgende maand mag (bv. kleding).",
       "Op het <b>Overzicht</b> toont de balk wat je uitgaf en de streep wat je mag uitgeven." ] },
-    { id: "deel", icon: "⑃", title: "Een deelbudget maken", tab: "budget", steps: [
+    { id: "deel", show: [["budget", '[data-act="grp-add"]'], null, ["budget", '[data-act="sub-add"]'], null], icon: "⑃", title: "Een deelbudget maken", tab: "budget", steps: [
       "Ga naar <b>Budget</b> → <b>⑃ + Deelbudget</b>. Maak een nieuwe categorie of zet een bestaande om.",
       "Geef het deelbudget een bedrag, bv. € 400 voor het gezamenlijke huishouden.",
       "Voeg in het blad van het deelbudget subcategorieën toe met <b>+ Subcategorie</b> en verdeel het bedrag.",
       "<b>Nog te verdelen</b> toont wat er overblijft. Uitgaven tellen in de subcategorie én in het deelbudget." ] },
-    { id: "spaar", icon: "◎", title: "Een spaardoel aanmaken", tab: "spaardoelen", steps: [
+    { id: "spaar", show: [["spaardoelen", '[data-act="add-goal"], [data-act="goal-new"]'], ["spaar", '[data-act="goal-ref"], [data-act="copy-ref"]'], null, ["spaar", '[data-act="sav-transfer"]']], icon: "◎", title: "Een spaardoel aanmaken", tab: "spaardoelen", steps: [
       "Ga naar <b>Spaardoelen</b> → <b>+ Spaardoel</b>. Geef een naam, doelbedrag en eventueel een datum.",
       "Elk doel krijgt een referentie <b>SP-…</b>. Zet die in de mededeling van je overschrijving naar je spaarrekening.",
       "Na de volgende CSV-import komt de storting vanzelf bij het juiste doel.",
       "In <b>Spaar</b> zie je alle bewegingen en kan je geld tussen doelen <b>⇄ verplaatsen</b>." ] },
-    { id: "plan", icon: "📅", title: "Betalingen plannen", tab: "planner", steps: [
+    { id: "plan", show: [["planner", '[data-act="pl-new"]'], null, ["planner", '[data-act="pl-adopt"], [data-act="pl-detected"]'], ["planner", '[data-act="pl-ics"]']], icon: "📅", title: "Betalingen plannen", tab: "planner", steps: [
       "Ga naar <b>Planner</b> → <b>+ Planning</b>. Vul in wat het is, het bedrag, de datum en hoe vaak het terugkomt.",
       "Kies de rekening waarvan het betaald wordt. Zo klopt de saldoverwachting per rekening.",
       "Vaste betalingen die de app zelf herkent, zet je met <b>In planner</b> erbij.",
       "Met <b>📅 Naar agenda</b> zet je de herinneringen in je agenda (Outlook, Google…)." ] },
-    { id: "onedrive", icon: "☁", title: "Automatische back-up naar OneDrive", tab: "profiel", steps: [
+    { id: "onedrive", show: [["profiel", '[data-act="folder-open"]'], null, null, null, null], icon: "☁", title: "Automatische back-up naar OneDrive", tab: "profiel", steps: [
       "Werkt op de pc in <b>Edge</b> of <b>Chrome</b>. Ga naar <b>Profiel</b> → <b>OneDrive-back-up</b>.",
       "Kies één keer een map in je OneDrive-map, bv. <i>OneDrive\\Budgetplanner</i>.",
       "De app schrijft daar een back-up en een gsm-samenvatting, na elke import en één keer per dag.",
       "Na een herstart vraagt de browser soms opnieuw toestemming: klik dan op <b>Hervatten</b>.",
       "Op de gsm: tik op <b>⟳</b> en kies <b>budgetplanner-mobiel.txt</b> uit OneDrive." ] },
-    { id: "backup", icon: "↓", title: "Back-up maken of naar een ander toestel", tab: "profiel", steps: [
+    { id: "backup", show: [["profiel", '[data-act="export-json"]'], ["profiel", '[data-act="import-json"]'], null], icon: "↓", title: "Back-up maken of naar een ander toestel", tab: "profiel", steps: [
       "Ga naar <b>Profiel</b> → <b>Back-up exporteren</b>. Je krijgt één .json-bestand met al je gegevens.",
       "Op het andere toestel (of na <b>Alles wissen</b>): <b>Profiel</b> → <b>Back-up terugzetten</b> en kies dat bestand.",
       "De app toont eerst een samenvatting. Pas na je bevestiging worden de gegevens vervangen." ] },
-    { id: "install", icon: "⤓", title: "De app installeren", tab: "profiel", steps: [
+    { id: "install", show: [["profiel", '[data-act="install"]'], null, null, null], icon: "⤓", title: "De app installeren", tab: "profiel", steps: [
       "<b>Pc (Edge/Chrome):</b> klik op <b>⤓ Installeren</b> bovenaan, of op het installatie-icoon in de adresbalk.",
       "<b>Android:</b> menu ⋮ → <b>App installeren</b> of <b>Toevoegen aan startscherm</b>.",
       "<b>iPhone (Safari):</b> deelknop □↑ → <b>Zet op beginscherm</b>.",
@@ -3952,10 +3956,10 @@ if (typeof module !== "undefined") module.exports = { belfiusDesc, catByName, pa
       "Na elke wisactie verschijnt onderaan <b>↶ Ongedaan maken</b>. Klik erop en alles staat terug.",
       "Te laat? Druk op <b>Ctrl+Z</b> (Mac: Cmd+Z), tot 20 stappen terug.",
       "Dit werkt zolang de app open is. Daarna is je back-up het vangnet." ] },
-    { id: "thema", icon: "🎨", title: "Thema kiezen", tab: "profiel", steps: [
+    { id: "thema", show: [["profiel", '[data-act="theme-open"]'], null], icon: "🎨", title: "Thema kiezen", tab: "profiel", steps: [
       "Ga naar <b>Profiel</b> → <b>Thema</b>: Cyberpunk, Synthwave, Matrix of Oceaan, telkens donker of licht.",
       "De keuze geldt per toestel: je gsm mag een ander thema hebben dan je pc." ] },
-    { id: "tutorial", icon: "🎓", title: "Tutorialmodus", tab: "profiel", steps: [
+    { id: "tutorial", show: [["profiel", '[data-act="tut-toggle"]'], null, null], icon: "🎓", title: "Tutorialmodus", tab: "profiel", steps: [
       "Ga naar <b>Profiel</b> en klik op <b>🎓 Tutorial</b> om hem aan of uit te zetten.",
             "Ga met je muis over een knop: er verschijnt een ballon met wat de knop doet, bij grote taken met een stappenplan.",
       "Werkt op de pc (met muis). Bij een nieuwe, lege planner staat hij de eerste keer vanzelf aan." ] },
@@ -3982,7 +3986,7 @@ if (typeof module !== "undefined") module.exports = { belfiusDesc, catByName, pa
       <section class="card help-search"><input class="input" id="help-q" type="search" placeholder="Zoek in de help, bv. startsaldo, OneDrive, splitsen…" aria-label="Zoeken in de help" autocomplete="off"><p class="muted" id="help-none" hidden style="margin:10px 0 0">Niets gevonden. Probeer een ander woord.</p></section>`;
     h += `<section class="card"><div class="card-head"><h2>Stappenplannen</h2><span class="hint">Klik om open te klappen</span></div><div class="help-list">` + HELP_TOPICS.map(t =>
       `<details class="help-item" id="help-${t.id}" data-q="${esc(plain(t.title + " " + t.steps.join(" ")))}"><summary><span class="help-ic">${t.icon}</span>${esc(t.title)}</summary>
-        <ol class="help-steps">${t.steps.map(x => `<li><span>${x}</span></li>`).join("")}</ol>${t.tab ? `<a class="hint" href="#${t.tab}">→ Naar ${esc(tabName(t.tab))}</a>` : ""}</details>`).join("") + `</div></section>`;
+        <ol class="help-steps">${t.steps.map((x, i) => `<li><span>${x}${t.show && t.show[i] ? ` <button class="linkbtn help-show" data-act="help-show" data-topic="${t.id}" data-i="${i}" type="button">Toon me →</button>` : ""}</span></li>`).join("")}</ol>${t.tab ? `<a class="hint" href="#${t.tab}">→ Naar ${esc(tabName(t.tab))}</a>` : ""}</details>`).join("") + `</div></section>`;
     h += `<section class="card"><div class="card-head"><h2>De tabbladen</h2></div><div class="help-tabs">` + HELP_TABS.map(([k, n, x]) =>
       `<div class="help-item help-tab" data-q="${esc(plain(n + " " + x))}"><a href="#${k}"><b>${esc(n)}</b></a><p>${x}</p></div>`).join("") + `</div></section>`;
     h += `<section class="card help-item" data-q="sneltoetsen toetsen ctrl z escape"><div class="card-head"><h2>Sneltoetsen (pc)</h2></div><div class="help-keys">
@@ -4090,14 +4094,39 @@ if (typeof module !== "undefined") module.exports = { belfiusDesc, catByName, pa
   function tutHide() { tutCur = null; $("#tut-tip").style.display = "none"; }
   function tutShow(el) {
     const t = TUT[+el.dataset.tut]; if (!t) return; tutCur = el;
-    const topic = t.topic && HELP_TOPICS.find(x => x.id === t.topic), box = $("#tut-tip");
-    box.innerHTML = `<b class="tt">${esc(t.t)}</b><p>${t.x}</p>${topic && t.steps ? `<ol class="help-steps">${topic.steps.map(x => `<li><span>${x}</span></li>`).join("")}</ol>` : ""}${topic ? `<small>Meer uitleg: Help → ${esc(topic.title)}</small>` : ""}`;
-    box.style.display = "block";
+    const topic = t.topic && HELP_TOPICS.find(x => x.id === t.topic);
+    tipAt(el, `<b class="tt">${esc(t.t)}</b><p>${t.x}</p>${topic && t.steps ? `<ol class="help-steps">${topic.steps.map(x => `<li><span>${x}</span></li>`).join("")}</ol>` : ""}${topic ? `<small>Meer uitleg: Help → ${esc(topic.title)}</small>` : ""}`);
+  }
+  // ballon onder (of boven) een element, met pijltje
+  function tipAt(el, html) {
+    const box = $("#tut-tip"); box.innerHTML = html; box.style.display = "block";
     const r = el.getBoundingClientRect(), w = box.offsetWidth, h = box.offsetHeight;
     let x = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), innerWidth - w - 8), y = r.bottom + 10, below = true;
     if (y + h > innerHeight - 8) { y = r.top - h - 10; below = false; }
     box.style.left = x + "px"; box.style.top = Math.max(8, y) + "px"; box.classList.toggle("above", !below);
     box.style.setProperty("--ax", Math.round(Math.min(w - 14, Math.max(14, r.left + r.width / 2 - x))) + "px");
+  }
+
+  /* ---------- "Toon me" (stap 10d): naar het scherm springen en de echte knop oplichten ---------- */
+  let spotEl = null, spotT = 0, spotHtml = "";
+  function spotOff() { spotEl = null; clearTimeout(spotT); $("#spot").style.display = "none"; if (!tutCur) $("#tut-tip").style.display = "none"; }
+  function spotPlace() {
+    if (!spotEl) return; const r = spotEl.getBoundingClientRect(), sp = $("#spot");
+    if (!r.width) { spotOff(); return; }
+    Object.assign(sp.style, { display: "block", left: r.left - 6 + "px", top: r.top - 6 + "px", width: r.width + 12 + "px", height: r.height + 12 + "px" });
+  }
+  function helpShow(id, i) {
+    const t = HELP_TOPICS.find(x => x.id === id), target = t && t.show && t.show[i]; if (!target) return;
+    const [tab, sel] = target, go = () => {
+      let el = [...document.querySelectorAll(sel)].find(e => e.getBoundingClientRect().width && !e.closest("dialog"));
+      if (!el && sel === "#btn-import") el = $("#btn-import");
+      if (!el) { toast("Die knop is er nu nog niet. Doe eerst de vorige stap, of importeer eerst je transacties."); return; }
+      el.scrollIntoView({ block: "center", behavior: "instant" });
+      spotEl = el; tutCur = null; spotPlace();
+      tipAt(el, spotHtml = `<b class="tt">Stap ${i + 1} · ${esc(t.title)}</b><p>${t.steps[i]}</p><small>Klik ergens om verder te gaan · terug via het tabblad Help</small>`);
+      clearTimeout(spotT); spotT = setTimeout(spotOff, 9000);
+    };
+    if (tab && location.hash !== "#" + tab) { location.hash = tab; setTimeout(go, 450); } else go();
   }
 
   const VIEWS = { help: viewHelp, overzicht: viewOverview, transacties: viewTransactions, budget: viewBudget, regels: viewRules, spaardoelen: viewGoals, spaar: viewSavings, planner: viewPlanner, leningen: viewLoans, profiel: viewProfile };
@@ -4347,6 +4376,7 @@ if (typeof module !== "undefined") module.exports = { belfiusDesc, catByName, pa
       case "install": installApp(); break;
       case "theme-open": themeDialog(); break;
       case "help-open": location.hash = "help"; window.scrollTo(0, 0); break;
+      case "help-show": helpShow(el.dataset.topic, +el.dataset.i); break;
       case "help-topic": { const id = el.dataset.topic; location.hash = "help"; setTimeout(() => { const d = $("#help-" + id); if (d) { d.open = true; d.scrollIntoView({ block: "center" }); } }, 150); break; }
       case "tut-toggle": { const on = !tutOn(); setTut(on); render();
         toast(on ? (tutActive() ? "Tutorial aan: ga met je muis over een knop" : "Tutorial aan. De ballonnen werken op een toestel met muis.") : "Tutorial uit. Alle uitleg staat in het tabblad Help."); break; }
@@ -4603,7 +4633,8 @@ if (typeof module !== "undefined") module.exports = { belfiusDesc, catByName, pa
     if (!el) { if (tutCur) tutHide(); return; }
     if (el !== tutCur) tutShow(el);
   });
-  addEventListener("scroll", () => { if (tutCur) tutHide(); }, { passive: true }); addEventListener("resize", tutPaint);
+  addEventListener("scroll", () => { if (tutCur) tutHide(); if (spotEl) { spotPlace(); if (spotEl) tipAt(spotEl, spotHtml); } }, { passive: true });
+  document.addEventListener("pointerdown", e => { if (spotEl && !(e.target.closest && e.target.closest('[data-act="help-show"]'))) spotOff(); }, true); addEventListener("resize", tutPaint);
 
   /* tooltip */
   const tip = $("#tip");
