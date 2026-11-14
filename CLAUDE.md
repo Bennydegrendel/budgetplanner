@@ -67,6 +67,7 @@ Wie Claude wil gebruiken, gebruikt de versie op claude.ai. Geen API-sleutel-opti
 - Werken gebeurt op een **werkbranch** (`claude/…`). Dat is de werktekening: niemand anders ziet ze.
 - **`main` = de vrijgegeven versie.** Alles wat op `main` komt, zet `.github/workflows/pages.yml` automatisch online op `https://bennydegrendel.github.io/budgetplanner/`.
 - Vrijgeven = de werkbranch samenvoegen in `main` via een pull request, pas nadat Benny getest heeft. Nooit rechtstreeks op `main` pushen zonder zijn akkoord.
+- **Na elke afgewerkte stap meteen de pull request klaarzetten** (op vraag van Benny), zonder te wachten tot hij erom vraagt. Samenvoegen (Merge) doet hij altijd zelf.
 
 ## Afwijkingen in de standalone app (op vraag van Benny)
 
