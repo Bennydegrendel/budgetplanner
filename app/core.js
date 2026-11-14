@@ -354,6 +354,20 @@ function applyOwnTransfers(state) {
   }
   return set;
 }
+/* ---------- kredietkaarten (stap 8c-4) ----------
+   state.cards = [{ id, name, keyword, cat }]. De maandelijkse afrekening op een zichtrekening wordt herkend aan het
+   trefwoord. Zolang de losse aankopen niet ingelezen worden, telt de afrekening als UITGAVE (categorie van de kaart),
+   anders zouden die uitgaven uit het budget verdwijnen. Verdelen kan met Splitsen. */
+function cardMatch(state, t) {
+  if (!t || !(t.amount < 0)) return null;
+  const x = ruleText(t);
+  return (state.cards || []).find(k => k.keyword && x.includes(k.keyword.toLowerCase())) || null;
+}
+function applyCards(state) {
+  let n = 0;
+  for (const t of budgetTx(state)) if (t.cat === UNCAT && !(t.splits && t.splits.length)) { const k = cardMatch(state, t); if (k && k.cat) { t.cat = k.cat; n++; } }
+  return n;
+}
 /* Stromen tussen eigen zichtrekeningen in een maand: [{from, to, total, count}] (stap 8c-2).
    Telt de uitgaande kant; een inkomende enkel als de verzendende rekening die maand niet ingelezen is. */
 function transferFlows(state, ym) {
@@ -859,4 +873,4 @@ function toCsv(state) {
   return "﻿" + lines.join("\r\n");
 }
 
-if (typeof module !== "undefined") module.exports = { transferFlows, OWN_CAT, ownTransfer, applyOwnTransfers, ownConflicts, MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
+if (typeof module !== "undefined") module.exports = { cardMatch, applyCards, transferFlows, OWN_CAT, ownTransfer, applyOwnTransfers, ownConflicts, MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };

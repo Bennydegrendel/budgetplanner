@@ -887,7 +887,8 @@ dialog[open] { animation: fx-pop .18s ease-out; }
     for (const c of st.credits) {
       if (!c.keywords && c.entries) { const keys = [...new Set(c.entries.filter(e => e.txId).map(e => st.transactions.find(t => t.id === e.txId)).filter(Boolean).map(txRefKey))]; if (keys.length) c.keywords = keys.join(", "); }
       if (c.entries) c.entries = c.entries.filter(e => !e.txId); if (c.anchorUsed === undefined) { c.anchorUsed = null; c.anchorDate = ""; } if (c.keywords === undefined) c.keywords = ""; delete c.startBalance; delete c.startDate; }
-    applyOwnTransfers(st);
+    if (!st.cards) st.cards = [];
+    applyOwnTransfers(st); applyCards(st);
     return st;
   }
   function openDb() {
@@ -1025,7 +1026,7 @@ dialog[open] { animation: fx-pop .18s ease-out; }
       const r = mergeRows(state, res.rows); added += r.added; dup += r.dup; uncat += r.uncat; auto += r.auto;
       savAdded += 0;
     }
-    const sug = 0; const resolved = resolvePending(state); applyAllSplitRules(state); applyOwnTransfers(state);
+    const sug = 0; const resolved = resolvePending(state); applyAllSplitRules(state); applyOwnTransfers(state); applyCards(state);
     if (added) { askPersist(); setTimeout(() => folderAuto("import"), 800); }
     const newSav = savMoves(state).filter(m => m.src === "bank" && !m.checked && m.date >= (minD || "0")).length;
     save();
@@ -1771,7 +1772,7 @@ dialog[open] { animation: fx-pop .18s ease-out; }
     const open = ui.open.has(t.id);
     return `<tr class="${open ? "open" : ""}" data-id="${esc(t.id)}">
       <td class="num muted" style="width:96px">${fmtDate(t.date)}</td>
-      <td class="desc">${accDot(t)}<div class="d" data-act="toggle-raw" title="Klik voor de volledige bankomschrijving">${esc(t.desc)}</div>${(t.tags && t.tags.length) || (t.splits && t.splits.length) ? `<div class="tagrow">${(t.splits || []).length ? `<span class="tag split" data-act="split-tx" title="Gesplitst">⑂ ${t.splits.map(x => esc(x.cat) + " " + eur0(Math.abs(x.amount))).join(" · ")}</span>` : ""}${(t.tags || []).map(g => `<span class="tag" data-act="tag-filter" data-tag="${esc(g)}">#${esc(g)}</span>`).join("")}</div>` : ""}${t.raw ? `<div class="raw">${esc(t.raw)}</div>` : ""}</td>
+      <td class="desc">${accDot(t)}${cardChip(t) ? `<div style="float:right;margin-left:8px">${cardChip(t)}</div>` : ""}<div class="d" data-act="toggle-raw" title="Klik voor de volledige bankomschrijving">${esc(t.desc)}</div>${(t.tags && t.tags.length) || (t.splits && t.splits.length) ? `<div class="tagrow">${(t.splits || []).length ? `<span class="tag split" data-act="split-tx" title="Gesplitst">⑂ ${t.splits.map(x => esc(x.cat) + " " + eur0(Math.abs(x.amount))).join(" · ")}</span>` : ""}${(t.tags || []).map(g => `<span class="tag" data-act="tag-filter" data-tag="${esc(g)}">#${esc(g)}</span>`).join("")}</div>` : ""}${t.raw ? `<div class="raw">${esc(t.raw)}</div>` : ""}</td>
       <td>${t.splits && t.splits.length ? `<button class="btn small" data-act="split-tx" type="button" title="Gesplitst over ${t.splits.length} categorieën">⑂ Gesplitst</button>` : `<select class="cat${t.cat === UNCAT ? " uncat" : ""}" data-act="set-cat" aria-label="Categorie">${catOptions(t.cat)}</select>`}</td>
       ${(() => { const o = ownTransfer(state, t); return o ? `<td class="r num amount xfer" title="Verplaatsing ${t.amount < 0 ? "naar" : "van"} ${esc(accName(state, o))}: geen inkomen of uitgave">⇄ ${eur(Math.abs(t.amount))}<small>${t.amount < 0 ? "→" : "←"} ${esc(accName(state, o))}</small></td>` : `<td class="r num amount ${t.amount >= 0 ? "pos" : "neg"}">${signed(t.amount)}</td>`; })()}
       <td class="r" style="width:176px;white-space:nowrap"><button class="btn small ghost" data-act="tag-tx" type="button" title="Labels">#</button><button class="btn small ghost" data-act="split-tx" type="button" title="Splitsen over categorieën">⑂</button><button class="btn small ghost" data-act="make-rule" type="button" title="Maak een regel op basis van deze transactie">Regel</button><button class="btn small ghost" data-act="del-tx" type="button" aria-label="Verwijderen" title="Verwijderen">✕</button></td></tr>`;
@@ -2780,6 +2781,19 @@ dialog[open] { animation: fx-pop .18s ease-out; }
     }
     if (!sp.length) h += `<tr class="empty-row"><td colspan="5">Nog geen spaarrekening.</td></tr>`;
     h += `</tbody></table></div><div style="margin-top:12px"><button class="btn" data-act="acc-add" data-type="spaar" type="button">+ Spaarrekening toevoegen</button></div></section>`;
+    const cards = state.cards || [];
+    h += `<section class="card" id="pf-cards"><div class="card-head"><h2>Kredietkaarten</h2><span class="hint">Bv. een Visa die maandelijks in één keer van je zichtrekening gaat. De afrekening telt als uitgave in de categorie van de kaart; verdeel ze met ⑂ Splitsen over categorieën.</span></div>
+      <div class="table-wrap"><table><thead><tr><th>Naam</th><th>Herkennen aan</th><th>Categorie</th><th class="r">Afrekeningen</th><th class="r">Laatste</th><th></th></tr></thead><tbody>`;
+    for (const k of cards) {
+      const hits = budgetTx(state).filter(t => cardMatch(state, t) === k), last = hits[0];
+      h += `<tr data-card="${esc(k.id)}"><td><input class="cell wide" data-act="card-name" value="${esc(k.name)}" aria-label="Naam van de kaart"></td>
+        <td><input class="cell" data-act="card-kw" value="${esc(k.keyword)}" aria-label="Herkennen aan"></td>
+        <td><select class="cat" data-act="card-cat" aria-label="Categorie">${catOptions(k.cat || UNCAT)}</select></td>
+        <td class="r num muted">${hits.length}</td><td class="r num">${last ? `${eur(Math.abs(last.amount))} <span class="muted">${fmtDate(last.date)}</span>` : `<span class="muted">—</span>`}</td>
+        <td class="r"><button class="btn small ghost" data-act="card-del" type="button" title="Verwijderen" aria-label="Kaart verwijderen">✕</button></td></tr>`;
+    }
+    if (!cards.length) h += `<tr class="empty-row"><td colspan="6">Nog geen kredietkaarten. Een debetkaart (zoals Bancontact of Mastercard in je zichtrekening) hoef je hier niet toe te voegen.</td></tr>`;
+    h += `</tbody></table></div><div style="margin-top:12px"><button class="btn" data-act="card-add" type="button">+ Kredietkaart toevoegen</button></div></section>`;
     const items = [["theme-open", "🎨", "Thema", "Cyberpunk, Synthwave, Matrix of Oceaan · donker of licht"], ["folder-open", "☁", "OneDrive-back-up", "Automatisch een kopie + gsm-samenvatting"],
       ["export-json", "↓", "Back-up exporteren", "Alles in één .json-bestand"], ["import-json", "↑", "Back-up terugzetten", "Een eerder geëxporteerd bestand laden"],
       ["export-csv", "⊞", "Transacties naar Excel", ".csv met puntkomma, opent in Excel"], ["pin-open", "🔒", "Pincode", "De planner afschermen met een code"],
@@ -2847,6 +2861,30 @@ dialog[open] { animation: fx-pop .18s ease-out; }
     const st = accStats(todayYm()), tot = st.filter(x => x.bal !== null).reduce((a, x) => a + x.bal, 0);
     return `<section class="card"><div class="card-head"><h2>Rekeningen</h2><a class="hint" href="#profiel">Profiel</a></div><div class="soon-list">${st.map(x => `<div class="row-i" style="grid-template-columns:1fr auto"><span><i class="acc-mini" style="--c:${x.color}"></i>${esc(x.name)}</span><span class="num ${x.bal !== null && x.bal < 0 ? "neg" : ""}">${x.bal === null ? "—" : eur(x.bal)}</span></div>`).join("")}<div class="row-i" style="grid-template-columns:1fr auto;font-weight:600"><span>Totaal</span><span class="num gold">${eur(tot)}</span></div></div></section>`;
   }
+  function cardAddDialog() {
+    dialog(`<h3>Kredietkaart toevoegen</h3><p class="muted" style="margin:4px 0 10px">Kijk in je transacties hoe de maandelijkse afrekening heet (bv. "VISA" of de laatste cijfers van de kaart) en vul dat woord in.</p>
+      <label for="kc-name">Naam</label><input class="input" id="kc-name" placeholder="bv. Visa" autocomplete="off">
+      <label for="kc-kw">Herkennen aan</label><input class="input" id="kc-kw" placeholder="bv. VISA" autocomplete="off">
+      <p id="kc-prev" class="muted" style="margin:8px 0 0;font-size:12.5px">&nbsp;</p>
+      <label for="kc-cat">Categorie van de afrekening</label><select class="input" id="kc-cat"><option value="__new">Nieuwe categorie met de naam van de kaart</option>${state.categories.filter(c => c.type === "Vaste kosten" || c.type === "Variabele kosten").map(c => `<option>${esc(c.name)}</option>`).join("")}</select>
+      <p id="kc-err" class="neg" style="margin:8px 0 0;font-size:12.5px"></p>
+      <div class="row"><button class="btn" data-close type="button">Annuleren</button><button class="btn primary" id="kc-ok" type="button">Toevoegen</button></div>`, d => {
+      const g = q => d.querySelector(q);
+      const prev = () => { const kw = g("#kc-kw").value.trim().toLowerCase(); if (kw.length < 3) { g("#kc-prev").innerHTML = "&nbsp;"; return; }
+        const hits = budgetTx(state).filter(t => t.amount < 0 && ruleText(t).includes(kw));
+        g("#kc-prev").textContent = hits.length ? `${hits.length} afrekening${hits.length === 1 ? "" : "en"} gevonden, de laatste: ${eur(Math.abs(hits[0].amount))} op ${fmtDate(hits[0].date)} (${hits[0].desc.slice(0, 50)}).` : "Nog geen afrekeningen met dit woord gevonden."; };
+      g("#kc-kw").addEventListener("input", prev); g("#kc-name").focus();
+      g("#kc-ok").addEventListener("click", () => {
+        const name = g("#kc-name").value.trim(), kw = g("#kc-kw").value.trim();
+        if (!name || kw.length < 3) { g("#kc-err").textContent = "Vul een naam in en een woord van minstens 3 tekens."; return; }
+        let cat = g("#kc-cat").value;
+        if (cat === "__new") { cat = name; if (!state.categories.some(c => c.name === cat)) state.categories.push({ name: cat, type: "Variabele kosten", budget: null }); }
+        state.cards = state.cards || []; state.cards.push({ id: "kc" + Date.now().toString(36), name, keyword: kw, cat });
+        const n = applyCards(state); save(); d.close(); render(); toast(`${name} toegevoegd${n ? ` · ${n} afrekening${n === 1 ? "" : "en"} gecategoriseerd` : ""}`);
+      });
+    });
+  }
+  function cardChip(t) { const k = cardMatch(state, t); return k ? `<span class="chip" title="Afrekening van je kredietkaart. Verdeel ze met ⑂ Splitsen over categorieën.">💳 ${esc(k.name)}</span>` : ""; }
   function updateProfileLabel() { const n = state.profile && state.profile.name; $("#pf-label").textContent = n || "Profiel"; }
 
   /* ---------- smalle schermen (stap 7b) ---------- */
@@ -2935,6 +2973,9 @@ dialog[open] { animation: fx-pop .18s ease-out; }
       case "install": installApp(); break;
       case "theme-open": themeDialog(); break;
       case "acc-add": accAddDialog(el.dataset.type); break;
+      case "card-add": cardAddDialog(); break;
+      case "card-del": { const id = el.closest("tr").dataset.card, k = (state.cards || []).find(x => x.id === id);
+        confirmDlg("Kredietkaart verwijderen?", `${k ? k.name : "De kaart"} wordt uit je lijst verwijderd. Je transacties en hun categorie blijven staan.`, "Verwijderen", () => { state.cards = state.cards.filter(x => x.id !== id); save(); render(); }); break; }
       case "acc-pick": ui.acc = el.dataset.acc || ""; render(); break;
       case "goto-profile": location.hash = "profiel"; break;
       case "own-fix": { const oc = ownConflicts(state); if (!state.categories.some(x => x.name === OWN_CAT)) state.categories.push({ name: OWN_CAT, type: "Overboeking", budget: null });
@@ -3070,6 +3111,9 @@ dialog[open] { animation: fx-pop .18s ease-out; }
         if (!nw || (nw !== old && catNames().includes(nw))) { toast("Die naam is leeg of bestaat al."); el.value = old; break; }
         c.name = nw; state.transactions.forEach(t => { if (t.cat === old) t.cat = nw; if (t.goal === old) t.goal = nw; }); { const sc = savConf(state); sc.entries.forEach(e => { if (e.goal === old) e.goal = nw; }); sc.pending.forEach(p => { if (p.goal === old) p.goal = nw; }); sc.transfers.forEach(x => { if (x.from === old) x.from = nw; if (x.to === old) x.to = nw; }); } state.rules.forEach(r => { if (r.cat === old) r.cat = nw; }); state.goals.forEach(g => { if (g.name === old) g.name = nw; }); save(); break; }
       case "pf-name": state.profile = Object.assign(state.profile || {}, { name: el.value.trim() }); save(); updateProfileLabel(); break;
+      case "card-name": case "card-kw": case "card-cat": { const k = (state.cards || []).find(x => x.id === el.closest("tr").dataset.card); if (!k) break;
+        if (a === "card-name") k.name = el.value.trim() || k.name; else if (a === "card-kw") { if (el.value.trim().length >= 3) k.keyword = el.value.trim(); } else k.cat = el.value === UNCAT ? "" : el.value;
+        applyCards(state); save(); render(); break; }
       case "acc-warn": { const a = state.accounts[el.closest("tr").dataset.acc]; if (a) { const v = num(el.value); a.warn = v === null ? 0 : v; save(); render(); } break; }
       case "acc-name": { const a = state.accounts[el.closest("tr").dataset.acc]; if (a) { a.name = el.value.trim(); save(); render(); } break; }
       case "bal-date": case "bal-amount": {
