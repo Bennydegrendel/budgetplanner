@@ -4236,6 +4236,11 @@ if (typeof module !== "undefined") module.exports = { monthClose, belfiusDesc, c
       "Na elke wisactie verschijnt onderaan <b>↶ Ongedaan maken</b>. Klik erop en alles staat terug.",
       "Te laat? Druk op <b>Ctrl+Z</b> (Mac: Cmd+Z), tot 20 stappen terug.",
       "Dit werkt zolang de app open is. Daarna is je back-up het vangnet." ] },
+    { id: "pin", icon: "🔒", show: [["profiel", '[data-act="pin-open"]'], null, null, null], title: "Pincode en versleuteling", tab: "profiel", steps: [
+      "Ga naar <b>Profiel</b> → <b>Pincode</b> en kies een code van 4 tot 8 cijfers.",
+      "Vanaf dan staan je gegevens <b>versleuteld</b> in de browser. Bij elk openen vraagt de app je code.",
+      "<b>Pincode vergeten = gegevens kwijt</b>: niemand kan ze terughalen. Maak daarom regelmatig een back-up (of zet de OneDrive-back-up aan); die blijft zonder code.",
+      "Pincode uitschakelen: laat het veld <b>Nieuwe pincode</b> leeg. Je gegevens staan dan weer gewoon (onversleuteld) in de browser." ] },
     { id: "thema", show: [["profiel", '[data-act="theme-open"]'], null], icon: "🎨", title: "Thema kiezen", tab: "profiel", steps: [
       "Ga naar <b>Profiel</b> → <b>Thema</b>: Cyberpunk, Synthwave, Matrix of Oceaan, telkens donker of licht.",
       "De keuze geldt per toestel: je gsm mag een ander thema hebben dan je pc." ] },
@@ -4350,7 +4355,7 @@ if (typeof module !== "undefined") module.exports = { monthClose, belfiusDesc, c
     { sel: '[data-act="export-json"]', t: "Back-up exporteren", x: "Al je gegevens in één .json-bestand. Bewaar het goed.", topic: "backup" },
     { sel: '[data-act="import-json"]', t: "Back-up terugzetten", x: "Laad een eerder geëxporteerd bestand. Je ziet eerst een samenvatting voor er iets vervangen wordt." },
     { sel: '[data-act="export-csv"]', t: "Naar Excel", x: "Al je transacties als .csv met puntkomma's, opent rechtstreeks in Excel." },
-    { sel: '[data-act="pin-open"]', t: "Pincode", x: "Scherm de planner af met een code, bv. op een gedeelde pc." },
+    { sel: '[data-act="pin-open"]', t: "Pincode", x: "Versleutelt je gegevens in deze browser: zonder de code zijn ze onleesbaar. Pincode vergeten = gegevens kwijt; je back-ups blijven zonder code.", topic: "pin" },
     { sel: '[data-act="tut-toggle"]', t: "Tutorial", x: "Zet deze uitleg-ballonnen aan of uit." },
     { sel: '[data-act="reset"]', t: "Alles wissen", x: "Verwijdert alle gegevens in deze browser. Je moet eerst WISSEN intypen; maak vooraf een back-up." },
   ];
@@ -4480,7 +4485,7 @@ if (typeof module !== "undefined") module.exports = { monthClose, belfiusDesc, c
     h += `</tbody></table></div><div style="margin-top:12px"><button class="btn" data-act="card-add" type="button">+ Kredietkaart toevoegen</button></div></section>`;
     const items = [["theme-open", "🎨", "Thema", "Cyberpunk, Synthwave, Matrix of Oceaan · donker of licht"], ["folder-open", "☁", "OneDrive-back-up", "Automatisch een kopie + gsm-samenvatting"],
       ["export-json", "↓", "Back-up exporteren", "Alles in één .json-bestand"], ["import-json", "↑", "Back-up terugzetten", "Een eerder geëxporteerd bestand laden"],
-      ["export-csv", "⊞", "Transacties naar Excel", ".csv met puntkomma, opent in Excel"], ["pin-open", "🔒", "Pincode", "De planner afschermen met een code"], ["help-open", "?", "Help", "Uitleg en stappenplannen"], ["tut-toggle", "🎓", tutOn() ? "Tutorial: aan" : "Tutorial: uit", "Uitleg-ballonnen bij de knoppen (pc)"],
+      ["export-csv", "⊞", "Transacties naar Excel", ".csv met puntkomma, opent in Excel"], ["pin-open", "🔒", "Pincode", "Je gegevens versleutelen met een code"], ["help-open", "?", "Help", "Uitleg en stappenplannen"], ["tut-toggle", "🎓", tutOn() ? "Tutorial: aan" : "Tutorial: uit", "Uitleg-ballonnen bij de knoppen (pc)"],
       ...(isStandalone() ? [] : [["install", "⤓", "App installeren", "Als programma op je pc of gsm"]]), ["reset", "✕", "Alles wissen", "Verwijdert alle gegevens in deze browser", "danger"]];
     h += `<section class="card"><div class="card-head"><h2>Instellingen</h2></div><div class="pf-grid">${items.map(([act, ic, t, sub, cls]) => `<button type="button" class="pf-item${cls ? " " + cls : ""}" data-act="${act}"><b>${ic} ${t}</b><small>${sub}</small></button>`).join("")}</div></section>`;
     return h;
