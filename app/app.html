@@ -319,12 +319,7 @@ main { max-width: 1180px; margin: 0 auto; padding: 24px; display: grid; gap: 20p
 .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
 .legend i.tick { width: 2px; height: 12px; background: var(--ink); border-radius: 1px; vertical-align: -2px; }
 
-/* trend */
-.trend svg { width: 100%; height: auto; display: block; overflow: visible; }
-.trend text { fill: var(--muted); font: 11px var(--font-body); font-variant-numeric: tabular-nums; }
-.trend .grid { stroke: var(--line); }
-.trend .hit { fill: transparent; cursor: default; }
-.trend .hit:hover { fill: var(--bar-track); opacity: .6; }
+.chart .hit:hover { fill: var(--bar-track); opacity: .6; }
 
 .tooltip { position: fixed; pointer-events: none; background: var(--ink); color: var(--surface); padding: 8px 10px; border-radius: 8px; font-size: 12.5px; line-height: 1.45; z-index: 20; display: none; box-shadow: 0 6px 18px rgba(var(--shade-rgb), .18); max-width: 260px; }
 .tooltip b { font-weight: 600; }
@@ -636,8 +631,8 @@ tbody tr:hover td { background: rgba(var(--accent-rgb), .05); }
 .debt-bar .free { box-shadow: 0 0 10px rgba(var(--pos-rgb), calc(.45 * var(--glow))); opacity: .9; }
 .budget-tick { background: var(--magenta); box-shadow: 0 0 6px var(--magenta); }
 .legend i.tick { background: var(--magenta); }
-.chart text, .trend text { font-family: var(--font-mono); }
-.chart path[fill^="var"], .trend path[fill^="var"] { filter: drop-shadow(0 0 4px rgba(var(--accent-rgb), calc(.25 * var(--glow)))); }
+.chart text { font-family: var(--font-mono); }
+.chart path[fill^="var"] { filter: drop-shadow(0 0 4px rgba(var(--accent-rgb), calc(.25 * var(--glow)))); }
 .chart path[stroke^="var"] { filter: drop-shadow(0 0 5px currentColor); }
 
 .notice { border-radius: var(--r-card); border-left: 3px solid currentColor; }
@@ -768,7 +763,7 @@ td.amount.xfer::first-letter { color: var(--accent); }
 #main.enter > *:nth-child(2) { animation-delay: .04s; } #main.enter > *:nth-child(3) { animation-delay: .08s; }
 #main.enter > *:nth-child(4) { animation-delay: .12s; } #main.enter > *:nth-child(5) { animation-delay: .16s; }
 #main.enter > *:nth-child(n+6) { animation-delay: .2s; }
-#main.enter .chart svg, #main.enter .trend svg, #main.enter section svg { animation: fx-reveal .8s ease-out .15s both; }
+#main.enter .chart svg, #main.enter section svg { animation: fx-reveal .8s ease-out .15s both; }
 #main.enter .fill, #main.enter .gw-bar span { transform-origin: left center; animation: fx-grow .8s cubic-bezier(.2, .8, .2, 1) .15s both; }
 dialog[open] { animation: fx-pop .18s ease-out; }
 .menu.open .menu-list { animation: fx-drop .16s ease-out; }
@@ -1449,7 +1444,7 @@ dialog[open] { animation: fx-pop .18s ease-out; }
     const uncatHtml = s.uncatCount ? uncatCard(ui.month) : "";
     h += goalsWide();
     h += `<div class="stack">${chartsCard()}${transferCard()}</div>`;
-    h += `<div class="grid-2"><div class="stack"><section class="card">${catChart(s)}</section>${groupCards(s)}${debtCard()}${uncatHtml}</div><div class="stack">${(state.plans.length || detectRecurring(state).length) ? soonCard(14, true) : ""}<section class="card trend">${trendChart()}</section>${carryCard()}</div></div>`;
+    h += `<div class="grid-2"><div class="stack"><section class="card">${catChart(s)}</section>${groupCards(s)}${debtCard()}${uncatHtml}</div><div class="stack">${(state.plans.length || detectRecurring(state).length) ? soonCard(14, true) : ""}${carryCard()}</div></div>`;
     return h;
   }
 
@@ -1834,27 +1829,6 @@ dialog[open] { animation: fx-pop .18s ease-out; }
     return h;
   }
 
-  function trendChart() {
-    const months = []; for (let i = 5; i >= 0; i--) months.push(shiftMonth(ui.month, -i));
-    const data = months.map(m => { const s = monthSummary(state, m); return { m, inc: s.income, exp: s.expenses + Math.max(0, -s.uncat), net: s.net }; });
-    const W = 420, H = 190, L = 44, B = 22, T = 8, iw = W - L - 6, ih = H - B - T;
-    const max = Math.max(1, ...data.map(d => Math.max(d.inc, d.exp)));
-    const step = niceStep(max / 3), top = Math.ceil(max / step) * step;
-    const y = v => T + ih - v / top * ih, gw = iw / months.length, bw = Math.min(16, gw / 3.2);
-    let g = "";
-    for (let v = 0; v <= top + 1e-9; v += step) g += `<line class="grid" x1="${L}" x2="${W - 6}" y1="${y(v)}" y2="${y(v)}" ${v === 0 ? 'style="stroke:var(--muted);opacity:.5"' : ""}/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${v >= 1000 ? (v / 1000).toLocaleString("nl-BE") + "k" : v}</text>`;
-    data.forEach((d, i) => {
-      const cx = L + gw * i + gw / 2;
-      const bar = (x, v, col) => v > 0 ? `<path d="${roundTop(x, y(v), bw, T + ih - y(v), 3)}" fill="${col}"${d.m === ui.month ? "" : ' opacity=".55"'}/>` : "";
-      g += bar(cx - bw - 1, d.inc, "var(--pos)") + bar(cx + 1, d.exp, "var(--neg)");
-      g += `<text x="${cx}" y="${H - 6}" text-anchor="middle" style="${d.m === ui.month ? "fill:var(--ink);font-weight:600" : ""}">${monthShort(d.m)}</text>`;
-      const tip = `<b>${esc(monthName(d.m))}</b><br>Inkomsten: ${eur(d.inc)}<br>Uitgaven: ${eur(d.exp)}<br>Netto: ${signed(d.net)}`;
-      g += `<rect class="hit" x="${L + gw * i}" y="${T}" width="${gw}" height="${ih}" rx="6" data-tip="${esc(tip)}" data-act="goto-month" data-month="${d.m}" style="cursor:pointer"/>`;
-    });
-    return `<div class="card-head"><h2>Laatste 6 maanden</h2><span class="hint">Klik op een maand</span></div>
-      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Inkomsten en uitgaven over de laatste zes maanden">${g}</svg>
-      <div class="legend"><span><i style="background:var(--pos)"></i>Inkomsten</span><span><i style="background:var(--neg)"></i>Uitgaven (incl. te categoriseren)</span></div>`;
-  }
   function niceStep(x) { const p = Math.pow(10, Math.floor(Math.log10(x || 1))); const n = x / p; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p; }
   function roundTop(x, y, w, h, r) { r = Math.min(r, h, w / 2); return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`; }
 
