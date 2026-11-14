@@ -651,9 +651,59 @@ body.dragging::after { border-radius: var(--r-card); background: rgba(var(--pane
 .foot { font-family: var(--font-mono); text-transform: var(--case-ui); letter-spacing: .08em; font-size: 11px; }
 a.hint, .legend a { color: var(--accent); }
 @media (prefers-reduced-motion: reduce) { body::before { display: none; } }
+/* ================= ANIMATIES (stap 6c) =================
+   Kort en spaarzaam. Alles valt weg bij "minder beweging" (zie onderaan).
+   #main.enter wordt kort gezet als je van tabblad wisselt of de app opent. */
+@keyframes fx-in { from { opacity: 0; transform: translateY(8px); } }
+@keyframes fx-reveal { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes fx-grow { from { transform: scaleX(0); } }
+@keyframes fx-pop { from { opacity: 0; transform: translateY(6px) scale(.98); } }
+@keyframes fx-drop { from { opacity: 0; transform: translateY(-4px); } }
+#main.enter > * { animation: fx-in .32s ease-out both; }
+#main.enter > *:nth-child(2) { animation-delay: .04s; } #main.enter > *:nth-child(3) { animation-delay: .08s; }
+#main.enter > *:nth-child(4) { animation-delay: .12s; } #main.enter > *:nth-child(5) { animation-delay: .16s; }
+#main.enter > *:nth-child(n+6) { animation-delay: .2s; }
+#main.enter .chart svg, #main.enter .trend svg, #main.enter section svg { animation: fx-reveal .8s ease-out .15s both; }
+#main.enter .fill, #main.enter .gw-bar span { transform-origin: left center; animation: fx-grow .8s cubic-bezier(.2, .8, .2, 1) .15s both; }
+dialog[open] { animation: fx-pop .18s ease-out; }
+.menu.open .menu-list { animation: fx-drop .16s ease-out; }
+.card, .kpi, .btn, .theme-tile { transition: box-shadow .2s ease, border-color .2s ease, background-color .2s ease, color .2s ease; }
+.kpi:hover { border-color: rgba(var(--accent-rgb), .45); }
+
+/* Cyberpunk: korte glitch op de titel */
+@keyframes fx-glitch {
+  0% { clip-path: inset(40% 0 35% 0); transform: translateX(-6px); text-shadow: -3px 0 var(--magenta), 3px 0 var(--accent); }
+  20% { clip-path: inset(10% 0 60% 0); transform: translateX(5px); }
+  40% { clip-path: inset(70% 0 5% 0); transform: translateX(-3px); text-shadow: 3px 0 var(--magenta), -3px 0 var(--accent); }
+  60% { clip-path: inset(0 0 0 0); transform: translateX(2px); }
+  100% { clip-path: inset(0 0 0 0); transform: none; } }
+[data-theme="cyberpunk"] #main.enter .page-head h1 { animation: fx-glitch .45s steps(2, end) .1s both; }
+
+/* Matrix: knipperende cursor (de titel typt zichzelf via het script) */
+@keyframes fx-blink { 50% { opacity: 0; } }
+[data-theme="matrix"] .page-head h1::after { animation: fx-blink 1.05s steps(1, end) infinite; }
+
+/* Achtergrondlaag voor Synthwave en Oceaan (bewogen met transform = door de grafische kaart, zuinig) */
+#fx { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; display: none; }
+[data-theme="synthwave"] #fx, [data-theme="oceaan"] #fx { display: block; }
+/* Synthwave: neonvloer aan de horizon die langzaam naar je toe schuift */
+@keyframes fx-floor { from { transform: perspective(340px) rotateX(64deg) translateY(0); } to { transform: perspective(340px) rotateX(64deg) translateY(44px); } }
+[data-theme="synthwave"] #fx::before { content: ""; position: absolute; left: -60%; right: -60%; bottom: -30%; height: 75%;
+  background: linear-gradient(rgba(var(--magenta-rgb), .38) 1.5px, transparent 1.5px) 0 0 / 100% 44px,
+              linear-gradient(90deg, rgba(var(--magenta-rgb), .30) 1.5px, transparent 1.5px) 0 0 / 44px 100%;
+  -webkit-mask-image: linear-gradient(to top, var(--bg) 25%, transparent 85%); mask-image: linear-gradient(to top, var(--bg) 25%, transparent 85%);
+  transform-origin: 50% 100%; animation: fx-floor 6s linear infinite; }
+/* Oceaan: zachte lichtvlekken die traag deinen */
+@keyframes fx-tide { to { transform: translate(8vmax, 5vmax) scale(1.12); } }
+[data-theme="oceaan"] #fx::before, [data-theme="oceaan"] #fx::after { content: ""; position: absolute; width: 75vmax; height: 75vmax; border-radius: 50%; }
+[data-theme="oceaan"] #fx::before { left: -25vmax; top: -40vmax; background: radial-gradient(circle, rgba(var(--accent-rgb), .16), transparent 65%); animation: fx-tide 18s ease-in-out infinite alternate; }
+[data-theme="oceaan"] #fx::after { right: -30vmax; bottom: -45vmax; background: radial-gradient(circle, rgba(var(--magenta-rgb), .12), transparent 65%); animation: fx-tide 23s ease-in-out infinite alternate-reverse; }
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; } #fx { display: none !important; } }
 </style>
 </head>
 <body>
+<div id="fx" aria-hidden="true"></div>
 <header>
   <div class="bar">
     <div class="brand" title="Budgetplanner"><span class="brand-mark" aria-hidden="true">€</span><span class="brand-text">Budgetplanner</span></div>
@@ -2534,12 +2584,46 @@ a.hint, .legend a { color: var(--accent); }
   const route = () => { const r = location.hash.slice(1); return VIEWS[r] ? r : "overzicht"; };
   function render() {
     const r = route(), focusId = document.activeElement && document.activeElement.id, selStart = document.activeElement && document.activeElement.selectionStart;
-    if (liteMode()) { document.body.classList.add("lite"); document.body.classList.toggle("eye-off", liteHidden()); $("#main").innerHTML = viewLite(); return; }
+    if (liteMode()) { document.body.classList.add("lite"); document.body.classList.toggle("eye-off", liteHidden()); $("#main").innerHTML = viewLite(); afterRender("lite"); return; }
     document.body.classList.remove("lite", "eye-off");
     $("#main").innerHTML = VIEWS[r]();
     updateBadge();
     document.querySelectorAll("#nav a").forEach(a => { if (a.getAttribute("href") === "#" + r) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
     if (focusId) { const el = document.getElementById(focusId); if (el) { el.focus(); try { el.setSelectionRange(selStart, selStart); } catch (e) {} } }
+    afterRender(r + (r === "overzicht" ? ui.period : ""));
+  }
+  /* ---------- animaties ----------
+     Alleen als je van scherm wisselt (niet bij elke wijziging: dat zou storen). */
+  let lastView = null;
+  const calm = () => window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function afterRender(view) {
+    if (view === lastView) return; lastView = view;
+    if (calm()) return;
+    const m = $("#main"); m.classList.remove("enter"); void m.offsetWidth; m.classList.add("enter");
+    clearTimeout(afterRender._t); afterRender._t = setTimeout(() => m.classList.remove("enter"), 1300);
+    countUp(m.querySelectorAll(".kpi .value"));
+    if (document.documentElement.dataset.theme === "matrix") typeTitle(m.querySelector(".page-head h1, .lite-head h1"));
+  }
+  // bedragen optellen van 0 tot hun waarde (± 0,6 s)
+  function countUp(els) {
+    els.forEach(el => {
+      const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), nodes = [];
+      while (w.nextNode()) if (/\d/.test(w.currentNode.nodeValue)) nodes.push(w.currentNode);
+      nodes.forEach(n => {
+        const orig = n.nodeValue, mt = orig.match(/(\d{1,3}(?:\.\d{3})+|\d+)(?:,(\d+))?/); if (!mt) return;
+        const dec = mt[2] ? mt[2].length : 0, target = parseFloat(mt[1].replace(/\./g, "") + (dec ? "." + mt[2] : ""));
+        if (!(target > 0)) return;
+        const f = new Intl.NumberFormat("nl-BE", { minimumFractionDigits: dec, maximumFractionDigits: dec }), t0 = performance.now();
+        const step = now => { if (!n.isConnected) return; const k = Math.min(1, Math.max(0, (now - t0) / 600)), e = 1 - Math.pow(1 - k, 3);
+          n.nodeValue = k < 1 ? orig.replace(mt[0], f.format(target * e)) : orig; if (k < 1) requestAnimationFrame(step); };
+        requestAnimationFrame(step);
+      });
+    });
+  }
+  // Matrix: titel letter per letter typen
+  function typeTitle(h) {
+    if (!h) return; const full = h.textContent; h.textContent = ""; let i = 0;
+    const iv = setInterval(() => { if (!h.isConnected) { clearInterval(iv); return; } h.textContent = full.slice(0, ++i); if (i >= full.length) clearInterval(iv); }, 45);
   }
   window.addEventListener("hashchange", () => { render(); window.scrollTo(0, 0); });
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden" && !liteMode() && unsynced && state.folder && state.folder.enabled && !ui.folderAsk) folderBackup(false); });
