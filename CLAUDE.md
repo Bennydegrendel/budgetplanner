@@ -93,6 +93,15 @@ Werk ze in volgorde af. Na elke stap: commit, korte uitleg, en wacht op Benny vo
   - [x] 7c – Gsm-weergave: bovenbalk weg (`body.lite header`), logo + titel + 👁/⟳ in één kopregel die bovenaan blijft staan (sticky); prijsstijgingen inklapbaar.
   - Oorspronkelijke omschrijving: Gsm-weergave verfijnen en de lege ruimte op brede schermen benutten (bv. breder raster of zijpaneel met "binnenkort te betalen", spaardoelen, resterend budget).
 
+- [ ] **Stap 8 – Meerdere rekeningen en deelbudgetten** (op vraag van Benny, na het oorspronkelijke stappenplan).
+  - [ ] 8a – Profielscherm (`#profiel`, knop rechtsboven i.p.v. het Back-up-menu): naam, lijst **zichtrekeningen** (max. 5: naam, kleur, rekeningnummer, startsaldo), lijst **spaarrekeningen**, en alle instellingen (Thema, Pincode, OneDrive, Installeren, Back-up, Excel, Alles wissen). CSV-import met onbekend rekeningnummer vraagt soort + naam; een 6e zichtrekening kan niet. Bestaande gegevens = rekening 1. *Gebouwd:* `viewProfile()`, `accAddDialog()`, kleur per zichtrekening (`state.accounts[iban].color`, `ACC_COLORS`), naam in `state.profile.name`; in `core.js` `MAX_ZICHT`, `accKey()` (rekeningnummer herkennen met/zonder spaties), `zichtList()`, `spaarList()`, `fmtIban()`, `accName()`.
+  - [ ] 8b – Rekeningen gescheiden (rekeningkeuze op Transacties, Budget, Planner), dashboard (Overzicht) toont totaal + kaartje per rekening. **Budget blijft één geheel** voor alle rekeningen samen (één persoon = één budget).
+  - [ ] 8c – Overboekingen tussen eigen rekeningen automatisch herkend (tegenpartij = eigen rekeningnummer) als type Overboeking + visualisatie (welke rekening stuurde hoeveel naar welke, per maand). Lijst **kredietkaarten** in het profiel: de maandelijkse afrekening (bv. Visa) telt als overboeking; tot er een import is: categorie "Visa" + Splitsen.
+  - [ ] 8d – Meerdere spaarrekeningen, elk met eigen spaardoelen (doel hoort bij één spaarrekening; `SP-…` blijft werken; verplaatsen tussen doelen binnen dezelfde rekening). Gsm-samenvatting per rekening.
+  - [ ] 8e – **Deelbudgetten**: categorie van het soort "Deelbudget" met een bedrag; eigen venster onder het hoofdbudget om dat bedrag over subcategorieën te verdelen ("nog te verdelen", waarschuwing bij te veel). Uitgaven tellen in het deelbudget én in de bovenliggende regel. Meerdere deelbudgetten mogelijk. Doel: bv. een gezamenlijk budget virtueel bijhouden zonder extra rekening.
+  - [ ] 8f – Belfius-CSV-import (automatisch herkennen ING/Belfius). Wacht op de kolomnamen van een echte Belfius-export (enkel de kopregel, nooit bedragen).
+  - [ ] 8g – Visa-import via CSV of PDF, enkel als blijkt dat het kan (PDF = breekbaar, één geanonimiseerd voorbeeld nodig, nooit in de repo).
+
 ## Regels
 
 - **Nooit persoonlijke gegevens in de repo**: geen bank-CSV's, back-ups, rekeningnummers of bedragen. Zie `.gitignore`. Testgegevens zijn verzonnen.

@@ -316,6 +316,24 @@ function cleanBackup(data) {
   return st;
 }
 
+/* ---------- rekeningen (stap 8) ---------- */
+const MAX_ZICHT = 5;
+/* Zelfde rekening, met of zonder spaties/kleine letters → bestaande sleutel; anders de ruwe waarde. */
+function accKey(state, raw) {
+  const n = normIban(raw); if (!n) return raw;
+  const hit = Object.keys(state.accounts || {}).find(k => normIban(k) === n);
+  return hit || raw;
+}
+function zichtList(state) { return Object.keys(state.accounts || {}).filter(k => state.accounts[k].type === "zicht"); }
+function spaarList(state) {
+  const l = Object.keys(state.accounts || {}).filter(k => state.accounts[k].type === "spaar");
+  const ib = state.savings && state.savings.iban;
+  if (ib && !l.some(k => normIban(k) === normIban(ib))) l.push(ib);
+  return l;
+}
+function fmtIban(a) { return normIban(a).replace(/(.{4})/g, "$1 ").trim(); }
+function accName(state, acc) { const a = state.accounts && state.accounts[accKey(state, acc)]; return (a && a.name) || fmtIban(acc); }
+
 function typeOf(state, cat) {
   const c = state.categories.find(x => x.name === cat);
   return c ? c.type : "Onbekend";
@@ -803,4 +821,4 @@ function toCsv(state) {
   return "﻿" + lines.join("\r\n");
 }
 
-if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
+if (typeof module !== "undefined") module.exports = { MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
