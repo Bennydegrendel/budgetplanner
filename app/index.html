@@ -637,6 +637,8 @@ tbody tr:hover td { background: rgba(var(--accent-rgb), .05); }
 
 .notice { border-radius: var(--r-card); border-left: 3px solid currentColor; }
 .tooltip { background: rgba(var(--shade-rgb), .96); color: var(--ink); border: 1px solid var(--accent); border-radius: var(--r-card); box-shadow: 0 0 18px rgba(var(--accent-rgb), calc(.35 * var(--glow))); font-family: var(--font-body); font-size: 13.5px; }
+.toast-undo { margin-left: 10px; background: none; border: 1px solid currentColor; color: inherit; font: inherit; padding: 3px 9px; border-radius: var(--r-btn); cursor: pointer; text-transform: none; }
+.toast-undo:hover { background: rgba(var(--accent-rgb), .15); }
 .toast { background: rgba(var(--panel-rgb), .96); color: var(--accent); border: 1px solid var(--accent); border-radius: var(--r-card); box-shadow: 0 0 20px rgba(var(--accent-rgb), calc(.4 * var(--glow))); text-transform: var(--case-ui); letter-spacing: .05em; font-weight: 600; }
 .menu-list { background: var(--panel); border-color: var(--accent); border-radius: var(--r-card); box-shadow: 0 0 20px rgba(var(--accent-rgb), calc(.25 * var(--glow))); }
 .menu-list button { border-radius: var(--r-sm); }
@@ -1930,10 +1932,24 @@ if (typeof module !== "undefined") module.exports = { belfiusDesc, catByName, pa
     if (sel && sel !== UNCAT && !catNames().includes(sel)) h += `<option selected>${esc(sel)}</option>`;
     return h;
   }
-  function toast(msg) {
+  function toast(msg, undoBtn) {
     const t = $("#toast"); t.textContent = msg; t.style.display = "block";
-    clearTimeout(toast._t); toast._t = setTimeout(() => (t.style.display = "none"), 4200);
+    if (undoBtn) { const b = document.createElement("button"); b.type = "button"; b.className = "toast-undo"; b.dataset.act = "undo"; b.textContent = "↶ Ongedaan maken"; t.append(" ", b); }
+    clearTimeout(toast._t); toast._t = setTimeout(() => (t.style.display = "none"), undoBtn ? 9000 : 4200);
   }
+
+  /* ---------- ongedaan maken (stap 10a) ----------
+     Vóór elke wisactie een momentopname van de volledige state (zoals een revisie bewaren vóór je iets weggomt).
+     Enkel in het geheugen: na het sluiten van de app is ze weg. Max. 20 stappen terug. */
+  const undoStack = [];
+  function snapshot(label) { undoStack.push({ label, json: JSON.stringify(state) }); if (undoStack.length > 20) undoStack.shift(); }
+  function undo() {
+    const u = undoStack.pop(); if (!u) { toast("Niets om ongedaan te maken"); return; }
+    state = hydrate(JSON.parse(u.json)); save(); render(); toast(`↶ ${u.label} ongedaan gemaakt`);
+  }
+  function withUndo(label, fn) { snapshot(label); fn(); toast(`${label} ✓`, true); }
+  // bevestiging + momentopname in één: gebruikt door alle wisknoppen
+  function confirmDel(title, text, okLabel, label, fn) { confirmDlg(title, text, okLabel, () => withUndo(label, fn), true); }
   function dialog(html, onReady) {
     const d = $("#dlg"); d.innerHTML = html; d.showModal(); if (onReady) onReady(d);
     d.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", () => d.close()));
@@ -1941,6 +1957,16 @@ if (typeof module !== "undefined") module.exports = { belfiusDesc, catByName, pa
   function confirmDlg(title, text, okLabel, onOk, danger) {
     dialog(`<h3>${esc(title)}</h3><p>${esc(text)}</p><div class="row"><button class="btn" data-close type="button">Annuleren</button><button class="btn ${danger ? "danger" : "primary"}" id="dlg-ok" type="button">${esc(okLabel)}</button></div>`,
       d => d.querySelector("#dlg-ok").addEventListener("click", () => { d.close(); onOk(); }));
+  }
+
+  function resetDialog() {
+    dialog(`<h3>Alles wissen?</h3><p>Alle transacties, budgetten, regels, rekeningen en spaardoelen in deze browser worden verwijderd. <b>Exporteer eerst een back-up</b> als je ze wilt bewaren.</p>
+      <label for="rs-word">Typ <b>WISSEN</b> om te bevestigen</label><input class="input" id="rs-word" autocomplete="off">
+      <div class="row"><button class="btn" data-close type="button">Annuleren</button><button class="btn" data-act="export-json" type="button">Eerst back-up</button><button class="btn danger" id="rs-ok" type="button" disabled>Alles wissen</button></div>`, d => {
+      const w = d.querySelector("#rs-word"), ok = d.querySelector("#rs-ok");
+      w.addEventListener("input", () => { ok.disabled = w.value.trim().toUpperCase() !== "WISSEN"; }); w.focus();
+      ok.addEventListener("click", () => { d.close(); withUndo("Alles gewist", () => { state = newState(); save(); render(); }); });
+    });
   }
 
   /* ---------- import / export ---------- */
@@ -3459,7 +3485,7 @@ if (typeof module !== "undefined") module.exports = { belfiusDesc, catByName, pa
       <div class="row">${id ? `<button class="btn danger" id="p-del" type="button">Verwijderen</button>` : ""}<button class="btn" data-close type="button">Annuleren</button><button class="btn primary" id="p-ok" type="button">Opslaan</button></div>`, d => {
       d.querySelector("#p-title").focus();
       const del = d.querySelector("#p-del");
-      if (del) del.addEventListener("click", () => { state.plans = state.plans.filter(x => x.id !== id); save(); d.close(); render(); toast("Planning verwijderd"); });
+      if (del) del.addEventListener("click", () => { d.close(); confirmDel("Planning verwijderen?", `“${p.title}” wordt uit de planner verwijderd.`, "Verwijderen", "Planning verwijderd", () => { state.plans = state.plans.filter(x => x.id !== id); save(); render(); }); });
       d.querySelector("#p-ok").addEventListener("click", () => {
         const g = q => d.querySelector(q).value.trim();
         if (!g("#p-title") || !g("#p-date")) { d.querySelector("#p-err").textContent = "Vul minstens in wat het is en de datum."; return; }
@@ -4077,7 +4103,7 @@ if (typeof module !== "undefined") module.exports = { belfiusDesc, catByName, pa
       case "acc-add": accAddDialog(el.dataset.type); break;
       case "card-add": cardAddDialog(); break;
       case "card-del": { const id = el.closest("tr").dataset.card, k = (state.cards || []).find(x => x.id === id);
-        confirmDlg("Kredietkaart verwijderen?", `${k ? k.name : "De kaart"} wordt uit je lijst verwijderd. Je transacties en hun categorie blijven staan.`, "Verwijderen", () => { state.cards = state.cards.filter(x => x.id !== id); save(); render(); }); break; }
+        confirmDel("Kredietkaart verwijderen?", `${k ? k.name : "De kaart"} wordt uit je lijst verwijderd. Je transacties en hun categorie blijven staan.`, "Verwijderen", "Kredietkaart verwijderd", () => { state.cards = state.cards.filter(x => x.id !== id); save(); render(); }); break; }
       case "chart-view": setChartPref({ view: el.dataset.v }); render(); break;
       case "chart-acc": { const h = new Set(chartPref().hide || ["*"]), k = el.dataset.acc; h.has(k) ? h.delete(k) : h.add(k); setChartPref({ hide: [...h] }); render(); break; }
       case "chart-catmode": setChartPref({ catMode: el.dataset.v }); render(); break;
@@ -4090,11 +4116,11 @@ if (typeof module !== "undefined") module.exports = { belfiusDesc, catByName, pa
       case "acc-open": ui.acc = el.dataset.acc; ui.txAll = false; ui.txCat = ""; ui.txSearch = ""; location.hash = "transacties"; break;
       case "acc-color": { const acc = el.closest("tr").dataset.acc, a = state.accounts[acc]; const cur = Number.isInteger(a.color) ? a.color : Math.max(0, zichtList(state).indexOf(acc)); a.color = (cur + 1) % ACC_COLORS.length; save(); render(); break; }
       case "acc-del": { const acc = el.closest("tr").dataset.acc; if (state.transactions.some(t => normIban(t.account) === normIban(acc))) break;
-        confirmDlg("Rekening verwijderen?", `${accName(state, acc)} wordt uit je lijst verwijderd.`, "Verwijderen", () => { delete state.accounts[acc]; state.balances = state.balances.filter(b => b.account !== acc); save(); render(); }); break; }
+        confirmDel("Rekening verwijderen?", `${accName(state, acc)} wordt uit je lijst verwijderd.`, "Verwijderen", "Rekening verwijderd", () => { delete state.accounts[acc]; state.balances = state.balances.filter(b => b.account !== acc); save(); render(); }); break; }
       case "folder-open": folderDialog(); break;
       case "folder-resume": folderBackup(true); break;
       case "export-csv": offerFile(`transacties-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(state), "text/csv"); break;
-      case "reset": confirmDlg("Alles wissen?", "Alle transacties, budgetten, regels en spaardoelen in deze browser worden verwijderd. Exporteer eerst een back-up als je ze wilt bewaren.", "Alles wissen", () => { state = newState(); save(); render(); toast("Alles gewist"); }, true); break;
+      case "reset": resetDialog(); break;
       case "prev-month": ui.month = shiftMonth(ui.month, -1); render(); break;
       case "next-month": ui.month = shiftMonth(ui.month, 1); render(); break;
       case "goto-month": ui.month = el.dataset.month; hideTip(); render(); break;
@@ -4118,11 +4144,13 @@ if (typeof module !== "undefined") module.exports = { belfiusDesc, catByName, pa
       case "sav-transfer": transferDialog(); break;
       case "goal-new": goalNewDialog(); break;
       case "sav-transfer-del": { const id = el.closest("tr").dataset.tid, sc = savConf(state), t = sc.transfers.find(x => x.id === id); if (!t) break;
-        confirmDlg("Verplaatsing ongedaan maken?", `${eur(t.amount)} gaat terug van ${t.to} naar ${t.from}.`, "Ongedaan maken", () => { sc.transfers = sc.transfers.filter(x => x.id !== id); save(); render(); }); break; }
+        confirmDel("Verplaatsing terugdraaien?", `${eur(t.amount)} gaat terug van ${t.to} naar ${t.from}.`, "Terugdraaien", "Verplaatsing teruggedraaid", () => { sc.transfers = sc.transfers.filter(x => x.id !== id); save(); render(); }); break; }
       case "sav-move": savMoveDialog(el.dataset.type); break;
       case "sav-entry": savEntryDialog(); break;
-      case "sav-entry-del": { const sc = savConf(state); const id = el.closest("tr").dataset.id; sc.entries = sc.entries.filter(e => e.id !== id); save(); render(); break; }
-      case "sav-pending-del": { const sc = savConf(state); const id = el.closest("tr").dataset.pid; sc.pending = sc.pending.filter(p => p.id !== id); save(); render(); break; }
+      case "sav-entry-del": { const sc = savConf(state); const id = el.closest("tr").dataset.id, en = sc.entries.find(e => e.id === id); if (!en) break;
+        confirmDel("Spaarbeweging verwijderen?", `De manuele ingave van ${eur(Math.abs(+en.amount || 0))} op ${fmtDate(en.date)} wordt verwijderd.`, "Verwijderen", "Spaarbeweging verwijderd", () => { sc.entries = sc.entries.filter(e => e.id !== id); save(); render(); }); break; }
+      case "sav-pending-del": { const sc = savConf(state); const id = el.closest("tr").dataset.pid;
+        confirmDel("Geplande spaarverrichting verwijderen?", "Ze verdwijnt uit de lijst \"Gepland, nog niet in je bankafschrift\".", "Verwijderen", "Geplande verrichting verwijderd", () => { sc.pending = sc.pending.filter(p => p.id !== id); save(); render(); }); break; }
       case "copy-ref": (async () => { try { await navigator.clipboard.writeText(el.dataset.ref); toast("Referentie gekopieerd"); } catch (e) { toast(el.dataset.ref); } })(); break;
       case "sav-f": ui2.savFilter = el.dataset.f; render(); break;
       case "sav-check": { const t = txById(el); t.savChecked = true; if (t.goal === undefined || t.goal === null) { const g = moveGoal(state, t); if (g) t.goal = g; } save(); render(); break; }
@@ -4136,11 +4164,11 @@ if (typeof module !== "undefined") module.exports = { belfiusDesc, catByName, pa
       case "credit-entry": entryDialog(+el.dataset.i, el.dataset.type); break;
       case "credit-sync": syncDialog(+el.dataset.i); break;
       case "credit-from-found": { const f = detectLoans(state).find(x => x.keyword === el.dataset.key); if (f) creditDialog(null, { name: "Krediet " + f.keyword.slice(-4), lender: f.name.replace(/\s*(Consumer Finance|Benelux|B\.V\.).*$/i, "").trim() || f.name, keywords: f.keyword }); break; }
-      case "credit-del": { const c = state.credits[+el.dataset.i]; confirmDlg("Krediet verwijderen?", `“${c.name}” en al zijn ingaven worden verwijderd.`, "Verwijderen", () => { state.credits.splice(+el.dataset.i, 1); save(); render(); }, true); break; }
-      case "credit-entry-del": { const c = state.credits[+el.dataset.i]; const e = c.entries.find(x => x.id === el.dataset.id); if (!e) break; confirmDlg("Ingave verwijderen?", `${CREDIT_TYPES[e.type].label} van ${eur(e.amount)} op ${fmtDate(e.date)} wordt verwijderd.`, "Verwijderen", () => { c.entries = c.entries.filter(x => x !== e); save(); render(); }, true); break; }
+      case "credit-del": { const c = state.credits[+el.dataset.i]; confirmDel("Krediet verwijderen?", `“${c.name}” en al zijn ingaven worden verwijderd.`, "Verwijderen", "Krediet verwijderd", () => { state.credits.splice(+el.dataset.i, 1); save(); render(); }); break; }
+      case "credit-entry-del": { const c = state.credits[+el.dataset.i]; const e = c.entries.find(x => x.id === el.dataset.id); if (!e) break; confirmDel("Ingave verwijderen?", `${CREDIT_TYPES[e.type].label} van ${eur(e.amount)} op ${fmtDate(e.date)} wordt verwijderd.`, "Verwijderen", "Ingave verwijderd", () => { c.entries = c.entries.filter(x => x !== e); save(); render(); }); break; }
       case "loan-edit": loanDialog(+el.dataset.i); break;
       case "loan-from-found": { const f = detectLoans(state).find(x => x.keyword === el.dataset.key); if (f) loanDialog(null, { name: f.name.replace(/\s*(Consumer Finance|Benelux|B\.V\.).*$/i, "").trim() + " " + f.keyword.slice(-4), lender: f.name, keyword: f.keyword, monthly: f.monthly }); break; }
-      case "loan-del": { const l = state.loans[+el.dataset.i]; confirmDlg("Lening verwijderen?", `“${l.name}” wordt uit je planner verwijderd. Je transacties blijven staan.`, "Verwijderen", () => { state.loans.splice(+el.dataset.i, 1); save(); render(); }, true); break; }
+      case "loan-del": { const l = state.loans[+el.dataset.i]; confirmDel("Lening verwijderen?", `“${l.name}” wordt uit je planner verwijderd. Je transacties blijven staan.`, "Verwijderen", "Lening verwijderd", () => { state.loans.splice(+el.dataset.i, 1); save(); render(); }); break; }
       case "period-month": ui.period = "maand"; render(); break;
       case "period-year": ui.period = "jaar"; ui.year = +ui.month.slice(0, 4); render(); break;
       case "prev-year": ui.year--; render(); break;
@@ -4150,7 +4178,7 @@ if (typeof module !== "undefined") module.exports = { belfiusDesc, catByName, pa
       case "tx-month": ui.txAll = false; render(); break;
       case "tx-all": ui.txAll = true; render(); break;
       case "toggle-raw": { const id = el.closest("tr").dataset.id; ui.open.has(id) ? ui.open.delete(id) : ui.open.add(id); el.closest("tr").classList.toggle("open"); break; }
-      case "del-tx": { const t = txById(el); confirmDlg("Transactie verwijderen?", `${t.desc} (${signed(t.amount)}) wordt verwijderd. Een nieuwe import van hetzelfde bestand zet ze terug.`, "Verwijderen", () => { state.transactions = state.transactions.filter(x => x !== t); save(); render(); }, true); break; }
+      case "del-tx": { const t = txById(el); confirmDel("Transactie verwijderen?", `${t.desc} (${signed(t.amount)}) wordt verwijderd.`, "Verwijderen", "Transactie verwijderd", () => { state.transactions = state.transactions.filter(x => x !== t); save(); render(); }); break; }
       case "make-rule": ruleDialog(txById(el)); break;
       case "tag-tx": tagDialog(txById(el)); break;
       case "split-tx": splitDialog(txById(el)); break;
@@ -4162,17 +4190,19 @@ if (typeof module !== "undefined") module.exports = { belfiusDesc, catByName, pa
       case "sub-add": subAddDialog(el.dataset.parent); break;
       case "add-cat": state.categories.push({ name: "Nieuwe categorie", type: "Variabele kosten", budget: null }); save(); render(); break;
       case "del-cat": { const c = state.categories[rowIndex(el)]; const used = state.transactions.filter(t => t.cat === c.name).length;
-        confirmDlg("Categorie verwijderen?", used ? `${used} transacties met “${c.name}” worden weer “${UNCAT}”.` : `“${c.name}” wordt verwijderd.`, "Verwijderen", () => { state.transactions.forEach(t => { if (t.cat === c.name) t.cat = UNCAT; }); state.categories.splice(state.categories.indexOf(c), 1); save(); render(); }, true); break; }
+        confirmDel("Categorie verwijderen?", (used ? `${used} transacties met “${c.name}” worden weer “${UNCAT}”.` : `“${c.name}” wordt verwijderd.`) + (c.group && subsOf(state, c.name).length ? ` De subcategorieën worden gewone categorieën.` : ""), "Verwijderen", "Categorie verwijderd", () => { state.transactions.forEach(t => { if (t.cat === c.name) t.cat = UNCAT; }); state.categories.splice(state.categories.indexOf(c), 1); save(); render(); }); break; }
       case "apply-rules": { const n = applyRules(state); save(); render(); toast(n ? `${n} transactie${n === 1 ? "" : "s"} gecategoriseerd` : "Geen nieuwe treffers"); break; }
       case "sr-new": splitRuleDialog(null); break;
       case "sr-edit": splitRuleDialog(rowIndex(el)); break;
       case "sr-apply": { const x = applySplitRule(state, state.splitRules[rowIndex(el)]); save(); render(); toast(`${x.split} gesplitst · ${x.full} volledig`); break; }
       case "sr-del": { const r = state.splitRules[rowIndex(el)]; const n = state.transactions.filter(t => t.splitRule === r.id).length;
         dialog(`<h3>Splitsregel verwijderen?</h3><p>De regel “${esc(r.keyword)}” heeft ${n} transacties gesplitst. Wil je die splitsingen ook ongedaan maken?</p><div class="row"><button class="btn" data-close type="button">Annuleren</button><button class="btn" id="srd-keep" type="button">Splitsingen houden</button><button class="btn danger" id="srd-undo" type="button">Ook ongedaan maken</button></div>`, d => {
-          const go = undo => { if (undo) undoSplitRule(state, r); else state.transactions.forEach(t => { if (t.splitRule === r.id) { delete t.splitRule; delete t.splitBase; } }); state.splitRules = state.splitRules.filter(x => x !== r); save(); d.close(); render(); };
+          const go = undo => { snapshot("Splitsregel verwijderd"); if (undo) undoSplitRule(state, r); else state.transactions.forEach(t => { if (t.splitRule === r.id) { delete t.splitRule; delete t.splitBase; } }); state.splitRules = state.splitRules.filter(x => x !== r); save(); d.close(); render(); toast("Splitsregel verwijderd ✓", true); };
           d.querySelector("#srd-keep").addEventListener("click", () => go(false)); d.querySelector("#srd-undo").addEventListener("click", () => go(true)); }); break; }
       case "add-rule": state.rules.push({ keyword: "", cat: UNCAT }); save(); render(); { const ins = document.querySelectorAll('[data-act="rule-kw"]'); ins[ins.length - 1].focus(); } break;
-      case "del-rule": state.rules.splice(rowIndex(el), 1); save(); render(); break;
+      case "del-rule": { const i = rowIndex(el), r = state.rules[i];
+        if (!r.keyword) { state.rules.splice(i, 1); save(); render(); break; }   // lege, net toegevoegde regel: zonder vragen weg
+        confirmDel("Regel verwijderen?", `De regel “${r.keyword}” → ${r.cat} wordt verwijderd. Al gecategoriseerde transacties blijven zoals ze zijn.`, "Verwijderen", "Regel verwijderd", () => { state.rules.splice(state.rules.indexOf(r), 1); save(); render(); }); break; }
       case "rules-analyze": analyzeRules(); break;
       case "rs-del": ui.ruleSug.splice(+el.closest("tr").dataset.s, 1); if (!ui.ruleSug.length) ui.ruleSug = null; render(); break;
       case "rs-all": ui.ruleSug.forEach(s => { if (s.cat) s.on = true; }); render(); break;
@@ -4182,7 +4212,9 @@ if (typeof module !== "undefined") module.exports = { belfiusDesc, catByName, pa
       case "add-goal": { const free = state.categories.filter(c => c.type === "Sparen" && !state.goals.some(g => g.name === c.name));
         if (!free.length) { goalNewDialog(); break; }
         state.goals.push({ name: free[0].name, target: null, start: 0, deadline: "" }); ensureGoalRefs(state); save(); render(); break; }
-      case "del-goal": state.goals.splice(rowIndex(el), 1); save(); render(); break;
+      case "del-goal": { const g = state.goals[rowIndex(el)], p = goalProgress(state, g);
+        confirmDel("Spaardoel verwijderen?", `“${g.name}” wordt verwijderd${p.total ? ` (er staat ${eur(p.total)} op)` : ""}. Je spaarrekening en transacties blijven staan.`, "Verwijderen", "Spaardoel verwijderd", () => { state.goals.splice(state.goals.indexOf(g), 1); save(); render(); }); break; }
+      case "undo": $("#toast").style.display = "none"; undo(); break;
     }
   });
 
@@ -4328,6 +4360,11 @@ if (typeof module !== "undefined") module.exports = { belfiusDesc, catByName, pa
     tip.style.left = x + "px"; tip.style.top = y + "px";
   });
   document.addEventListener("keydown", e => { if (e.key === "Escape") { hideTip(); navOpen(false); } });
+  // Ctrl+Z (Cmd+Z op Mac) = laatste wisactie ongedaan maken, behalve tijdens het typen in een veld
+  document.addEventListener("keydown", e => {
+    if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.key.toLowerCase() !== "z" || e.target.closest("input, textarea, select, [contenteditable]") || $("#dlg").open) return;
+    if (!undoStack.length) return; e.preventDefault(); undo();
+  });
 
   $("#main").innerHTML = `<p class="muted" style="padding:40px 0;text-align:center">Gegevens laden…</p>`;
   loadState().then(st => { state = st; ui.month = state.transactions.length ? state.transactions[0].date.slice(0, 7) : todayYm();
