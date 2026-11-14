@@ -12,18 +12,26 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Budget">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link id="theme-fonts" rel="stylesheet">
 <script>
   // Thema van dit toestel meteen zetten (anders flitst eerst het standaardthema)
   (function () { let t = {}; try { t = JSON.parse(localStorage.getItem("budgetplanner.v1.theme") || "{}"); } catch (e) {}
     const ok = ["cyberpunk", "synthwave", "matrix", "oceaan"];
     document.documentElement.dataset.theme = ok.includes(t.t) ? t.t : "cyberpunk";
-    document.documentElement.dataset.mode = t.m === "light" ? "light" : "dark"; })();
+    document.documentElement.dataset.mode = t.m === "light" ? "light" : "dark";
+    // lettertypes van het gekozen thema (de andere worden pas geladen als je het themavenster opent)
+    window.THEME_FONTS = {
+      cyberpunk: "https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700;800&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap",
+      synthwave: "https://fonts.googleapis.com/css2?family=Audiowide&family=Exo+2:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap",
+      matrix: "https://fonts.googleapis.com/css2?family=VT323&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap",
+      oceaan: "https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Nunito:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" };
+    document.getElementById("theme-fonts").href = window.THEME_FONTS[document.documentElement.dataset.theme]; })();
   // Het manifest ("typeplaatje" voor installeren) alleen laden als de app via een webadres draait;
   // als los bestand (file://) geeft de browser er anders een foutmelding op.
   if (/^https?:$/.test(location.protocol)) { const l = document.createElement("link"); l.rel = "manifest"; l.href = "manifest.webmanifest"; document.head.appendChild(l); }
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700;800&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
 /* Cyberpunk: nachtzwarte ondergrond met neonraster en scanlijnen, cyaan/magenta als accent, groen/rood blijven plus/min. Eén donker thema. */
 :root {
@@ -62,6 +70,11 @@
   --font-display: "Orbitron", "Segoe UI", system-ui, sans-serif;
   --font-body: "Rajdhani", "Segoe UI", system-ui, sans-serif;
   --font-mono: "Share Tech Mono", ui-monospace, "Consolas", monospace;
+  /* vorm en karakter (per thema anders, zie de thema-blokken) */
+  --r-card: 0; --r-btn: 0; --r-field: 0; --r-pill: 0; --r-bar: 0; --r-sm: 0;
+  --case-title: uppercase; --case-ui: uppercase; --title-spacing: .06em;
+  --glow: 1; --corner: .8;
+  --font-hero: var(--font-display); --hero-size: 24px; --body-size: 15.5px; --body-weight: 500;
   --notch: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
   --notch-sm: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
   color-scheme: dark;
@@ -70,6 +83,7 @@
    4 thema's × donker/licht. Elk thema vult dezelfde tokens in; de rest van de stijl blijft gelijk.
    <html data-theme="…" data-mode="dark|light"> wordt gezet door het scriptje in <head> (keuze per toestel). */
 [data-theme="cyberpunk"][data-mode="dark"] {
+  --glow: 1;
   --bg: #000000; --surface: #0b0b0b; --ink: #e6f1ff; --muted: #9a9a9a; --line: #262626;
   --accent: #00e5ff; --magenta: #ff2bd6; --pos: #00ffa3; --neg: #ff2a6d; --gold: #ffc934; --warn: #f5e83b;
   --accent-rgb: 0, 229, 255; --magenta-rgb: 255, 43, 214; --pos-rgb: 0, 255, 163; --neg-rgb: 255, 42, 109;
@@ -80,6 +94,7 @@
   color-scheme: dark;
 }
 [data-theme="cyberpunk"][data-mode="light"] {
+  --glow: .5;
   --bg: #ffffff; --surface: #f7f9fb; --ink: #0a0f1a; --muted: #5c6470; --line: #dfe3e8;
   --accent: #0095b3; --magenta: #e0109b; --pos: #00a364; --neg: #e3124f; --gold: #c48a00; --warn: #857400;
   --accent-rgb: 0, 149, 179; --magenta-rgb: 224, 16, 155; --pos-rgb: 0, 163, 100; --neg-rgb: 227, 18, 79;
@@ -90,6 +105,7 @@
   color-scheme: light;
 }
 [data-theme="synthwave"][data-mode="dark"] {
+  --glow: 1.15;
   --bg: #13062b; --surface: #1b0b38; --ink: #f7ecff; --muted: #a993c9; --line: #3b2468;
   --accent: #ff8a3d; --magenta: #ff3caa; --pos: #72f1b8; --neg: #fe4450; --gold: #fede5d; --warn: #f9d71c;
   --accent-rgb: 255, 138, 61; --magenta-rgb: 255, 60, 170; --pos-rgb: 114, 241, 184; --neg-rgb: 254, 68, 80;
@@ -100,6 +116,7 @@
   color-scheme: dark;
 }
 [data-theme="synthwave"][data-mode="light"] {
+  --glow: .5;
   --bg: #fff5fb; --surface: #ffffff; --ink: #2a0f45; --muted: #7d6696; --line: #f0d6ea;
   --accent: #e8620c; --magenta: #d81b8c; --pos: #0e9a6a; --neg: #d7263d; --gold: #b8860b; --warn: #a37c00;
   --accent-rgb: 232, 98, 12; --magenta-rgb: 216, 27, 140; --pos-rgb: 14, 154, 106; --neg-rgb: 215, 38, 61;
@@ -110,6 +127,7 @@
   color-scheme: light;
 }
 [data-theme="matrix"][data-mode="dark"] {
+  --glow: 1;
   --bg: #000300; --surface: #020b02; --ink: #c6ffc6; --muted: #5e8c5e; --line: #0e2a0e;
   --accent: #00ff41; --magenta: #39ff14; --pos: #00ff41; --neg: #ff3b3b; --gold: #d4ff00; --warn: #e6ff4d;
   --accent-rgb: 0, 255, 65; --magenta-rgb: 57, 255, 20; --pos-rgb: 0, 255, 65; --neg-rgb: 255, 59, 59;
@@ -120,6 +138,7 @@
   color-scheme: dark;
 }
 [data-theme="matrix"][data-mode="light"] {
+  --glow: .4;
   --bg: #f3fbf3; --surface: #ffffff; --ink: #062b06; --muted: #4c7a4c; --line: #cfe6cf;
   --accent: #00862b; --magenta: #00a336; --pos: #00862b; --neg: #c62828; --gold: #7a8c00; --warn: #8a7d00;
   --accent-rgb: 0, 134, 43; --magenta-rgb: 0, 163, 54; --pos-rgb: 0, 134, 43; --neg-rgb: 198, 40, 40;
@@ -130,16 +149,18 @@
   color-scheme: light;
 }
 [data-theme="oceaan"][data-mode="dark"] {
+  --glow: .35;
   --bg: #03141f; --surface: #072233; --ink: #e2f3ff; --muted: #7fa2bb; --line: #12384f;
   --accent: #2ed3c6; --magenta: #3b9dff; --pos: #4ade80; --neg: #ff6b81; --gold: #ffd166; --warn: #ffe066;
   --accent-rgb: 46, 211, 198; --magenta-rgb: 59, 157, 255; --pos-rgb: 74, 222, 128; --neg-rgb: 255, 107, 129;
   --gold-rgb: 255, 209, 102; --warn-rgb: 255, 224, 102; --muted-rgb: 127, 162, 187; --ink-rgb: 226, 243, 255; --amber-rgb: 255, 170, 80;
   --bar: #2ed3c6; --bar-track: #0b2c40; --s1: #2ed3c6; --s2: #3b9dff; --s3: #ffd166; --s4: #b48cff;
-  --panel: #061d2c; --panel-rgb: 3, 20, 31; --scan: .15; --on-accent: #03141f; --gold-dark: #c99a2e; --field: rgba(3, 20, 31, .9);
+  --panel: #061d2c; --panel-rgb: 3, 20, 31; --scan: 0; --on-accent: #03141f; --gold-dark: #c99a2e; --field: rgba(3, 20, 31, .9);
   --head-top: rgba(8, 36, 54, .96); --head-bottom: rgba(4, 24, 37, .96); --grid-line: rgba(46, 211, 198, .035); --backdrop: rgba(1, 10, 18, .6); --menu-shadow: 0 8px 24px rgba(0, 0, 0, .4);
   color-scheme: dark;
 }
 [data-theme="oceaan"][data-mode="light"] {
+  --glow: .25;
   --bg: #f2f8fc; --surface: #ffffff; --ink: #0a2540; --muted: #5a7892; --line: #d3e3ef;
   --accent: #0c8f9a; --magenta: #1d6fe0; --pos: #15803d; --neg: #d92d4b; --gold: #b7791f; --warn: #9a6b00;
   --accent-rgb: 12, 143, 154; --magenta-rgb: 29, 111, 224; --pos-rgb: 21, 128, 61; --neg-rgb: 217, 45, 75;
@@ -152,11 +173,58 @@
 .theme-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0 4px; }
 .theme-tile { all: unset; box-sizing: border-box; cursor: pointer; background: var(--bg); color: var(--ink); border: 1px solid var(--line); padding: 10px; clip-path: var(--notch-sm); display: grid; gap: 8px; }
 .theme-tile .tt-card { background: var(--surface); border: 1px solid var(--line); padding: 8px 10px; }
-.theme-tile .tt-name { font-family: var(--font-display); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+.theme-tile .tt-name { font-family: var(--font-display); font-size: 12px; letter-spacing: .1em; text-transform: var(--case-ui); color: var(--accent); }
 .theme-tile .tt-amt { font-family: var(--font-mono); font-size: 15px; color: var(--pos); }
 .theme-tile .tt-dots { display: flex; gap: 5px; } .theme-tile .tt-dots i { width: 14px; height: 6px; display: block; }
 .theme-tile[aria-pressed="true"] { outline: 2px solid var(--magenta); outline-offset: -2px; box-shadow: 0 0 14px rgba(var(--magenta-rgb), .45); }
 .theme-tile:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* ---- vorm en karakter per thema (geldt voor donker én licht) ---- */
+[data-theme="synthwave"] {
+  --font-display: "Audiowide", "Segoe UI", system-ui, sans-serif; --font-body: "Exo 2", "Segoe UI", system-ui, sans-serif; --font-mono: "Space Mono", ui-monospace, monospace;
+  --font-hero: var(--font-display); --notch: none; --notch-sm: none;
+  --r-card: 12px; --r-btn: 8px; --r-field: 8px; --r-pill: 999px; --r-bar: 999px; --r-sm: 6px;
+  --case-title: uppercase; --case-ui: uppercase; --title-spacing: .08em; --corner: 0; --hero-size: 26px; --body-size: 15px; --body-weight: 400;
+}
+[data-theme="matrix"] {
+  --font-display: "IBM Plex Mono", ui-monospace, monospace; --font-body: "IBM Plex Mono", ui-monospace, monospace; --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-hero: "VT323", "IBM Plex Mono", monospace; --notch: none; --notch-sm: none;
+  --r-card: 0; --r-btn: 0; --r-field: 0; --r-pill: 0; --r-bar: 0; --r-sm: 0;
+  --case-title: lowercase; --case-ui: lowercase; --title-spacing: 0; --corner: .8; --hero-size: 40px; --body-size: 13.5px; --body-weight: 400;
+}
+[data-theme="oceaan"] {
+  --font-display: "Quicksand", "Segoe UI", system-ui, sans-serif; --font-body: "Nunito", "Segoe UI", system-ui, sans-serif; --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-hero: var(--font-display); --notch: none; --notch-sm: none;
+  --r-card: 18px; --r-btn: 12px; --r-field: 10px; --r-pill: 999px; --r-bar: 999px; --r-sm: 8px;
+  --case-title: none; --case-ui: none; --title-spacing: 0; --corner: 0; --hero-size: 30px; --body-size: 15px; --body-weight: 400;
+}
+/* Synthwave: zonsondergang in de titel, zon aan de horizon, roze randjes */
+[data-theme="synthwave"] body { background:
+    radial-gradient(900px 340px at 50% 104%, rgba(var(--accent-rgb), .22), transparent 70%),
+    radial-gradient(1400px 520px at 50% 110%, rgba(var(--magenta-rgb), .20), transparent 72%),
+    linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0 / 100% 34px,
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0 / 34px 100%, var(--bg); background-attachment: fixed; }
+[data-theme="synthwave"] .page-head h1 { background: linear-gradient(180deg, var(--gold) 15%, var(--accent) 55%, var(--magenta) 95%); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: none; filter: drop-shadow(0 0 10px rgba(var(--magenta-rgb), calc(.45 * var(--glow)))); }
+[data-theme="synthwave"] .page-head h1::after { height: 4px; border-radius: 999px; background: linear-gradient(90deg, var(--gold), var(--accent), var(--magenta)); }
+[data-theme="synthwave"] .card, [data-theme="synthwave"] .kpi { border-color: rgba(var(--magenta-rgb), .28); box-shadow: 0 10px 32px rgba(var(--magenta-rgb), calc(.10 * var(--glow))); }
+[data-theme="synthwave"] .card h2 { color: var(--magenta); }
+/* Matrix: terminal. Titel als opdrachtregel met cursor, alles monospace, compacter */
+[data-theme="matrix"] .page-head h1 { line-height: 1; }
+[data-theme="matrix"] .page-head h1::before { content: "> "; color: var(--muted); }
+[data-theme="matrix"] .page-head h1::after { content: "_"; display: inline-block; width: auto; height: auto; margin: 0 0 0 6px; background: none; box-shadow: none; color: var(--accent); }
+[data-theme="matrix"] .card h2::before { content: "// "; color: var(--muted); }
+[data-theme="matrix"] .card, [data-theme="matrix"] .kpi { border-color: rgba(var(--accent-rgb), .22); }
+[data-theme="matrix"] main { gap: 14px; } [data-theme="matrix"] .card { padding: 16px; } [data-theme="matrix"] .kpi { padding: 12px 14px; }
+[data-theme="matrix"] .kpi .value { font-family: var(--font-mono); }
+[data-theme="matrix"] .kpi .chip { font-size: 10px; letter-spacing: 0; white-space: normal; }
+/* Oceaan: zacht en rond, luchtig, rustige schaduwen in plaats van neon */
+[data-theme="oceaan"] .card, [data-theme="oceaan"] .kpi { background: var(--surface); box-shadow: 0 8px 30px rgba(var(--shade-rgb), .22); }
+[data-theme="oceaan"][data-mode="light"] .card, [data-theme="oceaan"][data-mode="light"] .kpi { box-shadow: 0 6px 24px rgba(var(--ink-rgb), .07); }
+[data-theme="oceaan"] .page-head h1 { font-weight: 700; }
+[data-theme="oceaan"] .page-head h1::after { height: 4px; border-radius: 999px; width: 48px; }
+[data-theme="oceaan"] .card h2, [data-theme="oceaan"] .kpi .label { font-size: 13.5px; letter-spacing: .01em; }
+[data-theme="oceaan"] th { letter-spacing: .02em; font-size: 12px; }
+[data-theme="oceaan"] main { gap: 24px; } [data-theme="oceaan"] .card { padding: 24px; }
+[data-theme="oceaan"] .kpi::before { border-radius: 999px; }
 /* afgeleide tokens opnieuw uitrekenen op elk element met een thema (ook de voorbeeldtegels in het themavenster) */
 [data-theme] { --accent-soft: rgba(var(--accent-rgb), .10); --pos-soft: rgba(var(--pos-rgb), .12); --neg-soft: rgba(var(--neg-rgb), .14); --warn-soft: rgba(var(--warn-rgb), .12);
   --shadow: 0 0 0 1px rgba(var(--accent-rgb), .04), 0 0 28px rgba(var(--accent-rgb), .05); }
@@ -374,7 +442,7 @@ dialog textarea { width: 100%; height: 160px; font: 12px ui-monospace, monospace
 .goals-wide { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; }
 .gw { border: 1px solid var(--line); padding: 14px 16px 12px; background: rgba(var(--gold-rgb), .025); clip-path: var(--notch-sm); position: relative; }
 .gw-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-.gw-name { font-family: var(--font-display); font-size: 13px; letter-spacing: .1em; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+.gw-name { font-family: var(--font-display); font-size: 13px; letter-spacing: .1em; text-transform: var(--case-ui); display: flex; align-items: center; gap: 8px; }
 .gw-name i { width: 9px; height: 9px; display: inline-block; }
 .gw-ref { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); }
 .gw-amt { font-family: var(--font-display); font-size: 26px; font-weight: 700; color: var(--gold); text-shadow: 0 0 10px rgba(var(--gold-rgb), .7), 0 0 24px rgba(var(--amber-rgb), .3); margin-top: 6px; }
@@ -407,11 +475,11 @@ tr.dragging td { opacity: .4; }
 tr.drop-above td { box-shadow: inset 0 2px 0 var(--magenta); }
 tr.drop-below td { box-shadow: inset 0 -2px 0 var(--magenta); }
 .pl-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-.pl-title { font-family: var(--font-display); font-size: 15px; letter-spacing: .08em; text-transform: uppercase; min-width: 210px; text-align: center; }
+.pl-title { font-family: var(--font-display); font-size: 15px; letter-spacing: .08em; text-transform: var(--case-ui); min-width: 210px; text-align: center; }
 .pl-sum { display: flex; gap: 22px; flex-wrap: wrap; font-size: 13.5px; margin-top: 12px; }
 .pl-sum b { font-family: var(--font-mono); font-weight: 400; }
 .cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
-.cal-h { font-family: var(--font-display); font-size: 10.5px; letter-spacing: .12em; color: var(--muted); text-transform: uppercase; padding: 8px 8px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.cal-h { font-family: var(--font-display); font-size: 10.5px; letter-spacing: .12em; color: var(--muted); text-transform: var(--case-ui); padding: 8px 8px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .cal-d { min-height: 104px; padding: 6px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 3px; cursor: pointer; min-width: 0; }
 .cal-d:hover { background: rgba(var(--accent-rgb), .04); }
 .cal-d.other { opacity: .38; }
@@ -451,7 +519,7 @@ tr.drop-below td { box-shadow: inset 0 -2px 0 var(--magenta); }
 body.lite header nav, body.lite .actions, body.lite > .foot { display: none; }
 body.lite main { padding: 14px 14px 30px; gap: 14px; }
 .lite-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-.lite-head h1 { font-size: 22px; font-family: var(--font-display); text-transform: uppercase; letter-spacing: .06em; text-shadow: 0 0 14px rgba(var(--accent-rgb), .45); }
+.lite-head h1 { font-size: 22px; font-family: var(--font-display); text-transform: var(--case-ui); letter-spacing: .06em; text-shadow: 0 0 14px rgba(var(--accent-rgb), .45); }
 .lite-head p { margin: 2px 0 0; font-size: 13px; }
 .lite-head .btn { font-size: 18px; padding: 6px 14px; }
 .lite-btns { display: flex; gap: 8px; }
@@ -461,7 +529,7 @@ body.lite .num { transition: filter .25s ease; }
 body.eye-off main .num:not(.dt) { filter: blur(7px); user-select: none; }
 .lite-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .lite-kpis .kpi { padding: 12px 14px; } .lite-kpis .kpi .value { font-size: 21px; }
-.lite-bal { text-align: center; } .lite-bal .label { font-family: var(--font-display); font-size: 11px; letter-spacing: .12em; color: var(--muted); text-transform: uppercase; } .lite-bal .gw-amt { font-size: 30px; }
+.lite-bal { text-align: center; } .lite-bal .label { font-family: var(--font-display); font-size: 11px; letter-spacing: .12em; color: var(--muted); text-transform: var(--case-ui); } .lite-bal .gw-amt { font-size: 30px; }
 .lite-news { position: relative; padding: 10px 34px 10px 12px; border: 1px solid var(--gold); background: rgba(var(--gold-rgb), .1); color: var(--gold); font-size: 13.5px; box-shadow: 0 0 16px rgba(var(--gold-rgb), .35); animation: litepulse 1.6s ease-in-out 3; cursor: pointer; }
 .lite-news span { position: absolute; right: 12px; top: 9px; }
 @keyframes litepulse { 50% { box-shadow: 0 0 28px rgba(var(--gold-rgb), .7); } }
@@ -488,7 +556,7 @@ body.eye-off main .num:not(.dt) { filter: blur(7px); user-select: none; }
 
 /* ================= CYBERPUNK ================= */
 body {
-  font-size: 15.5px; font-weight: 500; letter-spacing: .01em;
+  font-size: var(--body-size); font-weight: var(--body-weight); letter-spacing: .01em;
   background:
     linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0 / 100% 34px,
     linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0 / 34px 100%,
@@ -499,93 +567,143 @@ body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-i
   background: repeating-linear-gradient(to bottom, transparent 0 2px, rgba(var(--shade-rgb), .22) 2px 3px); opacity: var(--scan); }
 ::selection { background: var(--magenta); color: var(--on-accent); }
 .num, .amount, .amt, td.cell, .totals, .gauge-legend b, .facts b, .month span { font-family: var(--font-mono); letter-spacing: 0; }
-h1, h2, h3 { letter-spacing: .06em; text-transform: uppercase; }
-.page-head h1 { font-size: 24px; font-weight: 700; text-shadow: 0 0 14px rgba(var(--accent-rgb), .45); }
-.page-head h1::after { content: ""; display: block; width: 64px; height: 3px; margin-top: 8px; background: linear-gradient(90deg, var(--magenta), var(--accent)); box-shadow: 0 0 10px rgba(var(--magenta-rgb), .6); }
+h1, h2, h3 { letter-spacing: var(--title-spacing); text-transform: var(--case-title); }
+.page-head h1 { font-family: var(--font-hero); font-size: var(--hero-size); font-weight: 700; text-shadow: 0 0 14px rgba(var(--accent-rgb), calc(.45 * var(--glow))); }
+.page-head h1::after { content: ""; display: block; width: 64px; height: 3px; margin-top: 8px; background: linear-gradient(90deg, var(--magenta), var(--accent)); box-shadow: 0 0 10px rgba(var(--magenta-rgb), calc(.6 * var(--glow))); }
 .page-head p { font-size: 14.5px; }
 
-header { background: rgba(var(--panel-rgb), .9); backdrop-filter: blur(8px); border-bottom: 1px solid rgba(var(--accent-rgb), .35); box-shadow: 0 0 22px rgba(var(--accent-rgb), .12); }
-.brand { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .1em; font-size: 15px; text-shadow: 0 0 10px rgba(var(--accent-rgb), .5); }
-.brand-mark { background: var(--magenta); color: var(--on-accent); border-radius: 0; clip-path: var(--notch-sm); box-shadow: 0 0 12px var(--magenta); }
-nav a { text-transform: uppercase; letter-spacing: .06em; font-weight: 600; font-size: 13px; padding-left: 8px; padding-right: 8px; }
+header { background: rgba(var(--panel-rgb), .9); backdrop-filter: blur(8px); border-bottom: 1px solid rgba(var(--accent-rgb), .35); box-shadow: 0 0 22px rgba(var(--accent-rgb), calc(.12 * var(--glow))); }
+.brand { font-family: var(--font-hero); text-transform: var(--case-ui); letter-spacing: .1em; font-size: 15px; text-shadow: 0 0 10px rgba(var(--accent-rgb), calc(.5 * var(--glow))); }
+.brand-mark { background: var(--magenta); color: var(--on-accent); border-radius: var(--r-sm); clip-path: var(--notch-sm); box-shadow: 0 0 12px var(--magenta); }
+nav a { text-transform: var(--case-ui); letter-spacing: .06em; font-weight: 600; font-size: 13px; padding-left: 8px; padding-right: 8px; }
 .brand-text { display: none; }
 @media (max-width: 1100px) { nav a { padding-left: 5px; padding-right: 5px; font-size: 12px; letter-spacing: .03em; } .bar { gap: 10px; } }
 nav a:hover { color: var(--accent); }
-nav a[aria-current="page"] { color: var(--accent); border-bottom-color: var(--accent); text-shadow: 0 0 10px rgba(var(--accent-rgb), .7); }
+nav a[aria-current="page"] { color: var(--accent); border-bottom-color: var(--accent); text-shadow: 0 0 10px rgba(var(--accent-rgb), calc(.7 * var(--glow))); }
 
 .card, .kpi, .drop {
   background: linear-gradient(180deg, var(--head-top), var(--head-bottom));
-  border: 1px solid var(--line); border-radius: 0; clip-path: var(--notch); position: relative;
+  border: 1px solid var(--line); border-radius: var(--r-card); clip-path: var(--notch); position: relative;
 }
-.card::after, .kpi::after { content: ""; position: absolute; left: 0; top: 0; width: 18px; height: 18px; border-top: 2px solid var(--accent); border-left: 2px solid var(--accent); opacity: .8; pointer-events: none; }
-.card h2, .kpi .label { font-family: var(--font-display); font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.card::after, .kpi::after { content: ""; position: absolute; left: 0; top: 0; width: 18px; height: 18px; border-top: 2px solid var(--accent); border-left: 2px solid var(--accent); opacity: var(--corner); pointer-events: none; }
+.card h2, .kpi .label { font-family: var(--font-display); font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: var(--case-ui); color: var(--accent); }
 .kpi .label { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kpi::before { width: 3px; box-shadow: 0 0 12px var(--k, transparent); }
-.kpi .value, .loan-big { font-family: var(--font-display); font-weight: 700; letter-spacing: .02em; text-shadow: 0 0 12px rgba(var(--ink-rgb), .18); }
-.kpi .value .pos, .loan-big.pos, .value .pos { text-shadow: 0 0 14px rgba(var(--pos-rgb), .55); }
-td.amount.pos, .amount.pos, b.pos, .num.pos { text-shadow: 0 0 8px rgba(var(--pos-rgb), .55); }
-td.amount.neg, .amount.neg, b.neg, .num.neg { text-shadow: 0 0 8px rgba(var(--neg-rgb), .55); }
-.kpi .value .neg { text-shadow: 0 0 14px rgba(var(--neg-rgb), .55); }
+.kpi .value, .loan-big { font-family: var(--font-display); font-weight: 700; letter-spacing: .02em; text-shadow: 0 0 12px rgba(var(--ink-rgb), calc(.18 * var(--glow))); }
+.kpi .value .pos, .loan-big.pos, .value .pos { text-shadow: 0 0 14px rgba(var(--pos-rgb), calc(.55 * var(--glow))); }
+td.amount.pos, .amount.pos, b.pos, .num.pos { text-shadow: 0 0 8px rgba(var(--pos-rgb), calc(.55 * var(--glow))); }
+td.amount.neg, .amount.neg, b.neg, .num.neg { text-shadow: 0 0 8px rgba(var(--neg-rgb), calc(.55 * var(--glow))); }
+.kpi .value .neg { text-shadow: 0 0 14px rgba(var(--neg-rgb), calc(.55 * var(--glow))); }
 .gold { color: var(--gold); }
-.kpi .value .gold { text-shadow: 0 0 10px rgba(var(--gold-rgb), .75), 0 0 26px rgba(var(--amber-rgb), .35); }
-.section-title h2 { font-family: var(--font-display); color: var(--magenta); text-shadow: 0 0 12px rgba(var(--magenta-rgb), .5); font-size: 16px; }
+.kpi .value .gold { text-shadow: 0 0 10px rgba(var(--gold-rgb), calc(.75 * var(--glow))), 0 0 26px rgba(var(--amber-rgb), calc(.35 * var(--glow))); }
+.section-title h2 { font-family: var(--font-display); color: var(--magenta); text-shadow: 0 0 12px rgba(var(--magenta-rgb), calc(.5 * var(--glow))); font-size: 16px; }
 
-.btn { border-radius: 0; clip-path: var(--notch-sm); text-transform: uppercase; letter-spacing: .07em; font-weight: 600; font-size: 13px; border-color: rgba(var(--accent-rgb), .45); background: rgba(var(--accent-rgb), .06); }
-.btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(var(--accent-rgb), .12); box-shadow: inset 0 0 12px rgba(var(--accent-rgb), .25); }
-.btn.primary { background: var(--magenta); border-color: var(--magenta); color: var(--on-accent); box-shadow: 0 0 16px rgba(var(--magenta-rgb), .45); }
+.btn { border-radius: var(--r-btn); clip-path: var(--notch-sm); text-transform: var(--case-ui); letter-spacing: .07em; font-weight: 600; font-size: 13px; border-color: rgba(var(--accent-rgb), .45); background: rgba(var(--accent-rgb), .06); }
+.btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(var(--accent-rgb), .12); box-shadow: inset 0 0 12px rgba(var(--accent-rgb), calc(.25 * var(--glow))); }
+.btn.primary { background: var(--magenta); border-color: var(--magenta); color: var(--on-accent); box-shadow: 0 0 16px rgba(var(--magenta-rgb), calc(.45 * var(--glow))); }
 .btn.primary:hover { filter: brightness(1.12); color: var(--on-accent); background: var(--magenta); }
 .btn.ghost { background: transparent; border-color: transparent; }
 .btn.small { font-size: 12px; }
 .btn[disabled] { opacity: .5; cursor: default; }
 
-.input, select.cat, input.cell, .month, .seg { border-radius: 0; }
+.input, select.cat, input.cell, .month, .seg { border-radius: var(--r-field); }
 .input, .month, .seg, .seg button { background: var(--field); border-color: var(--line); }
-.input:focus, select.cat:focus, input.cell:focus { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 0 12px rgba(var(--accent-rgb), .3); outline: none; }
+.input:focus, select.cat:focus, input.cell:focus { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 0 12px rgba(var(--accent-rgb), calc(.3 * var(--glow))); outline: none; }
 select option, select optgroup { background: var(--surface); color: var(--ink); }
-.seg button[aria-pressed="true"] { background: rgba(var(--accent-rgb), .14); color: var(--accent); text-shadow: 0 0 8px rgba(var(--accent-rgb), .6); }
-.seg button, .month span { text-transform: uppercase; letter-spacing: .06em; }
-input[type="date"] { color-scheme: dark; }
+.seg button[aria-pressed="true"] { background: rgba(var(--accent-rgb), .14); color: var(--accent); text-shadow: 0 0 8px rgba(var(--accent-rgb), calc(.6 * var(--glow))); }
+.seg button, .month span { text-transform: var(--case-ui); letter-spacing: .06em; }
+input[type="date"] { color-scheme: inherit; }
 input[type="checkbox"] { accent-color: var(--magenta); }
 
-th { font-family: var(--font-display); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); border-bottom-color: rgba(var(--accent-rgb), .3); }
+th { font-family: var(--font-display); font-size: 10.5px; letter-spacing: .12em; text-transform: var(--case-ui); color: var(--muted); border-bottom-color: rgba(var(--accent-rgb), .3); }
 tbody tr:hover td { background: rgba(var(--accent-rgb), .05); }
-.chip { border-radius: 0; border: 1px solid currentColor; background: transparent; text-transform: uppercase; letter-spacing: .05em; font-size: 11px; }
+.chip { border-radius: var(--r-pill); border: 1px solid currentColor; background: transparent; text-transform: var(--case-ui); letter-spacing: .05em; font-size: 11px; }
 .chip.warn { background: var(--warn-soft); } .chip.pos { background: var(--pos-soft); } .chip.neg { background: var(--neg-soft); }
-.type-pill { border-radius: 0; border: 1px solid currentColor; text-transform: uppercase; letter-spacing: .05em; }
+.type-pill { border-radius: var(--r-pill); border: 1px solid currentColor; text-transform: var(--case-ui); letter-spacing: .05em; }
 
-.track, .gauge, .debt-bar { border-radius: 0; }
-.fill { border-radius: 0; box-shadow: 0 0 10px rgba(var(--accent-rgb), .55); }
-.fill.over { box-shadow: 0 0 10px rgba(var(--neg-rgb), .7); }
-.goal .fill { box-shadow: 0 0 10px rgba(var(--pos-rgb), .55); }
-.gauge span, .debt-bar .owed { border-radius: 0; box-shadow: 0 0 10px rgba(var(--neg-rgb), .6); }
-.debt-bar .free { box-shadow: 0 0 10px rgba(var(--pos-rgb), .45); opacity: .9; }
+.track, .gauge, .debt-bar { border-radius: var(--r-bar); }
+.fill { border-radius: var(--r-bar); box-shadow: 0 0 10px rgba(var(--accent-rgb), calc(.55 * var(--glow))); }
+.fill.over { box-shadow: 0 0 10px rgba(var(--neg-rgb), calc(.7 * var(--glow))); }
+.goal .fill { box-shadow: 0 0 10px rgba(var(--pos-rgb), calc(.55 * var(--glow))); }
+.gauge span, .debt-bar .owed { border-radius: var(--r-bar); box-shadow: 0 0 10px rgba(var(--neg-rgb), calc(.6 * var(--glow))); }
+.debt-bar .free { box-shadow: 0 0 10px rgba(var(--pos-rgb), calc(.45 * var(--glow))); opacity: .9; }
 .budget-tick { background: var(--magenta); box-shadow: 0 0 6px var(--magenta); }
 .legend i.tick { background: var(--magenta); }
 .chart text, .trend text { font-family: var(--font-mono); }
-.chart path[fill^="var"], .trend path[fill^="var"] { filter: drop-shadow(0 0 4px rgba(var(--accent-rgb), .25)); }
+.chart path[fill^="var"], .trend path[fill^="var"] { filter: drop-shadow(0 0 4px rgba(var(--accent-rgb), calc(.25 * var(--glow)))); }
 .chart path[stroke^="var"] { filter: drop-shadow(0 0 5px currentColor); }
 
-.notice { border-radius: 0; border-left: 3px solid currentColor; }
-.tooltip { background: rgba(var(--shade-rgb), .96); color: var(--ink); border: 1px solid var(--accent); border-radius: 0; box-shadow: 0 0 18px rgba(var(--accent-rgb), .35); font-family: var(--font-body); font-size: 13.5px; }
-.toast { background: rgba(var(--panel-rgb), .96); color: var(--accent); border: 1px solid var(--accent); border-radius: 0; box-shadow: 0 0 20px rgba(var(--accent-rgb), .4); text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
-.menu-list { background: var(--panel); border-color: var(--accent); border-radius: 0; box-shadow: 0 0 20px rgba(var(--accent-rgb), .25); }
-.menu-list button { border-radius: 0; }
+.notice { border-radius: var(--r-card); border-left: 3px solid currentColor; }
+.tooltip { background: rgba(var(--shade-rgb), .96); color: var(--ink); border: 1px solid var(--accent); border-radius: var(--r-card); box-shadow: 0 0 18px rgba(var(--accent-rgb), calc(.35 * var(--glow))); font-family: var(--font-body); font-size: 13.5px; }
+.toast { background: rgba(var(--panel-rgb), .96); color: var(--accent); border: 1px solid var(--accent); border-radius: var(--r-card); box-shadow: 0 0 20px rgba(var(--accent-rgb), calc(.4 * var(--glow))); text-transform: var(--case-ui); letter-spacing: .05em; font-weight: 600; }
+.menu-list { background: var(--panel); border-color: var(--accent); border-radius: var(--r-card); box-shadow: 0 0 20px rgba(var(--accent-rgb), calc(.25 * var(--glow))); }
+.menu-list button { border-radius: var(--r-sm); }
 .menu-list button:hover { background: rgba(var(--accent-rgb), .1); color: var(--accent); }
-dialog { background: var(--panel); border: 1px solid var(--accent); border-radius: 0; clip-path: var(--notch); box-shadow: 0 0 40px rgba(var(--accent-rgb), .25); }
+dialog { background: var(--panel); border: 1px solid var(--accent); border-radius: var(--r-card); clip-path: var(--notch); box-shadow: 0 0 40px rgba(var(--accent-rgb), calc(.25 * var(--glow))); }
 dialog h3 { font-family: var(--font-display); color: var(--accent); }
 dialog::backdrop { background: rgba(var(--shade-rgb), .8); }
-dialog textarea { border-radius: 0; background: var(--bg); }
+dialog textarea { border-radius: var(--r-field); background: var(--bg); }
 .drop { border: 1px dashed var(--accent); }
 .drop.over { background: rgba(var(--accent-rgb), .08); }
-body.dragging::after { border-radius: 0; background: rgba(var(--panel-rgb), .9); color: var(--accent); font-family: var(--font-display); text-transform: uppercase; letter-spacing: .1em; text-shadow: 0 0 14px var(--accent); }
+body.dragging::after { border-radius: var(--r-card); background: rgba(var(--panel-rgb), .9); color: var(--accent); font-family: var(--font-display); text-transform: var(--case-ui); letter-spacing: .1em; text-shadow: 0 0 14px var(--accent); }
 
 .heat td.cell.cur { box-shadow: inset 0 -2px 0 var(--magenta); }
-.foot { font-family: var(--font-mono); text-transform: uppercase; letter-spacing: .08em; font-size: 11px; }
+.foot { font-family: var(--font-mono); text-transform: var(--case-ui); letter-spacing: .08em; font-size: 11px; }
 a.hint, .legend a { color: var(--accent); }
 @media (prefers-reduced-motion: reduce) { body::before { display: none; } }
+/* ================= ANIMATIES (stap 6c) =================
+   Kort en spaarzaam. Alles valt weg bij "minder beweging" (zie onderaan).
+   #main.enter wordt kort gezet als je van tabblad wisselt of de app opent. */
+@keyframes fx-in { from { opacity: 0; transform: translateY(8px); } }
+@keyframes fx-reveal { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes fx-grow { from { transform: scaleX(0); } }
+@keyframes fx-pop { from { opacity: 0; transform: translateY(6px) scale(.98); } }
+@keyframes fx-drop { from { opacity: 0; transform: translateY(-4px); } }
+#main.enter > * { animation: fx-in .32s ease-out both; }
+#main.enter > *:nth-child(2) { animation-delay: .04s; } #main.enter > *:nth-child(3) { animation-delay: .08s; }
+#main.enter > *:nth-child(4) { animation-delay: .12s; } #main.enter > *:nth-child(5) { animation-delay: .16s; }
+#main.enter > *:nth-child(n+6) { animation-delay: .2s; }
+#main.enter .chart svg, #main.enter .trend svg, #main.enter section svg { animation: fx-reveal .8s ease-out .15s both; }
+#main.enter .fill, #main.enter .gw-bar span { transform-origin: left center; animation: fx-grow .8s cubic-bezier(.2, .8, .2, 1) .15s both; }
+dialog[open] { animation: fx-pop .18s ease-out; }
+.menu.open .menu-list { animation: fx-drop .16s ease-out; }
+.card, .kpi, .btn, .theme-tile { transition: box-shadow .2s ease, border-color .2s ease, background-color .2s ease, color .2s ease; }
+.kpi:hover { border-color: rgba(var(--accent-rgb), .45); }
+
+/* Cyberpunk: korte glitch op de titel */
+@keyframes fx-glitch {
+  0% { clip-path: inset(40% 0 35% 0); transform: translateX(-6px); text-shadow: -3px 0 var(--magenta), 3px 0 var(--accent); }
+  20% { clip-path: inset(10% 0 60% 0); transform: translateX(5px); }
+  40% { clip-path: inset(70% 0 5% 0); transform: translateX(-3px); text-shadow: 3px 0 var(--magenta), -3px 0 var(--accent); }
+  60% { clip-path: inset(0 0 0 0); transform: translateX(2px); }
+  100% { clip-path: inset(0 0 0 0); transform: none; } }
+[data-theme="cyberpunk"] #main.enter .page-head h1 { animation: fx-glitch .45s steps(2, end) .1s both; }
+
+/* Matrix: knipperende cursor (de titel typt zichzelf via het script) */
+@keyframes fx-blink { 50% { opacity: 0; } }
+[data-theme="matrix"] .page-head h1::after { animation: fx-blink 1.05s steps(1, end) infinite; }
+
+/* Achtergrondlaag voor Synthwave en Oceaan (bewogen met transform = door de grafische kaart, zuinig) */
+#fx { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; display: none; }
+[data-theme="synthwave"] #fx, [data-theme="oceaan"] #fx { display: block; }
+/* Synthwave: neonvloer aan de horizon die langzaam naar je toe schuift */
+@keyframes fx-floor { from { transform: perspective(340px) rotateX(64deg) translateY(0); } to { transform: perspective(340px) rotateX(64deg) translateY(44px); } }
+[data-theme="synthwave"] #fx::before { content: ""; position: absolute; left: -60%; right: -60%; bottom: -30%; height: 75%;
+  background: linear-gradient(rgba(var(--magenta-rgb), .38) 1.5px, transparent 1.5px) 0 0 / 100% 44px,
+              linear-gradient(90deg, rgba(var(--magenta-rgb), .30) 1.5px, transparent 1.5px) 0 0 / 44px 100%;
+  -webkit-mask-image: linear-gradient(to top, var(--bg) 25%, transparent 85%); mask-image: linear-gradient(to top, var(--bg) 25%, transparent 85%);
+  transform-origin: 50% 100%; animation: fx-floor 6s linear infinite; }
+/* Oceaan: zachte lichtvlekken die traag deinen */
+@keyframes fx-tide { to { transform: translate(8vmax, 5vmax) scale(1.12); } }
+[data-theme="oceaan"] #fx::before, [data-theme="oceaan"] #fx::after { content: ""; position: absolute; width: 75vmax; height: 75vmax; border-radius: 50%; }
+[data-theme="oceaan"] #fx::before { left: -25vmax; top: -40vmax; background: radial-gradient(circle, rgba(var(--accent-rgb), .16), transparent 65%); animation: fx-tide 18s ease-in-out infinite alternate; }
+[data-theme="oceaan"] #fx::after { right: -30vmax; bottom: -45vmax; background: radial-gradient(circle, rgba(var(--magenta-rgb), .12), transparent 65%); animation: fx-tide 23s ease-in-out infinite alternate-reverse; }
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; } #fx { display: none !important; } }
 </style>
 </head>
 <body>
+<div id="fx" aria-hidden="true"></div>
 <header>
   <div class="bar">
     <div class="brand" title="Budgetplanner"><span class="brand-mark" aria-hidden="true">€</span><span class="brand-text">Budgetplanner</span></div>
@@ -825,13 +943,17 @@ a.hint, .legend a { color: var(--accent); }
   const THEMES = [["cyberpunk", "Cyberpunk"], ["synthwave", "Synthwave"], ["matrix", "Matrix"], ["oceaan", "Oceaan"]];
   function getTheme() { const r = document.documentElement; return { t: r.dataset.theme || "cyberpunk", m: r.dataset.mode || "dark" }; }
   function applyTheme(th) {
-    const r = document.documentElement; r.dataset.theme = th.t; r.dataset.mode = th.m;
+    const r = document.documentElement; r.dataset.theme = th.t; r.dataset.mode = th.m; $("#theme-fonts").href = window.THEME_FONTS[th.t];
     try { localStorage.setItem(KEY + ".theme", JSON.stringify(th)); } catch (e) {}
     syncThemeColor();
   }
   // statusbalk/titelbalk in de kleur van de achtergrond van het thema
   function syncThemeColor() { const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() || "#000000"; }
+  function loadAllThemeFonts() {   // voor de voorbeeldtegels
+    for (const [id] of THEMES) if (!document.getElementById("tf-" + id)) { const l = document.createElement("link"); l.id = "tf-" + id; l.rel = "stylesheet"; l.href = window.THEME_FONTS[id]; document.head.appendChild(l); }
+  }
   function themeDialog() {
+    loadAllThemeFonts();
     const draw = () => { const cur = getTheme();
       return `<h3>Thema</h3><p class="muted" style="margin:4px 0 10px">Geldt voor dit toestel. Je gegevens veranderen niet.</p>
         <div class="seg" role="group" aria-label="Donker of licht"><button type="button" data-tm="dark" aria-pressed="${cur.m === "dark"}">☾ Donker</button><button type="button" data-tm="light" aria-pressed="${cur.m === "light"}">☀ Licht</button></div>
@@ -1087,11 +1209,11 @@ a.hint, .legend a { color: var(--accent); }
     const k = d.k, kp = (l, v, c, cls) => `<div class="kpi" style="--k:${c}"><div class="label">${l}</div><div class="value num"><span class="${cls}">${v}</span></div></div>`;
     h += `<div class="lite-kpis">${kp("Inkomsten", eur0(k.inc), "var(--pos)", "pos")}${kp("Uitgaven", eur0(k.exp), "var(--neg)", "neg")}${kp("Gespaard", eurS(k.saved), "var(--gold)", "gold")}${kp("Netto", (k.net >= 0 ? "+" : "−") + eur0(Math.abs(k.net)), k.net >= 0 ? "var(--pos)" : "var(--neg)", k.net >= 0 ? "pos" : "neg")}</div>`;
     h += `<section class="card lite-bal"><div class="label">Saldo op rekening</div><div class="gw-amt num ${k.bal !== null && k.bal < 0 ? "neg" : ""}">${k.bal === null ? "—" : eur(k.bal)}</div>${k.uncat ? `<span class="chip warn">${k.uncat} te categoriseren</span>` : ""}</section>`;
-    if (d.price && d.price.length) h += `<div class="notice warn" style="flex-direction:column;align-items:stretch;gap:4px"><b style="font-size:12px;letter-spacing:.08em">⚠ DUURDER GEWORDEN</b>${d.price.map(p => `<span>${esc(p.t)}: <span class="num">${eur(p.o)}</span> → <b class="neg num">${eur(p.n)}</b></span>`).join("")}</div>`;
+    if (d.price && d.price.length) h += `<div class="notice warn" style="flex-direction:column;align-items:stretch;gap:4px"><b style="font-size:12px;letter-spacing:.08em;text-transform:var(--case-ui)">⚠ Duurder geworden</b>${d.price.map(p => `<span>${esc(p.t)}: <span class="num">${eur(p.o)}</span> → <b class="neg num">${eur(p.n)}</b></span>`).join("")}</div>`;
     if (d.soon.length) h += `<section class="card"><div class="card-head"><h2>Binnenkort</h2></div><div class="soon-list">${d.soon.map(x => { const late = x.d < todayS(); return `<div class="row-i" style="grid-template-columns:62px 1fr auto"><span class="num dt ${late ? "neg" : x.d <= addD(todayS(), 3) ? "gold" : "muted"}" style="font-size:12.5px">${late ? "te laat" : x.d === todayS() ? "vandaag" : fmtDate(x.d).slice(0, 5)}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.t)}${x.auto ? ' <span class="muted" style="font-size:11px">verwacht</span>' : ""}</span><span class="num ${x.k > 0 ? "pos" : "neg"}">${x.a ? (x.k > 0 ? "+" : "−") + eur0(x.a) : ""}</span></div>`; }).join("")}</div></section>`;
     if (d.fc) { const pts = d.fc.pts, W = 340, H = 80, mx = Math.max(...pts, d.fc.warn), mn = Math.min(...pts, d.fc.warn, 0), x = i => i / (pts.length - 1) * W, y = v => 4 + (mx - v) / ((mx - mn) || 1) * (H - 8);
       let p = `M0,${y(pts[0])}`; pts.forEach((v, i) => { if (i) p += `H${x(i).toFixed(1)}V${y(v).toFixed(1)}`; });
-      h += `<section class="card"><div class="card-head"><h2>Saldoverwachting</h2><span class="hint">45 dagen</span></div><div class="pl-sum" style="margin:0 0 6px"><span>Laagste <b class="num ${d.fc.low < d.fc.warn ? "neg" : ""}">${eur0(d.fc.low)}</b> op ${fmtDate(d.fc.lowD).slice(0, 5)}</span></div><svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;overflow:visible"><line x1="0" x2="${W}" y1="${y(d.fc.warn)}" y2="${y(d.fc.warn)}" stroke="var(--neg)" stroke-dasharray="4 4" opacity=".7"/><path d="${p}" fill="none" stroke="var(--accent)" stroke-width="2" style="filter:drop-shadow(0 0 4px rgba(var(--accent-rgb), .8))"/></svg></section>`; }
+      h += `<section class="card"><div class="card-head"><h2>Saldoverwachting</h2><span class="hint">45 dagen</span></div><div class="pl-sum" style="margin:0 0 6px"><span>Laagste <b class="num ${d.fc.low < d.fc.warn ? "neg" : ""}">${eur0(d.fc.low)}</b> op ${fmtDate(d.fc.lowD).slice(0, 5)}</span></div><svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;overflow:visible"><line x1="0" x2="${W}" y1="${y(d.fc.warn)}" y2="${y(d.fc.warn)}" stroke="var(--neg)" stroke-dasharray="4 4" opacity=".7"/><path d="${p}" fill="none" stroke="var(--accent)" stroke-width="2" style="filter:drop-shadow(0 0 4px rgba(var(--accent-rgb), calc(.8 * var(--glow))))"/></svg></section>`; }
     if (d.goals.length) h += `<section class="card"><div class="card-head"><h2>Spaardoelen</h2>${d.sav.bal !== null ? `<span class="hint">Spaar <b class="gold num">${eur0(d.sav.bal)}</b></span>` : ""}</div>${d.goals.map(g => `<div class="lite-goal"><div class="gw-top"><span class="gw-name"><i style="background:${SERIES[g.c % SERIES.length]}"></i>${esc(g.n)}</span><b class="gold num">${eurS(g.tot)}${g.tg ? `<span class="muted" style="font-weight:400"> / ${eur0(g.tg)}</span>` : ""}</b></div><div class="gw-bar"><span style="width:${((g.pct || 0) * 100).toFixed(1)}%"></span></div></div>`).join("")}</section>`;
     if (d.cats.length) { const mx = Math.max(1, ...d.cats.map(c => Math.max(c.s, c.b))); h += `<section class="card"><div class="card-head"><h2>Uitgaven per categorie</h2></div><div class="cats">${d.cats.map(c => `<div class="cat-row" style="grid-template-columns:110px 1fr 74px"><span class="name">${esc(c.n)}</span><span class="track"><span class="fill${c.b && c.s > c.b ? " over" : ""}" style="width:${(c.s / mx * 100).toFixed(1)}%"></span>${c.b ? `<span class="budget-tick" style="left:calc(${(c.b / mx * 100).toFixed(1)}% - 1px)"></span>` : ""}</span><span class="amt num">${eur0(c.s)}</span></div>`).join("")}</div></section>`; }
     h += `<section class="card"><div class="card-head"><h2>Vermogen</h2></div><div class="gw-amt num" style="margin:0;color:${d.nw.tot >= 0 ? "var(--pos)" : "var(--neg)"};text-shadow:0 0 12px currentColor">${d.nw.tot < 0 ? "−" : ""}${eur0(Math.abs(d.nw.tot))}</div><div class="pl-sum" style="margin-top:6px"><span>Rekening <b class="num">${eur0(d.nw.z)}</b></span><span>Spaar <b class="gold num">${eur0(d.nw.s)}</b></span><span>Schulden <b class="neg num">−${eur0(d.nw.l + d.nw.c)}</b></span></div>
@@ -1205,7 +1327,7 @@ a.hint, .legend a { color: var(--accent); }
   /* ---------- prijsstijgingen ---------- */
   function priceNotice() {
     const list = priceChanges(state); if (!list.length) return "";
-    return `<div class="notice warn" style="flex-direction:column;align-items:stretch;gap:6px"><b style="font-family:var(--font-display);letter-spacing:.08em;text-transform:uppercase;font-size:12px">⚠ Duurder geworden</b>${list.slice(0, 5).map(p => `<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><span>${esc(p.title)}: <span class="num">${eur(p.old)}</span> → <b class="num neg">${eur(p.now)}</b> (+${p.pct}%) sinds ${fmtDate(p.date)}</span><button class="btn small ghost" data-act="price-ok" data-key="${esc(p.key)}" type="button">Gezien</button></div>`).join("")}</div>`;
+    return `<div class="notice warn" style="flex-direction:column;align-items:stretch;gap:6px"><b style="font-family:var(--font-display);letter-spacing:.08em;text-transform:var(--case-ui);font-size:12px">⚠ Duurder geworden</b>${list.slice(0, 5).map(p => `<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><span>${esc(p.title)}: <span class="num">${eur(p.old)}</span> → <b class="num neg">${eur(p.now)}</b> (+${p.pct}%) sinds ${fmtDate(p.date)}</span><button class="btn small ghost" data-act="price-ok" data-key="${esc(p.key)}" type="button">Gezien</button></div>`).join("")}</div>`;
   }
 
   /* ---------- saldoverwachting ---------- */
@@ -1234,7 +1356,7 @@ a.hint, .legend a { color: var(--accent); }
     for (let v = bot; v <= top + 1e-9; v += step) g += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${Math.abs(v) >= 1000 ? (v / 1000).toLocaleString("nl-BE") + "k" : v}</text>`;
     g += `<line x1="${L}" x2="${W - R}" y1="${y(warn)}" y2="${y(warn)}" stroke="var(--neg)" stroke-dasharray="4 4" opacity=".8"/><text x="${W - R}" y="${y(warn) - 4}" text-anchor="end" style="fill:var(--neg)">grens ${eur0(warn)}</text>`;
     let d = `M${x(0)},${y(f.pts[0].value)}`; f.pts.forEach((p, i) => { if (i) d += `H${x(i).toFixed(1)}V${y(p.value).toFixed(1)}`; });
-    g += `<path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2" style="filter:drop-shadow(0 0 5px rgba(var(--accent-rgb), .8))"/>`;
+    g += `<path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2" style="filter:drop-shadow(0 0 5px rgba(var(--accent-rgb), calc(.8 * var(--glow))))"/>`;
     const li = f.pts.indexOf(f.low);
     g += `<circle cx="${x(li)}" cy="${y(f.low.value)}" r="4.5" fill="${f.low.value < warn ? "var(--neg)" : "var(--gold)"}" stroke="var(--bg)" stroke-width="1.5"/>`;
     f.pts.forEach((p, i) => { if (p.items.length) g += `<circle cx="${x(i)}" cy="${y(p.value)}" r="2.5" fill="var(--accent)"/>`; g += `<rect x="${x(i) - iw / f.pts.length / 2}" y="${T}" width="${iw / f.pts.length}" height="${ih}" fill="transparent" data-tip="${esc(`<b>${fmtDate(p.date)}</b><br>Verwacht saldo: ${eur(p.value)}${p.items.map(it => `<br>${it.plan.kind === "inkomst" ? "+" : "−"}${eur(it.plan.amount || 0)} ${esc(it.plan.title)}`).join("")}`)}"/>`; });
@@ -1296,7 +1418,7 @@ a.hint, .legend a { color: var(--accent); }
       const W = 240, H = 44, X = k => k / (months.length - 1) * W, Y = v => H - (v - mn) / (mx - mn) * (H - 4) - 2;
       const line = vals.map((v, k) => (k ? "L" : "M") + X(k).toFixed(1) + "," + Y(v).toFixed(1)).join("");
       const tipPts = vals.map((v, k) => `<rect x="${(X(k) - W / 24).toFixed(1)}" y="0" width="${(W / 12).toFixed(1)}" height="${H}" fill="transparent" data-tip="${esc(`<b>${esc(g.name)}</b> · ${esc(monthName(months[k]))}<br>${eur(v)}`)}"/>`).join("");
-      const spark = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">${showT ? `<line x1="0" x2="${W}" y1="${Y(p.target)}" y2="${Y(p.target)}" stroke="var(--magenta)" stroke-dasharray="3 3" opacity=".6"/>` : ""}<path d="${line}L${W},${H}L0,${H}Z" fill="rgba(var(--gold-rgb), .10)"/><path d="${line}" fill="none" stroke="var(--gold)" stroke-width="1.6" vector-effect="non-scaling-stroke" style="filter:drop-shadow(0 0 3px rgba(var(--gold-rgb), .8))"/><circle cx="${X(11)}" cy="${Y(vals[11])}" r="2.6" fill="var(--gold)"/>${tipPts}</svg>`;
+      const spark = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">${showT ? `<line x1="0" x2="${W}" y1="${Y(p.target)}" y2="${Y(p.target)}" stroke="var(--magenta)" stroke-dasharray="3 3" opacity=".6"/>` : ""}<path d="${line}L${W},${H}L0,${H}Z" fill="rgba(var(--gold-rgb), .10)"/><path d="${line}" fill="none" stroke="var(--gold)" stroke-width="1.6" vector-effect="non-scaling-stroke" style="filter:drop-shadow(0 0 3px rgba(var(--gold-rgb), calc(.8 * var(--glow))))"/><circle cx="${X(11)}" cy="${Y(vals[11])}" r="2.6" fill="var(--gold)"/>${tipPts}</svg>`;
       const pct = p.pct !== null ? Math.round(p.pct * 100) : null;
       return `<div class="gw" data-act="goto-spaar" style="cursor:pointer">
         <div class="gw-top"><span class="gw-name"><i style="background:${col}"></i>${esc(g.name)}</span><span class="gw-ref">${esc(g.ref || "")}</span></div>
@@ -1821,7 +1943,7 @@ a.hint, .legend a { color: var(--accent); }
     let d = `M${x(pts[0].date).toFixed(1)},${y(pts[0].value).toFixed(1)}`;
     for (let k = 1; k < pts.length; k++) d += `H${x(pts[k].date).toFixed(1)}V${y(pts[k].value).toFixed(1)}`;
     d += `H${(L + iw).toFixed(1)}`;
-    g += `<path d="${d}V${y(Math.max(0, bot))}H${x(pts[0].date)}Z" fill="rgba(var(--gold-rgb), .08)"/><path d="${d}" fill="none" stroke="var(--gold)" stroke-width="2" style="filter:drop-shadow(0 0 5px rgba(var(--gold-rgb), .7))"/>`;
+    g += `<path d="${d}V${y(Math.max(0, bot))}H${x(pts[0].date)}Z" fill="rgba(var(--gold-rgb), .08)"/><path d="${d}" fill="none" stroke="var(--gold)" stroke-width="2" style="filter:drop-shadow(0 0 5px rgba(var(--gold-rgb), calc(.7 * var(--glow))))"/>`;
     const span = (t1 - t0) / 864e5, years = [...new Set(pts.map(p => p.date.slice(0, 4)))];
     const lab = span > 540 ? years.map(yy => yy + "-01-01").filter(dd => new Date(dd).getTime() >= t0) : [];
     lab.forEach(dd => g += `<text x="${x(dd)}" y="${H - 6}" text-anchor="middle">${dd.slice(0, 4)}</text>`);
@@ -2404,7 +2526,7 @@ a.hint, .legend a { color: var(--accent); }
     const x = i => L + i / (n - 1 || 1) * iw, y = v => T + (top - v) / top * ih;
     let g = ""; for (let v = 0; v <= top + 1e-9; v += step) g += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end">${v >= 1000 ? (v / 1000).toLocaleString("nl-BE") + "k" : v}</text>`;
     const path = c => c.map((v, i) => (i ? "L" : "M") + x(i).toFixed(1) + "," + y(v).toFixed(1)).join("");
-    g += `<path d="${path(base.curve)}" fill="none" stroke="var(--muted)" stroke-width="2" stroke-dasharray="5 4"/><path d="${path(snow.curve)}" fill="none" stroke="var(--gold)" stroke-width="2" style="filter:drop-shadow(0 0 4px rgba(var(--gold-rgb), .7))"/><path d="${path(aval.curve)}" fill="none" stroke="var(--accent)" stroke-width="2" style="filter:drop-shadow(0 0 4px rgba(var(--accent-rgb), .8))"/>`;
+    g += `<path d="${path(base.curve)}" fill="none" stroke="var(--muted)" stroke-width="2" stroke-dasharray="5 4"/><path d="${path(snow.curve)}" fill="none" stroke="var(--gold)" stroke-width="2" style="filter:drop-shadow(0 0 4px rgba(var(--gold-rgb), calc(.7 * var(--glow))))"/><path d="${path(aval.curve)}" fill="none" stroke="var(--accent)" stroke-width="2" style="filter:drop-shadow(0 0 4px rgba(var(--accent-rgb), calc(.8 * var(--glow))))"/>`;
     for (let yr = 1; yr * 12 < n; yr++) g += `<text x="${x(yr * 12)}" y="${H - 6}" text-anchor="middle">+${yr} jaar</text>`;
     for (let i = 0; i < n; i += Math.max(1, Math.round(n / 60))) g += `<rect x="${x(i) - iw / n}" y="${T}" width="${2 * iw / n}" height="${ih}" fill="transparent" data-tip="${esc(`<b style="text-transform:capitalize">${esc(when(i))}</b><br>Zoals nu: ${eur0(base.curve[i] ?? 0)}<br>Lawine: ${eur0(aval.curve[i] ?? 0)}<br>Sneeuwbal: ${eur0(snow.curve[i] ?? 0)}`)}"/>`;
     const row = (lab, r, col) => `<tr><td><span style="display:inline-block;width:10px;height:3px;background:${col};vertical-align:middle;margin-right:8px"></span>${lab}</td><td class="num" style="text-transform:capitalize">${r.never ? "—" : esc(when(r.months))}</td><td class="r num">${r.never ? "—" : r.months + " mnd"}</td><td class="r num neg">${eur(r.interest)}</td><td class="r num ${r === base ? "muted" : "pos"}">${r === base ? "—" : (base.months - r.months > 0 ? (base.months - r.months) + " mnd sneller · " : "") + eur(Math.max(0, base.interest - r.interest)) + " minder rente"}</td></tr>`;
@@ -2462,12 +2584,46 @@ a.hint, .legend a { color: var(--accent); }
   const route = () => { const r = location.hash.slice(1); return VIEWS[r] ? r : "overzicht"; };
   function render() {
     const r = route(), focusId = document.activeElement && document.activeElement.id, selStart = document.activeElement && document.activeElement.selectionStart;
-    if (liteMode()) { document.body.classList.add("lite"); document.body.classList.toggle("eye-off", liteHidden()); $("#main").innerHTML = viewLite(); return; }
+    if (liteMode()) { document.body.classList.add("lite"); document.body.classList.toggle("eye-off", liteHidden()); $("#main").innerHTML = viewLite(); afterRender("lite"); return; }
     document.body.classList.remove("lite", "eye-off");
     $("#main").innerHTML = VIEWS[r]();
     updateBadge();
     document.querySelectorAll("#nav a").forEach(a => { if (a.getAttribute("href") === "#" + r) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
     if (focusId) { const el = document.getElementById(focusId); if (el) { el.focus(); try { el.setSelectionRange(selStart, selStart); } catch (e) {} } }
+    afterRender(r + (r === "overzicht" ? ui.period : ""));
+  }
+  /* ---------- animaties ----------
+     Alleen als je van scherm wisselt (niet bij elke wijziging: dat zou storen). */
+  let lastView = null;
+  const calm = () => window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function afterRender(view) {
+    if (view === lastView) return; lastView = view;
+    if (calm()) return;
+    const m = $("#main"); m.classList.remove("enter"); void m.offsetWidth; m.classList.add("enter");
+    clearTimeout(afterRender._t); afterRender._t = setTimeout(() => m.classList.remove("enter"), 1300);
+    countUp(m.querySelectorAll(".kpi .value"));
+    if (document.documentElement.dataset.theme === "matrix") typeTitle(m.querySelector(".page-head h1, .lite-head h1"));
+  }
+  // bedragen optellen van 0 tot hun waarde (± 0,6 s)
+  function countUp(els) {
+    els.forEach(el => {
+      const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), nodes = [];
+      while (w.nextNode()) if (/\d/.test(w.currentNode.nodeValue)) nodes.push(w.currentNode);
+      nodes.forEach(n => {
+        const orig = n.nodeValue, mt = orig.match(/(\d{1,3}(?:\.\d{3})+|\d+)(?:,(\d+))?/); if (!mt) return;
+        const dec = mt[2] ? mt[2].length : 0, target = parseFloat(mt[1].replace(/\./g, "") + (dec ? "." + mt[2] : ""));
+        if (!(target > 0)) return;
+        const f = new Intl.NumberFormat("nl-BE", { minimumFractionDigits: dec, maximumFractionDigits: dec }), t0 = performance.now();
+        const step = now => { if (!n.isConnected) return; const k = Math.min(1, Math.max(0, (now - t0) / 600)), e = 1 - Math.pow(1 - k, 3);
+          n.nodeValue = k < 1 ? orig.replace(mt[0], f.format(target * e)) : orig; if (k < 1) requestAnimationFrame(step); };
+        requestAnimationFrame(step);
+      });
+    });
+  }
+  // Matrix: titel letter per letter typen
+  function typeTitle(h) {
+    if (!h) return; const full = h.textContent; h.textContent = ""; let i = 0;
+    const iv = setInterval(() => { if (!h.isConnected) { clearInterval(iv); return; } h.textContent = full.slice(0, ++i); if (i >= full.length) clearInterval(iv); }, 45);
   }
   window.addEventListener("hashchange", () => { render(); window.scrollTo(0, 0); });
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden" && !liteMode() && unsynced && state.folder && state.folder.enabled && !ui.folderAsk) folderBackup(false); });
