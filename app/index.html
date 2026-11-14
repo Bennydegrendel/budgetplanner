@@ -13,6 +13,11 @@
 <meta name="apple-mobile-web-app-title" content="Budget">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <script>
+  // Thema van dit toestel meteen zetten (anders flitst eerst het standaardthema)
+  (function () { let t = {}; try { t = JSON.parse(localStorage.getItem("budgetplanner.v1.theme") || "{}"); } catch (e) {}
+    const ok = ["cyberpunk", "synthwave", "matrix", "oceaan"];
+    document.documentElement.dataset.theme = ok.includes(t.t) ? t.t : "cyberpunk";
+    document.documentElement.dataset.mode = t.m === "light" ? "light" : "dark"; })();
   // Het manifest ("typeplaatje" voor installeren) alleen laden als de app via een webadres draait;
   // als los bestand (file://) geeft de browser er anders een foutmelding op.
   if (/^https?:$/.test(location.protocol)) { const l = document.createElement("link"); l.rel = "manifest"; l.href = "manifest.webmanifest"; document.head.appendChild(l); }
@@ -28,18 +33,31 @@
   --muted: #9a9a9a;
   --line: #262626;
   --accent: #00e5ff;
-  --accent-soft: rgba(0, 229, 255, .10);
+  /* basiswaarden (R, G, B) voor gloed en doorzichtige varianten: rgba(var(--accent-rgb), .45) */
+  --accent-rgb: 0, 229, 255; --magenta-rgb: 255, 43, 214; --pos-rgb: 0, 255, 163; --neg-rgb: 255, 42, 109;
+  --gold-rgb: 255, 201, 52; --warn-rgb: 245, 232, 59; --muted-rgb: 154, 154, 154; --ink-rgb: 230, 241, 255;
+  --amber-rgb: 255, 170, 0; --shade-rgb: 0, 0, 0;
+  --panel: #0a0a0a; --panel-rgb: 0, 0, 0;   /* menu, dialogen, bovenbalk, meldingen */
+  --scan: .35;                       /* sterkte van de scanlijnen */
+  --on-accent: #000;                 /* tekst op een felle knop/badge */
+  --gold-dark: #b8860b;              /* begin van het verloop in spaarbalken */
+  --field: rgba(4, 4, 4, .9);        /* achtergrond van invulvelden */
+  --head-top: rgba(14, 14, 14, .96); --head-bottom: rgba(6, 6, 6, .96);   /* bovenbalk */
+  --grid-line: rgba(255, 255, 255, .025);                                  /* neonraster op de achtergrond */
+  --backdrop: rgba(15, 20, 27, .45);  /* donkere waas achter een dialoogvenster */
+  --menu-shadow: 0 8px 24px rgba(20, 32, 51, .12);
+  --accent-soft: rgba(var(--accent-rgb), .10);
   --magenta: #ff2bd6;
   --pos: #00ffa3;
-  --pos-soft: rgba(0, 255, 163, .12);
+  --pos-soft: rgba(var(--pos-rgb), .12);
   --neg: #ff2a6d;
-  --neg-soft: rgba(255, 42, 109, .14);
+  --neg-soft: rgba(var(--neg-rgb), .14);
   --gold: #ffc934;
   --warn: #f5e83b;
-  --warn-soft: rgba(245, 232, 59, .12);
+  --warn-soft: rgba(var(--warn-rgb), .12);
   --bar: #00e5ff;
   --bar-track: #161616;
-  --shadow: 0 0 0 1px rgba(0, 229, 255, .04), 0 0 28px rgba(0, 229, 255, .05);
+  --shadow: 0 0 0 1px rgba(var(--accent-rgb), .04), 0 0 28px rgba(var(--accent-rgb), .05);
   --s1: #00e5ff; --s2: #ff2bd6; --s3: #f5e83b; --s4: #9d7bff;
   --font-display: "Orbitron", "Segoe UI", system-ui, sans-serif;
   --font-body: "Rajdhani", "Segoe UI", system-ui, sans-serif;
@@ -48,6 +66,102 @@
   --notch-sm: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
   color-scheme: dark;
 }
+/* ================= THEMA'S =================
+   4 thema's × donker/licht. Elk thema vult dezelfde tokens in; de rest van de stijl blijft gelijk.
+   <html data-theme="…" data-mode="dark|light"> wordt gezet door het scriptje in <head> (keuze per toestel). */
+[data-theme="cyberpunk"][data-mode="dark"] {
+  --bg: #000000; --surface: #0b0b0b; --ink: #e6f1ff; --muted: #9a9a9a; --line: #262626;
+  --accent: #00e5ff; --magenta: #ff2bd6; --pos: #00ffa3; --neg: #ff2a6d; --gold: #ffc934; --warn: #f5e83b;
+  --accent-rgb: 0, 229, 255; --magenta-rgb: 255, 43, 214; --pos-rgb: 0, 255, 163; --neg-rgb: 255, 42, 109;
+  --gold-rgb: 255, 201, 52; --warn-rgb: 245, 232, 59; --muted-rgb: 154, 154, 154; --ink-rgb: 230, 241, 255; --amber-rgb: 255, 170, 0;
+  --bar: #00e5ff; --bar-track: #161616; --s1: #00e5ff; --s2: #ff2bd6; --s3: #f5e83b; --s4: #9d7bff;
+  --panel: #0a0a0a; --panel-rgb: 0, 0, 0; --scan: .35; --on-accent: #000; --gold-dark: #b8860b; --field: rgba(4, 4, 4, .9);
+  --head-top: rgba(14, 14, 14, .96); --head-bottom: rgba(6, 6, 6, .96); --grid-line: rgba(255, 255, 255, .025); --backdrop: rgba(15, 20, 27, .45); --menu-shadow: 0 8px 24px rgba(20, 32, 51, .12);
+  color-scheme: dark;
+}
+[data-theme="cyberpunk"][data-mode="light"] {
+  --bg: #ffffff; --surface: #f7f9fb; --ink: #0a0f1a; --muted: #5c6470; --line: #dfe3e8;
+  --accent: #0095b3; --magenta: #e0109b; --pos: #00a364; --neg: #e3124f; --gold: #c48a00; --warn: #857400;
+  --accent-rgb: 0, 149, 179; --magenta-rgb: 224, 16, 155; --pos-rgb: 0, 163, 100; --neg-rgb: 227, 18, 79;
+  --gold-rgb: 196, 138, 0; --warn-rgb: 133, 116, 0; --muted-rgb: 92, 100, 112; --ink-rgb: 10, 15, 26; --amber-rgb: 230, 140, 0;
+  --bar: #0095b3; --bar-track: #eceff3; --s1: #0095b3; --s2: #e0109b; --s3: #c9a700; --s4: #7a52ff;
+  --panel: #ffffff; --panel-rgb: 255, 255, 255; --scan: .07; --on-accent: #ffffff; --gold-dark: #8a6100; --field: #ffffff;
+  --head-top: rgba(255, 255, 255, .96); --head-bottom: rgba(248, 250, 252, .96); --grid-line: rgba(0, 0, 0, .035); --backdrop: rgba(20, 25, 35, .35); --menu-shadow: 0 8px 24px rgba(20, 32, 51, .15);
+  color-scheme: light;
+}
+[data-theme="synthwave"][data-mode="dark"] {
+  --bg: #13062b; --surface: #1b0b38; --ink: #f7ecff; --muted: #a993c9; --line: #3b2468;
+  --accent: #ff8a3d; --magenta: #ff3caa; --pos: #72f1b8; --neg: #fe4450; --gold: #fede5d; --warn: #f9d71c;
+  --accent-rgb: 255, 138, 61; --magenta-rgb: 255, 60, 170; --pos-rgb: 114, 241, 184; --neg-rgb: 254, 68, 80;
+  --gold-rgb: 254, 222, 93; --warn-rgb: 249, 215, 28; --muted-rgb: 169, 147, 201; --ink-rgb: 247, 236, 255; --amber-rgb: 255, 140, 60;
+  --bar: #ff8a3d; --bar-track: #2a1650; --s1: #ff8a3d; --s2: #ff3caa; --s3: #fede5d; --s4: #2de2e6;
+  --panel: #1a0a35; --panel-rgb: 19, 6, 43; --scan: .25; --on-accent: #13062b; --gold-dark: #c9952b; --field: rgba(19, 6, 43, .9);
+  --head-top: rgba(32, 12, 62, .96); --head-bottom: rgba(22, 8, 46, .96); --grid-line: rgba(255, 60, 170, .06); --backdrop: rgba(10, 2, 25, .6); --menu-shadow: 0 8px 24px rgba(0, 0, 0, .4);
+  color-scheme: dark;
+}
+[data-theme="synthwave"][data-mode="light"] {
+  --bg: #fff5fb; --surface: #ffffff; --ink: #2a0f45; --muted: #7d6696; --line: #f0d6ea;
+  --accent: #e8620c; --magenta: #d81b8c; --pos: #0e9a6a; --neg: #d7263d; --gold: #b8860b; --warn: #a37c00;
+  --accent-rgb: 232, 98, 12; --magenta-rgb: 216, 27, 140; --pos-rgb: 14, 154, 106; --neg-rgb: 215, 38, 61;
+  --gold-rgb: 184, 134, 11; --warn-rgb: 163, 124, 0; --muted-rgb: 125, 102, 150; --ink-rgb: 42, 15, 69; --amber-rgb: 232, 98, 12;
+  --bar: #e8620c; --bar-track: #f6e6f1; --s1: #e8620c; --s2: #d81b8c; --s3: #c99a00; --s4: #0ea5b5;
+  --panel: #ffffff; --panel-rgb: 255, 255, 255; --scan: .06; --on-accent: #ffffff; --gold-dark: #8a6100; --field: #ffffff;
+  --head-top: rgba(255, 255, 255, .96); --head-bottom: rgba(255, 245, 251, .96); --grid-line: rgba(216, 27, 140, .05); --backdrop: rgba(42, 15, 69, .35); --menu-shadow: 0 8px 24px rgba(42, 15, 69, .15);
+  color-scheme: light;
+}
+[data-theme="matrix"][data-mode="dark"] {
+  --bg: #000300; --surface: #020b02; --ink: #c6ffc6; --muted: #5e8c5e; --line: #0e2a0e;
+  --accent: #00ff41; --magenta: #39ff14; --pos: #00ff41; --neg: #ff3b3b; --gold: #d4ff00; --warn: #e6ff4d;
+  --accent-rgb: 0, 255, 65; --magenta-rgb: 57, 255, 20; --pos-rgb: 0, 255, 65; --neg-rgb: 255, 59, 59;
+  --gold-rgb: 212, 255, 0; --warn-rgb: 230, 255, 77; --muted-rgb: 94, 140, 94; --ink-rgb: 198, 255, 198; --amber-rgb: 200, 255, 0;
+  --bar: #00ff41; --bar-track: #061806; --s1: #00ff41; --s2: #9dff9d; --s3: #d4ff00; --s4: #00c8ff;
+  --panel: #010801; --panel-rgb: 0, 8, 0; --scan: .45; --on-accent: #000000; --gold-dark: #6b8000; --field: rgba(0, 8, 0, .9);
+  --head-top: rgba(2, 14, 2, .96); --head-bottom: rgba(0, 6, 0, .96); --grid-line: rgba(0, 255, 65, .04); --backdrop: rgba(0, 10, 0, .6); --menu-shadow: 0 8px 24px rgba(0, 0, 0, .5);
+  color-scheme: dark;
+}
+[data-theme="matrix"][data-mode="light"] {
+  --bg: #f3fbf3; --surface: #ffffff; --ink: #062b06; --muted: #4c7a4c; --line: #cfe6cf;
+  --accent: #00862b; --magenta: #00a336; --pos: #00862b; --neg: #c62828; --gold: #7a8c00; --warn: #8a7d00;
+  --accent-rgb: 0, 134, 43; --magenta-rgb: 0, 163, 54; --pos-rgb: 0, 134, 43; --neg-rgb: 198, 40, 40;
+  --gold-rgb: 122, 140, 0; --warn-rgb: 138, 125, 0; --muted-rgb: 76, 122, 76; --ink-rgb: 6, 43, 6; --amber-rgb: 122, 140, 0;
+  --bar: #00862b; --bar-track: #e4f2e4; --s1: #00a336; --s2: #5cb85c; --s3: #a0b400; --s4: #0b84a5;
+  --panel: #ffffff; --panel-rgb: 255, 255, 255; --scan: .05; --on-accent: #ffffff; --gold-dark: #4d5900; --field: #ffffff;
+  --head-top: rgba(255, 255, 255, .96); --head-bottom: rgba(243, 251, 243, .96); --grid-line: rgba(0, 134, 43, .05); --backdrop: rgba(6, 43, 6, .3); --menu-shadow: 0 8px 24px rgba(6, 43, 6, .15);
+  color-scheme: light;
+}
+[data-theme="oceaan"][data-mode="dark"] {
+  --bg: #03141f; --surface: #072233; --ink: #e2f3ff; --muted: #7fa2bb; --line: #12384f;
+  --accent: #2ed3c6; --magenta: #3b9dff; --pos: #4ade80; --neg: #ff6b81; --gold: #ffd166; --warn: #ffe066;
+  --accent-rgb: 46, 211, 198; --magenta-rgb: 59, 157, 255; --pos-rgb: 74, 222, 128; --neg-rgb: 255, 107, 129;
+  --gold-rgb: 255, 209, 102; --warn-rgb: 255, 224, 102; --muted-rgb: 127, 162, 187; --ink-rgb: 226, 243, 255; --amber-rgb: 255, 170, 80;
+  --bar: #2ed3c6; --bar-track: #0b2c40; --s1: #2ed3c6; --s2: #3b9dff; --s3: #ffd166; --s4: #b48cff;
+  --panel: #061d2c; --panel-rgb: 3, 20, 31; --scan: .15; --on-accent: #03141f; --gold-dark: #c99a2e; --field: rgba(3, 20, 31, .9);
+  --head-top: rgba(8, 36, 54, .96); --head-bottom: rgba(4, 24, 37, .96); --grid-line: rgba(46, 211, 198, .035); --backdrop: rgba(1, 10, 18, .6); --menu-shadow: 0 8px 24px rgba(0, 0, 0, .4);
+  color-scheme: dark;
+}
+[data-theme="oceaan"][data-mode="light"] {
+  --bg: #f2f8fc; --surface: #ffffff; --ink: #0a2540; --muted: #5a7892; --line: #d3e3ef;
+  --accent: #0c8f9a; --magenta: #1d6fe0; --pos: #15803d; --neg: #d92d4b; --gold: #b7791f; --warn: #9a6b00;
+  --accent-rgb: 12, 143, 154; --magenta-rgb: 29, 111, 224; --pos-rgb: 21, 128, 61; --neg-rgb: 217, 45, 75;
+  --gold-rgb: 183, 121, 31; --warn-rgb: 154, 107, 0; --muted-rgb: 90, 120, 146; --ink-rgb: 10, 37, 64; --amber-rgb: 183, 121, 31;
+  --bar: #0c8f9a; --bar-track: #e5eff6; --s1: #0c8f9a; --s2: #1d6fe0; --s3: #d39e00; --s4: #7c5cd6;
+  --panel: #ffffff; --panel-rgb: 255, 255, 255; --scan: .04; --on-accent: #ffffff; --gold-dark: #7a4f10; --field: #ffffff;
+  --head-top: rgba(255, 255, 255, .96); --head-bottom: rgba(242, 248, 252, .96); --grid-line: rgba(12, 143, 154, .05); --backdrop: rgba(10, 37, 64, .3); --menu-shadow: 0 8px 24px rgba(10, 37, 64, .15);
+  color-scheme: light;
+}
+.theme-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0 4px; }
+.theme-tile { all: unset; box-sizing: border-box; cursor: pointer; background: var(--bg); color: var(--ink); border: 1px solid var(--line); padding: 10px; clip-path: var(--notch-sm); display: grid; gap: 8px; }
+.theme-tile .tt-card { background: var(--surface); border: 1px solid var(--line); padding: 8px 10px; }
+.theme-tile .tt-name { font-family: var(--font-display); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+.theme-tile .tt-amt { font-family: var(--font-mono); font-size: 15px; color: var(--pos); }
+.theme-tile .tt-dots { display: flex; gap: 5px; } .theme-tile .tt-dots i { width: 14px; height: 6px; display: block; }
+.theme-tile[aria-pressed="true"] { outline: 2px solid var(--magenta); outline-offset: -2px; box-shadow: 0 0 14px rgba(var(--magenta-rgb), .45); }
+.theme-tile:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* afgeleide tokens opnieuw uitrekenen op elk element met een thema (ook de voorbeeldtegels in het themavenster) */
+[data-theme] { --accent-soft: rgba(var(--accent-rgb), .10); --pos-soft: rgba(var(--pos-rgb), .12); --neg-soft: rgba(var(--neg-rgb), .14); --warn-soft: rgba(var(--warn-rgb), .12);
+  --shadow: 0 0 0 1px rgba(var(--accent-rgb), .04), 0 0 28px rgba(var(--accent-rgb), .05); }
+/* lichte varianten: geen wazige gloed rond tekst (leest slecht op een lichte ondergrond) */
+[data-mode="light"] body, [data-mode="light"] body * { text-shadow: none !important; }
 * { box-sizing: border-box; }
 html, body { margin: 0; }
 body { background: var(--bg); color: var(--ink); font: 14px/1.5 var(--font-body); -webkit-font-smoothing: antialiased; }
@@ -79,7 +193,7 @@ nav a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--accen
 .btn.small { padding: 4px 9px; font-size: 13px; }
 .btn.danger { color: var(--neg); }
 .menu { position: relative; }
-.menu-list { position: absolute; right: 0; top: calc(100% + 6px); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(20,32,51,.12); min-width: 250px; padding: 6px; display: none; }
+.menu-list { position: absolute; right: 0; top: calc(100% + 6px); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--menu-shadow); min-width: 250px; padding: 6px; display: none; }
 .menu.open .menu-list { display: block; }
 .menu-list button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 9px 10px; border-radius: 6px; cursor: pointer; }
 .menu-list button:hover { background: var(--bar-track); }
@@ -137,7 +251,7 @@ main { max-width: 1180px; margin: 0 auto; padding: 24px; display: grid; gap: 20p
 .trend .hit { fill: transparent; cursor: default; }
 .trend .hit:hover { fill: var(--bar-track); opacity: .6; }
 
-.tooltip { position: fixed; pointer-events: none; background: var(--ink); color: var(--surface); padding: 8px 10px; border-radius: 8px; font-size: 12.5px; line-height: 1.45; z-index: 20; display: none; box-shadow: 0 6px 18px rgba(0,0,0,.18); max-width: 260px; }
+.tooltip { position: fixed; pointer-events: none; background: var(--ink); color: var(--surface); padding: 8px 10px; border-radius: 8px; font-size: 12.5px; line-height: 1.45; z-index: 20; display: none; box-shadow: 0 6px 18px rgba(var(--shade-rgb), .18); max-width: 260px; }
 .tooltip b { font-weight: 600; }
 
 /* doelen */
@@ -188,10 +302,10 @@ body.dragging::after { content: "Laat los om je CSV te importeren"; position: fi
 .notice.warn { background: var(--warn-soft); color: var(--warn); }
 .notice.info { background: var(--accent-soft); color: var(--accent); }
 
-.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--surface); padding: 10px 16px; border-radius: 10px; font-size: 13.5px; z-index: 30; box-shadow: 0 8px 24px rgba(0,0,0,.2); display: none; max-width: calc(100% - 32px); }
+.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--surface); padding: 10px 16px; border-radius: 10px; font-size: 13.5px; z-index: 30; box-shadow: 0 8px 24px rgba(var(--shade-rgb), .2); display: none; max-width: calc(100% - 32px); }
 
-dialog { border: 1px solid var(--line); border-radius: 14px; padding: 22px; background: var(--surface); color: var(--ink); width: min(520px, calc(100% - 32px)); box-shadow: 0 20px 50px rgba(0,0,0,.25); }
-dialog::backdrop { background: rgba(15,20,27,.45); }
+dialog { border: 1px solid var(--line); border-radius: 14px; padding: 22px; background: var(--surface); color: var(--ink); width: min(520px, calc(100% - 32px)); box-shadow: 0 20px 50px rgba(var(--shade-rgb), .25); }
+dialog::backdrop { background: var(--backdrop); }
 dialog h3 { font-size: 17px; margin-bottom: 8px; }
 dialog p { margin: 0 0 14px; color: var(--muted); }
 dialog .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; flex-wrap: wrap; }
@@ -250,23 +364,23 @@ dialog textarea { width: 100%; height: 160px; font: 12px ui-monospace, monospace
 .debt-foot { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; border-top: 1px solid var(--line); margin-top: 10px; padding-top: 10px; font-size: 13px; }
 .alloc { display: flex; height: 26px; gap: 2px; margin: 6px 0 12px; }
 .alloc span { min-width: 3px; position: relative; }
-.alloc span.un { background: repeating-linear-gradient(45deg, rgba(154,154,154,.35) 0 4px, rgba(154,154,154,.12) 4px 8px); }
-.alloc span.over { background: repeating-linear-gradient(45deg, rgba(255,42,109,.6) 0 4px, rgba(255,42,109,.2) 4px 8px); }
+.alloc span.un { background: repeating-linear-gradient(45deg, rgba(var(--muted-rgb), .35) 0 4px, rgba(var(--muted-rgb), .12) 4px 8px); }
+.alloc span.over { background: repeating-linear-gradient(45deg, rgba(var(--neg-rgb), .6) 0 4px, rgba(var(--neg-rgb), .2) 4px 8px); }
 .alloc-legend { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 6px 18px; font-size: 13.5px; }
 .alloc-legend div { display: flex; align-items: center; gap: 8px; }
 .alloc-legend i { width: 10px; height: 10px; flex: none; }
 .alloc-legend b { margin-left: auto; font-family: var(--font-mono); font-weight: 400; }
 .status-ok { color: var(--pos); font-size: 12.5px; white-space: nowrap; }
 .goals-wide { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; }
-.gw { border: 1px solid var(--line); padding: 14px 16px 12px; background: rgba(255, 201, 52, .025); clip-path: var(--notch-sm); position: relative; }
+.gw { border: 1px solid var(--line); padding: 14px 16px 12px; background: rgba(var(--gold-rgb), .025); clip-path: var(--notch-sm); position: relative; }
 .gw-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .gw-name { font-family: var(--font-display); font-size: 13px; letter-spacing: .1em; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
 .gw-name i { width: 9px; height: 9px; display: inline-block; }
 .gw-ref { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); }
-.gw-amt { font-family: var(--font-display); font-size: 26px; font-weight: 700; color: var(--gold); text-shadow: 0 0 10px rgba(255, 201, 52, .7), 0 0 24px rgba(255, 170, 0, .3); margin-top: 6px; }
+.gw-amt { font-family: var(--font-display); font-size: 26px; font-weight: 700; color: var(--gold); text-shadow: 0 0 10px rgba(var(--gold-rgb), .7), 0 0 24px rgba(var(--amber-rgb), .3); margin-top: 6px; }
 .gw-amt small { font-family: var(--font-mono); font-size: 13px; color: var(--muted); text-shadow: none; font-weight: 400; margin-left: 6px; }
 .gw-bar { position: relative; height: 12px; background: var(--bar-track); margin: 10px 0 6px; }
-.gw-bar span { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, #b8860b, var(--gold)); box-shadow: 0 0 12px rgba(255, 201, 52, .65); }
+.gw-bar span { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, var(--gold-dark), var(--gold)); box-shadow: 0 0 12px rgba(var(--gold-rgb), .65); }
 .gw-bar b { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--magenta); box-shadow: 0 0 6px var(--magenta); }
 .gw-meta { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; color: var(--muted); flex-wrap: wrap; }
 .gw-meta .num { color: var(--ink); }
@@ -299,19 +413,19 @@ tr.drop-below td { box-shadow: inset 0 -2px 0 var(--magenta); }
 .cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
 .cal-h { font-family: var(--font-display); font-size: 10.5px; letter-spacing: .12em; color: var(--muted); text-transform: uppercase; padding: 8px 8px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .cal-d { min-height: 104px; padding: 6px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 3px; cursor: pointer; min-width: 0; }
-.cal-d:hover { background: rgba(0, 229, 255, .04); }
+.cal-d:hover { background: rgba(var(--accent-rgb), .04); }
 .cal-d.other { opacity: .38; }
-.cal-d.today { box-shadow: inset 0 0 0 1px var(--accent), inset 0 0 18px rgba(0, 229, 255, .15); }
+.cal-d.today { box-shadow: inset 0 0 0 1px var(--accent), inset 0 0 18px rgba(var(--accent-rgb), .15); }
 .cal-n { font-family: var(--font-mono); font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; }
 .cal-d.today .cal-n { color: var(--accent); }
 .cal-week .cal-d { min-height: 320px; }
-.chipi { display: block; font-size: 11.5px; line-height: 1.25; padding: 3px 5px; border-left: 3px solid var(--magenta); background: rgba(255, 43, 214, .08); cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chipi { display: block; font-size: 11.5px; line-height: 1.25; padding: 3px 5px; border-left: 3px solid var(--magenta); background: rgba(var(--magenta-rgb), .08); cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chipi b { font-family: var(--font-mono); font-weight: 400; }
-.chipi.auto { border-left-style: dashed; border-left-color: var(--accent); background: rgba(0, 229, 255, .06); }
-.chipi.paid { border-left-color: var(--pos); background: rgba(0, 255, 163, .07); color: var(--muted); }
+.chipi.auto { border-left-style: dashed; border-left-color: var(--accent); background: rgba(var(--accent-rgb), .06); }
+.chipi.paid { border-left-color: var(--pos); background: rgba(var(--pos-rgb), .07); color: var(--muted); }
 .chipi.paid::before { content: "✓ "; color: var(--pos); }
-.chipi.late { border-left-color: var(--neg); background: rgba(255, 42, 109, .12); }
-.chipi.soon { border-left-color: var(--gold); background: rgba(255, 201, 52, .10); }
+.chipi.late { border-left-color: var(--neg); background: rgba(var(--neg-rgb), .12); }
+.chipi.soon { border-left-color: var(--gold); background: rgba(var(--gold-rgb), .10); }
 .chipi.inc b { color: var(--pos); }
 .cal-week .chipi { white-space: normal; font-size: 12.5px; padding: 6px 7px; }
 .pl-year { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
@@ -322,22 +436,22 @@ tr.drop-below td { box-shadow: inset 0 -2px 0 var(--magenta); }
 .pl-m .chipi { margin-bottom: 3px; }
 .pl-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 10px; }
 .pl-legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 6px; vertical-align: -1px; border-left: 3px solid var(--c); background: var(--b); }
-.nav-badge { display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 5px; background: var(--gold); color: #000; font-family: var(--font-mono); font-size: 11px; text-align: center; box-shadow: 0 0 8px rgba(255, 201, 52, .7); letter-spacing: 0; }
+.nav-badge { display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 5px; background: var(--gold); color: var(--on-accent); font-family: var(--font-mono); font-size: 11px; text-align: center; box-shadow: 0 0 8px rgba(var(--gold-rgb), .7); letter-spacing: 0; }
 .soon-list .row-i { display: grid; grid-template-columns: 86px 1fr auto auto; gap: 10px; align-items: center; padding: 7px 4px; border-bottom: 1px solid var(--line); font-size: 13.5px; }
 .soon-list .row-i:last-child { border-bottom: 0; }
-#lock { position: fixed; inset: 0; z-index: 200; background: radial-gradient(600px 300px at 50% 40%, rgba(255, 43, 214, .12), transparent), #000; display: grid; place-items: center; }
+#lock { position: fixed; inset: 0; z-index: 200; background: radial-gradient(600px 300px at 50% 40%, rgba(var(--magenta-rgb), .12), transparent), var(--bg); display: grid; place-items: center; }
 .lock-box { text-align: center; width: min(320px, 90vw); }
-.lock-box h2 { font-size: 18px; color: var(--accent); text-shadow: 0 0 12px rgba(0, 229, 255, .6); margin-bottom: 4px; }
+.lock-box h2 { font-size: 18px; color: var(--accent); text-shadow: 0 0 12px rgba(var(--accent-rgb), .6); margin-bottom: 4px; }
 .lock-box .input { width: 100%; text-align: center; font-size: 22px; letter-spacing: .4em; margin-top: 10px; }
 .tagrow { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 3px; }
-.tag { font-size: 11px; padding: 0 6px; border: 1px solid rgba(255, 43, 214, .55); color: var(--magenta); cursor: pointer; font-family: var(--font-mono); }
-.tag.split { border-color: rgba(0, 229, 255, .5); color: var(--accent); }
+.tag { font-size: 11px; padding: 0 6px; border: 1px solid rgba(var(--magenta-rgb), .55); color: var(--magenta); cursor: pointer; font-family: var(--font-mono); }
+.tag.split { border-color: rgba(var(--accent-rgb), .5); color: var(--accent); }
 .tag:hover { box-shadow: 0 0 8px currentColor; }
 .split-row { display: grid; grid-template-columns: 1fr 120px 30px; gap: 8px; margin-top: 8px; }
 body.lite header nav, body.lite .actions, body.lite > .foot { display: none; }
 body.lite main { padding: 14px 14px 30px; gap: 14px; }
 .lite-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-.lite-head h1 { font-size: 22px; font-family: var(--font-display); text-transform: uppercase; letter-spacing: .06em; text-shadow: 0 0 14px rgba(0, 229, 255, .45); }
+.lite-head h1 { font-size: 22px; font-family: var(--font-display); text-transform: uppercase; letter-spacing: .06em; text-shadow: 0 0 14px rgba(var(--accent-rgb), .45); }
 .lite-head p { margin: 2px 0 0; font-size: 13px; }
 .lite-head .btn { font-size: 18px; padding: 6px 14px; }
 .lite-btns { display: flex; gap: 8px; }
@@ -348,9 +462,9 @@ body.eye-off main .num:not(.dt) { filter: blur(7px); user-select: none; }
 .lite-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .lite-kpis .kpi { padding: 12px 14px; } .lite-kpis .kpi .value { font-size: 21px; }
 .lite-bal { text-align: center; } .lite-bal .label { font-family: var(--font-display); font-size: 11px; letter-spacing: .12em; color: var(--muted); text-transform: uppercase; } .lite-bal .gw-amt { font-size: 30px; }
-.lite-news { position: relative; padding: 10px 34px 10px 12px; border: 1px solid var(--gold); background: rgba(255, 201, 52, .1); color: var(--gold); font-size: 13.5px; box-shadow: 0 0 16px rgba(255, 201, 52, .35); animation: litepulse 1.6s ease-in-out 3; cursor: pointer; }
+.lite-news { position: relative; padding: 10px 34px 10px 12px; border: 1px solid var(--gold); background: rgba(var(--gold-rgb), .1); color: var(--gold); font-size: 13.5px; box-shadow: 0 0 16px rgba(var(--gold-rgb), .35); animation: litepulse 1.6s ease-in-out 3; cursor: pointer; }
 .lite-news span { position: absolute; right: 12px; top: 9px; }
-@keyframes litepulse { 50% { box-shadow: 0 0 28px rgba(255, 201, 52, .7); } }
+@keyframes litepulse { 50% { box-shadow: 0 0 28px rgba(var(--gold-rgb), .7); } }
 .lite-goal { margin-bottom: 12px; } .lite-goal .gw-bar { margin: 6px 0 0; height: 8px; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
 .form-grid .full { grid-column: 1 / -1; }
@@ -376,94 +490,94 @@ body.eye-off main .num:not(.dt) { filter: blur(7px); user-select: none; }
 body {
   font-size: 15.5px; font-weight: 500; letter-spacing: .01em;
   background:
-    linear-gradient(rgba(255, 255, 255, .025) 1px, transparent 1px) 0 0 / 100% 34px,
-    linear-gradient(90deg, rgba(255, 255, 255, .025) 1px, transparent 1px) 0 0 / 34px 100%,
+    linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0 / 100% 34px,
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0 / 34px 100%,
     var(--bg);
   background-attachment: fixed;
 }
 body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 60;
-  background: repeating-linear-gradient(to bottom, transparent 0 2px, rgba(0, 0, 0, .22) 2px 3px); opacity: .35; }
-::selection { background: var(--magenta); color: #000; }
+  background: repeating-linear-gradient(to bottom, transparent 0 2px, rgba(var(--shade-rgb), .22) 2px 3px); opacity: var(--scan); }
+::selection { background: var(--magenta); color: var(--on-accent); }
 .num, .amount, .amt, td.cell, .totals, .gauge-legend b, .facts b, .month span { font-family: var(--font-mono); letter-spacing: 0; }
 h1, h2, h3 { letter-spacing: .06em; text-transform: uppercase; }
-.page-head h1 { font-size: 24px; font-weight: 700; text-shadow: 0 0 14px rgba(0, 229, 255, .45); }
-.page-head h1::after { content: ""; display: block; width: 64px; height: 3px; margin-top: 8px; background: linear-gradient(90deg, var(--magenta), var(--accent)); box-shadow: 0 0 10px rgba(255, 43, 214, .6); }
+.page-head h1 { font-size: 24px; font-weight: 700; text-shadow: 0 0 14px rgba(var(--accent-rgb), .45); }
+.page-head h1::after { content: ""; display: block; width: 64px; height: 3px; margin-top: 8px; background: linear-gradient(90deg, var(--magenta), var(--accent)); box-shadow: 0 0 10px rgba(var(--magenta-rgb), .6); }
 .page-head p { font-size: 14.5px; }
 
-header { background: rgba(0, 0, 0, .9); backdrop-filter: blur(8px); border-bottom: 1px solid rgba(0, 229, 255, .35); box-shadow: 0 0 22px rgba(0, 229, 255, .12); }
-.brand { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .1em; font-size: 15px; text-shadow: 0 0 10px rgba(0, 229, 255, .5); }
-.brand-mark { background: var(--magenta); color: #000; border-radius: 0; clip-path: var(--notch-sm); box-shadow: 0 0 12px var(--magenta); }
+header { background: rgba(var(--panel-rgb), .9); backdrop-filter: blur(8px); border-bottom: 1px solid rgba(var(--accent-rgb), .35); box-shadow: 0 0 22px rgba(var(--accent-rgb), .12); }
+.brand { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .1em; font-size: 15px; text-shadow: 0 0 10px rgba(var(--accent-rgb), .5); }
+.brand-mark { background: var(--magenta); color: var(--on-accent); border-radius: 0; clip-path: var(--notch-sm); box-shadow: 0 0 12px var(--magenta); }
 nav a { text-transform: uppercase; letter-spacing: .06em; font-weight: 600; font-size: 13px; padding-left: 8px; padding-right: 8px; }
 .brand-text { display: none; }
 @media (max-width: 1100px) { nav a { padding-left: 5px; padding-right: 5px; font-size: 12px; letter-spacing: .03em; } .bar { gap: 10px; } }
 nav a:hover { color: var(--accent); }
-nav a[aria-current="page"] { color: var(--accent); border-bottom-color: var(--accent); text-shadow: 0 0 10px rgba(0, 229, 255, .7); }
+nav a[aria-current="page"] { color: var(--accent); border-bottom-color: var(--accent); text-shadow: 0 0 10px rgba(var(--accent-rgb), .7); }
 
 .card, .kpi, .drop {
-  background: linear-gradient(180deg, rgba(14, 14, 14, .96), rgba(6, 6, 6, .96));
+  background: linear-gradient(180deg, var(--head-top), var(--head-bottom));
   border: 1px solid var(--line); border-radius: 0; clip-path: var(--notch); position: relative;
 }
 .card::after, .kpi::after { content: ""; position: absolute; left: 0; top: 0; width: 18px; height: 18px; border-top: 2px solid var(--accent); border-left: 2px solid var(--accent); opacity: .8; pointer-events: none; }
 .card h2, .kpi .label { font-family: var(--font-display); font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
 .kpi .label { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kpi::before { width: 3px; box-shadow: 0 0 12px var(--k, transparent); }
-.kpi .value, .loan-big { font-family: var(--font-display); font-weight: 700; letter-spacing: .02em; text-shadow: 0 0 12px rgba(230, 241, 255, .18); }
-.kpi .value .pos, .loan-big.pos, .value .pos { text-shadow: 0 0 14px rgba(0, 255, 163, .55); }
-td.amount.pos, .amount.pos, b.pos, .num.pos { text-shadow: 0 0 8px rgba(0, 255, 163, .55); }
-td.amount.neg, .amount.neg, b.neg, .num.neg { text-shadow: 0 0 8px rgba(255, 42, 109, .55); }
-.kpi .value .neg { text-shadow: 0 0 14px rgba(255, 42, 109, .55); }
+.kpi .value, .loan-big { font-family: var(--font-display); font-weight: 700; letter-spacing: .02em; text-shadow: 0 0 12px rgba(var(--ink-rgb), .18); }
+.kpi .value .pos, .loan-big.pos, .value .pos { text-shadow: 0 0 14px rgba(var(--pos-rgb), .55); }
+td.amount.pos, .amount.pos, b.pos, .num.pos { text-shadow: 0 0 8px rgba(var(--pos-rgb), .55); }
+td.amount.neg, .amount.neg, b.neg, .num.neg { text-shadow: 0 0 8px rgba(var(--neg-rgb), .55); }
+.kpi .value .neg { text-shadow: 0 0 14px rgba(var(--neg-rgb), .55); }
 .gold { color: var(--gold); }
-.kpi .value .gold { text-shadow: 0 0 10px rgba(255, 201, 52, .75), 0 0 26px rgba(255, 170, 0, .35); }
-.section-title h2 { font-family: var(--font-display); color: var(--magenta); text-shadow: 0 0 12px rgba(255, 43, 214, .5); font-size: 16px; }
+.kpi .value .gold { text-shadow: 0 0 10px rgba(var(--gold-rgb), .75), 0 0 26px rgba(var(--amber-rgb), .35); }
+.section-title h2 { font-family: var(--font-display); color: var(--magenta); text-shadow: 0 0 12px rgba(var(--magenta-rgb), .5); font-size: 16px; }
 
-.btn { border-radius: 0; clip-path: var(--notch-sm); text-transform: uppercase; letter-spacing: .07em; font-weight: 600; font-size: 13px; border-color: rgba(0, 229, 255, .45); background: rgba(0, 229, 255, .06); }
-.btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(0, 229, 255, .12); box-shadow: inset 0 0 12px rgba(0, 229, 255, .25); }
-.btn.primary { background: var(--magenta); border-color: var(--magenta); color: #000; box-shadow: 0 0 16px rgba(255, 43, 214, .45); }
-.btn.primary:hover { filter: brightness(1.12); color: #000; background: var(--magenta); }
+.btn { border-radius: 0; clip-path: var(--notch-sm); text-transform: uppercase; letter-spacing: .07em; font-weight: 600; font-size: 13px; border-color: rgba(var(--accent-rgb), .45); background: rgba(var(--accent-rgb), .06); }
+.btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(var(--accent-rgb), .12); box-shadow: inset 0 0 12px rgba(var(--accent-rgb), .25); }
+.btn.primary { background: var(--magenta); border-color: var(--magenta); color: var(--on-accent); box-shadow: 0 0 16px rgba(var(--magenta-rgb), .45); }
+.btn.primary:hover { filter: brightness(1.12); color: var(--on-accent); background: var(--magenta); }
 .btn.ghost { background: transparent; border-color: transparent; }
 .btn.small { font-size: 12px; }
 .btn[disabled] { opacity: .5; cursor: default; }
 
 .input, select.cat, input.cell, .month, .seg { border-radius: 0; }
-.input, .month, .seg, .seg button { background: rgba(4, 4, 4, .9); border-color: var(--line); }
-.input:focus, select.cat:focus, input.cell:focus { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 0 12px rgba(0, 229, 255, .3); outline: none; }
-select option, select optgroup { background: #0b0b0b; color: var(--ink); }
-.seg button[aria-pressed="true"] { background: rgba(0, 229, 255, .14); color: var(--accent); text-shadow: 0 0 8px rgba(0, 229, 255, .6); }
+.input, .month, .seg, .seg button { background: var(--field); border-color: var(--line); }
+.input:focus, select.cat:focus, input.cell:focus { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 0 12px rgba(var(--accent-rgb), .3); outline: none; }
+select option, select optgroup { background: var(--surface); color: var(--ink); }
+.seg button[aria-pressed="true"] { background: rgba(var(--accent-rgb), .14); color: var(--accent); text-shadow: 0 0 8px rgba(var(--accent-rgb), .6); }
 .seg button, .month span { text-transform: uppercase; letter-spacing: .06em; }
 input[type="date"] { color-scheme: dark; }
 input[type="checkbox"] { accent-color: var(--magenta); }
 
-th { font-family: var(--font-display); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); border-bottom-color: rgba(0, 229, 255, .3); }
-tbody tr:hover td { background: rgba(0, 229, 255, .05); }
+th { font-family: var(--font-display); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); border-bottom-color: rgba(var(--accent-rgb), .3); }
+tbody tr:hover td { background: rgba(var(--accent-rgb), .05); }
 .chip { border-radius: 0; border: 1px solid currentColor; background: transparent; text-transform: uppercase; letter-spacing: .05em; font-size: 11px; }
 .chip.warn { background: var(--warn-soft); } .chip.pos { background: var(--pos-soft); } .chip.neg { background: var(--neg-soft); }
 .type-pill { border-radius: 0; border: 1px solid currentColor; text-transform: uppercase; letter-spacing: .05em; }
 
 .track, .gauge, .debt-bar { border-radius: 0; }
-.fill { border-radius: 0; box-shadow: 0 0 10px rgba(0, 229, 255, .55); }
-.fill.over { box-shadow: 0 0 10px rgba(255, 42, 109, .7); }
-.goal .fill { box-shadow: 0 0 10px rgba(0, 255, 163, .55); }
-.gauge span, .debt-bar .owed { border-radius: 0; box-shadow: 0 0 10px rgba(255, 42, 109, .6); }
-.debt-bar .free { box-shadow: 0 0 10px rgba(0, 255, 163, .45); opacity: .9; }
+.fill { border-radius: 0; box-shadow: 0 0 10px rgba(var(--accent-rgb), .55); }
+.fill.over { box-shadow: 0 0 10px rgba(var(--neg-rgb), .7); }
+.goal .fill { box-shadow: 0 0 10px rgba(var(--pos-rgb), .55); }
+.gauge span, .debt-bar .owed { border-radius: 0; box-shadow: 0 0 10px rgba(var(--neg-rgb), .6); }
+.debt-bar .free { box-shadow: 0 0 10px rgba(var(--pos-rgb), .45); opacity: .9; }
 .budget-tick { background: var(--magenta); box-shadow: 0 0 6px var(--magenta); }
 .legend i.tick { background: var(--magenta); }
 .chart text, .trend text { font-family: var(--font-mono); }
-.chart path[fill^="var"], .trend path[fill^="var"] { filter: drop-shadow(0 0 4px rgba(0, 229, 255, .25)); }
+.chart path[fill^="var"], .trend path[fill^="var"] { filter: drop-shadow(0 0 4px rgba(var(--accent-rgb), .25)); }
 .chart path[stroke^="var"] { filter: drop-shadow(0 0 5px currentColor); }
 
 .notice { border-radius: 0; border-left: 3px solid currentColor; }
-.tooltip { background: rgba(0, 0, 0, .96); color: var(--ink); border: 1px solid var(--accent); border-radius: 0; box-shadow: 0 0 18px rgba(0, 229, 255, .35); font-family: var(--font-body); font-size: 13.5px; }
-.toast { background: rgba(0, 0, 0, .96); color: var(--accent); border: 1px solid var(--accent); border-radius: 0; box-shadow: 0 0 20px rgba(0, 229, 255, .4); text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
-.menu-list { background: #0a0a0a; border-color: var(--accent); border-radius: 0; box-shadow: 0 0 20px rgba(0, 229, 255, .25); }
+.tooltip { background: rgba(var(--shade-rgb), .96); color: var(--ink); border: 1px solid var(--accent); border-radius: 0; box-shadow: 0 0 18px rgba(var(--accent-rgb), .35); font-family: var(--font-body); font-size: 13.5px; }
+.toast { background: rgba(var(--panel-rgb), .96); color: var(--accent); border: 1px solid var(--accent); border-radius: 0; box-shadow: 0 0 20px rgba(var(--accent-rgb), .4); text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
+.menu-list { background: var(--panel); border-color: var(--accent); border-radius: 0; box-shadow: 0 0 20px rgba(var(--accent-rgb), .25); }
 .menu-list button { border-radius: 0; }
-.menu-list button:hover { background: rgba(0, 229, 255, .1); color: var(--accent); }
-dialog { background: #0a0a0a; border: 1px solid var(--accent); border-radius: 0; clip-path: var(--notch); box-shadow: 0 0 40px rgba(0, 229, 255, .25); }
+.menu-list button:hover { background: rgba(var(--accent-rgb), .1); color: var(--accent); }
+dialog { background: var(--panel); border: 1px solid var(--accent); border-radius: 0; clip-path: var(--notch); box-shadow: 0 0 40px rgba(var(--accent-rgb), .25); }
 dialog h3 { font-family: var(--font-display); color: var(--accent); }
-dialog::backdrop { background: rgba(0, 0, 0, .8); }
-dialog textarea { border-radius: 0; background: #000; }
+dialog::backdrop { background: rgba(var(--shade-rgb), .8); }
+dialog textarea { border-radius: 0; background: var(--bg); }
 .drop { border: 1px dashed var(--accent); }
-.drop.over { background: rgba(0, 229, 255, .08); }
-body.dragging::after { border-radius: 0; background: rgba(0, 0, 0, .9); color: var(--accent); font-family: var(--font-display); text-transform: uppercase; letter-spacing: .1em; text-shadow: 0 0 14px var(--accent); }
+.drop.over { background: rgba(var(--accent-rgb), .08); }
+body.dragging::after { border-radius: 0; background: rgba(var(--panel-rgb), .9); color: var(--accent); font-family: var(--font-display); text-transform: uppercase; letter-spacing: .1em; text-shadow: 0 0 14px var(--accent); }
 
 .heat td.cell.cur { box-shadow: inset 0 -2px 0 var(--magenta); }
 .foot { font-family: var(--font-mono); text-transform: uppercase; letter-spacing: .08em; font-size: 11px; }
@@ -494,6 +608,7 @@ a.hint, .legend a { color: var(--accent); }
           <button type="button" data-act="export-json" role="menuitem">Back-up exporteren<small>Alles in één .json-bestand</small></button>
           <button type="button" data-act="folder-open" role="menuitem">OneDrive-back-up<small>Automatisch een kopie + gsm-samenvatting in je OneDrive</small></button>
           <button type="button" data-act="import-json" role="menuitem">Back-up terugzetten<small>Laad een eerder geëxporteerd .json-bestand</small></button>
+          <button type="button" data-act="theme-open" role="menuitem">Thema<small>Cyberpunk, Synthwave, Matrix of Oceaan · donker of licht</small></button>
           <button type="button" data-act="install" role="menuitem" id="mi-install">App installeren<small>Als programma op je pc of gsm, werkt ook offline</small></button>
           <button type="button" data-act="pin-open" role="menuitem">Pincode<small>De planner afschermen met een code</small></button>
           <button type="button" data-act="export-csv" role="menuitem">Transacties naar Excel<small>.csv met puntkomma, opent in Excel</small></button>
@@ -1511,6 +1626,34 @@ if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, 
       });
     return false;
   }
+  /* ---------- thema's ----------
+     De keuze hoort bij dit toestel (localStorage), niet bij de back-up: zo kan je gsm licht en je pc donker zijn. */
+  const THEMES = [["cyberpunk", "Cyberpunk"], ["synthwave", "Synthwave"], ["matrix", "Matrix"], ["oceaan", "Oceaan"]];
+  function getTheme() { const r = document.documentElement; return { t: r.dataset.theme || "cyberpunk", m: r.dataset.mode || "dark" }; }
+  function applyTheme(th) {
+    const r = document.documentElement; r.dataset.theme = th.t; r.dataset.mode = th.m;
+    try { localStorage.setItem(KEY + ".theme", JSON.stringify(th)); } catch (e) {}
+    syncThemeColor();
+  }
+  // statusbalk/titelbalk in de kleur van de achtergrond van het thema
+  function syncThemeColor() { const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() || "#000000"; }
+  function themeDialog() {
+    const draw = () => { const cur = getTheme();
+      return `<h3>Thema</h3><p class="muted" style="margin:4px 0 10px">Geldt voor dit toestel. Je gegevens veranderen niet.</p>
+        <div class="seg" role="group" aria-label="Donker of licht"><button type="button" data-tm="dark" aria-pressed="${cur.m === "dark"}">☾ Donker</button><button type="button" data-tm="light" aria-pressed="${cur.m === "light"}">☀ Licht</button></div>
+        <div class="theme-tiles">${THEMES.map(([id, name]) => `<button type="button" class="theme-tile" data-tt="${id}" data-theme="${id}" data-mode="${cur.m}" aria-pressed="${cur.t === id}"><span class="tt-name">${name}</span><span class="tt-card"><span class="muted" style="font-size:11px">Saldo</span><br><span class="tt-amt">€ 1.234</span></span><span class="tt-dots"><i style="background:var(--accent)"></i><i style="background:var(--magenta)"></i><i style="background:var(--gold)"></i><i style="background:var(--pos)"></i><i style="background:var(--neg)"></i></span></button>`).join("")}</div>
+        <div class="row"><button class="btn primary" data-close type="button">Klaar</button></div>`; };
+    dialog(`<div id="th-box">${draw()}</div>`, d => {
+      const box = d.querySelector("#th-box");
+      box.addEventListener("click", e => {
+        if (e.target.closest("[data-close]")) { d.close(); return; }
+        const tm = e.target.closest("[data-tm]"), tt = e.target.closest("[data-tt]"); if (!tm && !tt) return;
+        const cur = getTheme(); applyTheme({ t: tt ? tt.dataset.tt : cur.t, m: tm ? tm.dataset.tm : cur.m });
+        box.innerHTML = draw();
+      });
+    });
+  }
+
   /* ---------- installeren als app (PWA) ---------- */
   let installPrompt = null;   // de browser geeft dit als hij rechtstreeks kan installeren (Edge, Chrome, Android)
   const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true;
@@ -1754,7 +1897,7 @@ if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, 
     if (d.soon.length) h += `<section class="card"><div class="card-head"><h2>Binnenkort</h2></div><div class="soon-list">${d.soon.map(x => { const late = x.d < todayS(); return `<div class="row-i" style="grid-template-columns:62px 1fr auto"><span class="num dt ${late ? "neg" : x.d <= addD(todayS(), 3) ? "gold" : "muted"}" style="font-size:12.5px">${late ? "te laat" : x.d === todayS() ? "vandaag" : fmtDate(x.d).slice(0, 5)}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.t)}${x.auto ? ' <span class="muted" style="font-size:11px">verwacht</span>' : ""}</span><span class="num ${x.k > 0 ? "pos" : "neg"}">${x.a ? (x.k > 0 ? "+" : "−") + eur0(x.a) : ""}</span></div>`; }).join("")}</div></section>`;
     if (d.fc) { const pts = d.fc.pts, W = 340, H = 80, mx = Math.max(...pts, d.fc.warn), mn = Math.min(...pts, d.fc.warn, 0), x = i => i / (pts.length - 1) * W, y = v => 4 + (mx - v) / ((mx - mn) || 1) * (H - 8);
       let p = `M0,${y(pts[0])}`; pts.forEach((v, i) => { if (i) p += `H${x(i).toFixed(1)}V${y(v).toFixed(1)}`; });
-      h += `<section class="card"><div class="card-head"><h2>Saldoverwachting</h2><span class="hint">45 dagen</span></div><div class="pl-sum" style="margin:0 0 6px"><span>Laagste <b class="num ${d.fc.low < d.fc.warn ? "neg" : ""}">${eur0(d.fc.low)}</b> op ${fmtDate(d.fc.lowD).slice(0, 5)}</span></div><svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;overflow:visible"><line x1="0" x2="${W}" y1="${y(d.fc.warn)}" y2="${y(d.fc.warn)}" stroke="var(--neg)" stroke-dasharray="4 4" opacity=".7"/><path d="${p}" fill="none" stroke="var(--accent)" stroke-width="2" style="filter:drop-shadow(0 0 4px rgba(0,229,255,.8))"/></svg></section>`; }
+      h += `<section class="card"><div class="card-head"><h2>Saldoverwachting</h2><span class="hint">45 dagen</span></div><div class="pl-sum" style="margin:0 0 6px"><span>Laagste <b class="num ${d.fc.low < d.fc.warn ? "neg" : ""}">${eur0(d.fc.low)}</b> op ${fmtDate(d.fc.lowD).slice(0, 5)}</span></div><svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;overflow:visible"><line x1="0" x2="${W}" y1="${y(d.fc.warn)}" y2="${y(d.fc.warn)}" stroke="var(--neg)" stroke-dasharray="4 4" opacity=".7"/><path d="${p}" fill="none" stroke="var(--accent)" stroke-width="2" style="filter:drop-shadow(0 0 4px rgba(var(--accent-rgb), .8))"/></svg></section>`; }
     if (d.goals.length) h += `<section class="card"><div class="card-head"><h2>Spaardoelen</h2>${d.sav.bal !== null ? `<span class="hint">Spaar <b class="gold num">${eur0(d.sav.bal)}</b></span>` : ""}</div>${d.goals.map(g => `<div class="lite-goal"><div class="gw-top"><span class="gw-name"><i style="background:${SERIES[g.c % SERIES.length]}"></i>${esc(g.n)}</span><b class="gold num">${eurS(g.tot)}${g.tg ? `<span class="muted" style="font-weight:400"> / ${eur0(g.tg)}</span>` : ""}</b></div><div class="gw-bar"><span style="width:${((g.pct || 0) * 100).toFixed(1)}%"></span></div></div>`).join("")}</section>`;
     if (d.cats.length) { const mx = Math.max(1, ...d.cats.map(c => Math.max(c.s, c.b))); h += `<section class="card"><div class="card-head"><h2>Uitgaven per categorie</h2></div><div class="cats">${d.cats.map(c => `<div class="cat-row" style="grid-template-columns:110px 1fr 74px"><span class="name">${esc(c.n)}</span><span class="track"><span class="fill${c.b && c.s > c.b ? " over" : ""}" style="width:${(c.s / mx * 100).toFixed(1)}%"></span>${c.b ? `<span class="budget-tick" style="left:calc(${(c.b / mx * 100).toFixed(1)}% - 1px)"></span>` : ""}</span><span class="amt num">${eur0(c.s)}</span></div>`).join("")}</div></section>`; }
     h += `<section class="card"><div class="card-head"><h2>Vermogen</h2></div><div class="gw-amt num" style="margin:0;color:${d.nw.tot >= 0 ? "var(--pos)" : "var(--neg)"};text-shadow:0 0 12px currentColor">${d.nw.tot < 0 ? "−" : ""}${eur0(Math.abs(d.nw.tot))}</div><div class="pl-sum" style="margin-top:6px"><span>Rekening <b class="num">${eur0(d.nw.z)}</b></span><span>Spaar <b class="gold num">${eur0(d.nw.s)}</b></span><span>Schulden <b class="neg num">−${eur0(d.nw.l + d.nw.c)}</b></span></div>
@@ -1762,7 +1905,7 @@ if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, 
     h += `<section class="card"><div class="card-head"><h2>Laatste transacties</h2></div><div class="soon-list">${d.tx.map(x => `<div class="row-i" style="grid-template-columns:48px 1fr auto"><span class="num dt muted" style="font-size:12px">${fmtDate(x.d).slice(0, 5)}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.s)}<br><span class="muted" style="font-size:11.5px">${esc(x.c)}</span></span><span class="num ${x.a >= 0 ? "pos" : "neg"}">${signed(x.a)}</span></div>`).join("")}</div></section>`;
     return h + liteFoot();
   }
-  function liteFoot() { return `<p class="foot">Alleen bekijken · wijzigen doe je op je pc${lite.data && lite.data.src === "bestand" ? "<br>Bijwerken: ⟳ en kies budgetplanner-mobiel.txt in OneDrive" : ""}<br><button class="btn small ghost" data-act="lite-full" type="button">Volledige planner openen</button>${isStandalone() ? "" : `<br><button class="btn small ghost" data-act="install" type="button">⤓ App installeren</button>`}</p>`; }
+  function liteFoot() { return `<p class="foot">Alleen bekijken · wijzigen doe je op je pc${lite.data && lite.data.src === "bestand" ? "<br>Bijwerken: ⟳ en kies budgetplanner-mobiel.txt in OneDrive" : ""}<br><button class="btn small ghost" data-act="lite-full" type="button">Volledige planner openen</button><br><button class="btn small ghost" data-act="theme-open" type="button">🎨 Thema</button>${isStandalone() ? "" : `<br><button class="btn small ghost" data-act="install" type="button">⤓ App installeren</button>`}</p>`; }
 
   /* ---------- pincode ---------- */
   async function sha(t) { const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join(""); }
@@ -1897,9 +2040,9 @@ if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, 
     for (let v = bot; v <= top + 1e-9; v += step) g += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${Math.abs(v) >= 1000 ? (v / 1000).toLocaleString("nl-BE") + "k" : v}</text>`;
     g += `<line x1="${L}" x2="${W - R}" y1="${y(warn)}" y2="${y(warn)}" stroke="var(--neg)" stroke-dasharray="4 4" opacity=".8"/><text x="${W - R}" y="${y(warn) - 4}" text-anchor="end" style="fill:var(--neg)">grens ${eur0(warn)}</text>`;
     let d = `M${x(0)},${y(f.pts[0].value)}`; f.pts.forEach((p, i) => { if (i) d += `H${x(i).toFixed(1)}V${y(p.value).toFixed(1)}`; });
-    g += `<path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2" style="filter:drop-shadow(0 0 5px rgba(0,229,255,.8))"/>`;
+    g += `<path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2" style="filter:drop-shadow(0 0 5px rgba(var(--accent-rgb), .8))"/>`;
     const li = f.pts.indexOf(f.low);
-    g += `<circle cx="${x(li)}" cy="${y(f.low.value)}" r="4.5" fill="${f.low.value < warn ? "var(--neg)" : "var(--gold)"}" stroke="#000" stroke-width="1.5"/>`;
+    g += `<circle cx="${x(li)}" cy="${y(f.low.value)}" r="4.5" fill="${f.low.value < warn ? "var(--neg)" : "var(--gold)"}" stroke="var(--bg)" stroke-width="1.5"/>`;
     f.pts.forEach((p, i) => { if (p.items.length) g += `<circle cx="${x(i)}" cy="${y(p.value)}" r="2.5" fill="var(--accent)"/>`; g += `<rect x="${x(i) - iw / f.pts.length / 2}" y="${T}" width="${iw / f.pts.length}" height="${ih}" fill="transparent" data-tip="${esc(`<b>${fmtDate(p.date)}</b><br>Verwacht saldo: ${eur(p.value)}${p.items.map(it => `<br>${it.plan.kind === "inkomst" ? "+" : "−"}${eur(it.plan.amount || 0)} ${esc(it.plan.title)}`).join("")}`)}"/>`; });
     [0, 15, 30, 45].forEach(i => { if (f.pts[i]) g += `<text x="${x(i)}" y="${H - 6}" text-anchor="${i === 0 ? "start" : i === 45 ? "end" : "middle"}">${i === 0 ? "vandaag" : fmtDate(f.pts[i].date).slice(0, 5)}</text>`; });
     const danger = f.low.value < warn;
@@ -1933,7 +2076,7 @@ if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, 
     let g = ""; for (let v = bot; v <= top + 1e-9; v += step) g += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" ${Math.abs(v) < 1e-9 ? 'style="stroke:var(--muted)"' : ""}/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${Math.abs(v) >= 1000 ? (v / 1000).toLocaleString("nl-BE") + "k" : v}</text>`;
     const line = series.map((p, i) => (i ? "L" : "M") + x(i).toFixed(1) + "," + y(p.v).toFixed(1)).join("");
     const col = now.total >= 0 ? "var(--pos)" : "var(--neg)";
-    g += `<path d="${line}L${x(series.length - 1)},${y(Math.max(bot, Math.min(0, top)))}L${x(0)},${y(Math.max(bot, Math.min(0, top)))}Z" fill="${now.total >= 0 ? "rgba(0,255,163,.08)" : "rgba(255,42,109,.08)"}"/><path d="${line}" fill="none" stroke="${col}" stroke-width="2" style="filter:drop-shadow(0 0 5px ${col})"/>`;
+    g += `<path d="${line}L${x(series.length - 1)},${y(Math.max(bot, Math.min(0, top)))}L${x(0)},${y(Math.max(bot, Math.min(0, top)))}Z" fill="${now.total >= 0 ? "rgba(var(--pos-rgb), .08)" : "rgba(var(--neg-rgb), .08)"}"/><path d="${line}" fill="none" stroke="${col}" stroke-width="2" style="filter:drop-shadow(0 0 5px ${col})"/>`;
     series.forEach((p, i) => g += `<rect x="${x(i) - iw / 26}" y="${T}" width="${iw / 13}" height="${ih}" fill="transparent" data-tip="${esc(`<b>${i === series.length - 1 ? "Vandaag" : monthName(p.date.slice(0, 7))}</b><br>Vermogen: ${eur(p.v)}`)}"/>`);
     g += `<text x="${L}" y="${H - 4}">${monthShort(months[0].slice(0, 7))}</text><text x="${W - R}" y="${H - 4}" text-anchor="end">nu</text>`;
     return `<section class="card chart"><div class="card-head"><h2>Vermogen</h2><span class="hint">Rekening + spaar − leningen − kredieten</span></div>
@@ -1959,7 +2102,7 @@ if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, 
       const W = 240, H = 44, X = k => k / (months.length - 1) * W, Y = v => H - (v - mn) / (mx - mn) * (H - 4) - 2;
       const line = vals.map((v, k) => (k ? "L" : "M") + X(k).toFixed(1) + "," + Y(v).toFixed(1)).join("");
       const tipPts = vals.map((v, k) => `<rect x="${(X(k) - W / 24).toFixed(1)}" y="0" width="${(W / 12).toFixed(1)}" height="${H}" fill="transparent" data-tip="${esc(`<b>${esc(g.name)}</b> · ${esc(monthName(months[k]))}<br>${eur(v)}`)}"/>`).join("");
-      const spark = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">${showT ? `<line x1="0" x2="${W}" y1="${Y(p.target)}" y2="${Y(p.target)}" stroke="var(--magenta)" stroke-dasharray="3 3" opacity=".6"/>` : ""}<path d="${line}L${W},${H}L0,${H}Z" fill="rgba(255,201,52,.10)"/><path d="${line}" fill="none" stroke="var(--gold)" stroke-width="1.6" vector-effect="non-scaling-stroke" style="filter:drop-shadow(0 0 3px rgba(255,201,52,.8))"/><circle cx="${X(11)}" cy="${Y(vals[11])}" r="2.6" fill="var(--gold)"/>${tipPts}</svg>`;
+      const spark = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">${showT ? `<line x1="0" x2="${W}" y1="${Y(p.target)}" y2="${Y(p.target)}" stroke="var(--magenta)" stroke-dasharray="3 3" opacity=".6"/>` : ""}<path d="${line}L${W},${H}L0,${H}Z" fill="rgba(var(--gold-rgb), .10)"/><path d="${line}" fill="none" stroke="var(--gold)" stroke-width="1.6" vector-effect="non-scaling-stroke" style="filter:drop-shadow(0 0 3px rgba(var(--gold-rgb), .8))"/><circle cx="${X(11)}" cy="${Y(vals[11])}" r="2.6" fill="var(--gold)"/>${tipPts}</svg>`;
       const pct = p.pct !== null ? Math.round(p.pct * 100) : null;
       return `<div class="gw" data-act="goto-spaar" style="cursor:pointer">
         <div class="gw-top"><span class="gw-name"><i style="background:${col}"></i>${esc(g.name)}</span><span class="gw-ref">${esc(g.ref || "")}</span></div>
@@ -2459,7 +2602,7 @@ if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, 
     if (un !== null && un > 0.005) bar += `<span class="un" style="flex:${un}" data-tip="${esc(`<b>Niet verdeeld</b><br>${eur(un)}`)}"></span>`;
     let h = `<section class="card"><div class="card-head"><h2>Verdeling van je spaarrekening</h2><span class="hint">${sm.bal.set ? `Saldo ${eur(sm.bal.total)}` : "Stel je saldo in om te vergelijken"}</span></div>
       <div class="alloc">${bar || `<span class="un" style="flex:1"></span>`}</div>
-      <div class="alloc-legend">${parts.map(p => `<div><i style="background:${p.col}"></i>${esc(p.name)}<b>${eur(p.p.total)}</b></div>`).join("")}${un !== null ? `<div><i style="background:${un >= -0.005 ? "rgba(154,154,154,.5)" : "var(--neg)"}"></i>Niet verdeeld<b class="${un < -0.005 ? "neg" : ""}">${eur(un)}</b></div>` : ""}</div>`;
+      <div class="alloc-legend">${parts.map(p => `<div><i style="background:${p.col}"></i>${esc(p.name)}<b>${eur(p.p.total)}</b></div>`).join("")}${un !== null ? `<div><i style="background:${un >= -0.005 ? "rgba(var(--muted-rgb), .5)" : "var(--neg)"}"></i>Niet verdeeld<b class="${un < -0.005 ? "neg" : ""}">${eur(un)}</b></div>` : ""}</div>`;
     h += `<div class="table-wrap" style="margin-top:16px"><table><thead><tr><th>Spaardoel</th><th>Referentie</th><th class="r">Beginbedrag</th><th class="r">+ bewegingen</th><th class="r">= Gespaard</th><th class="r">Doel</th><th style="min-width:130px">Voortgang</th><th class="r">Per maand nodig</th></tr></thead><tbody>` +
       sm.goals.map((x, i) => `<tr data-i="${i}"><td><span style="display:inline-block;width:9px;height:9px;background:${SERIES[i % SERIES.length]};margin-right:8px"></span>${esc(x.g.name)}</td>
         <td style="white-space:nowrap"><input class="cell num" style="width:150px" data-act="goal-ref" value="${esc(x.g.ref || "")}" aria-label="Referentie ${esc(x.g.name)}"><button class="btn small ghost" data-act="copy-ref" data-ref="${esc(x.g.ref || "")}" type="button" title="Kopiëren">⧉</button></td>
@@ -2484,7 +2627,7 @@ if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, 
     let d = `M${x(pts[0].date).toFixed(1)},${y(pts[0].value).toFixed(1)}`;
     for (let k = 1; k < pts.length; k++) d += `H${x(pts[k].date).toFixed(1)}V${y(pts[k].value).toFixed(1)}`;
     d += `H${(L + iw).toFixed(1)}`;
-    g += `<path d="${d}V${y(Math.max(0, bot))}H${x(pts[0].date)}Z" fill="rgba(255,201,52,.08)"/><path d="${d}" fill="none" stroke="var(--gold)" stroke-width="2" style="filter:drop-shadow(0 0 5px rgba(255,201,52,.7))"/>`;
+    g += `<path d="${d}V${y(Math.max(0, bot))}H${x(pts[0].date)}Z" fill="rgba(var(--gold-rgb), .08)"/><path d="${d}" fill="none" stroke="var(--gold)" stroke-width="2" style="filter:drop-shadow(0 0 5px rgba(var(--gold-rgb), .7))"/>`;
     const span = (t1 - t0) / 864e5, years = [...new Set(pts.map(p => p.date.slice(0, 4)))];
     const lab = span > 540 ? years.map(yy => yy + "-01-01").filter(dd => new Date(dd).getTime() >= t0) : [];
     lab.forEach(dd => g += `<text x="${x(dd)}" y="${H - 6}" text-anchor="middle">${dd.slice(0, 4)}</text>`);
@@ -2691,7 +2834,7 @@ if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, 
       <label class="muted" style="margin-left:auto;font-size:13px;display:flex;gap:6px;align-items:center"><input type="checkbox" data-act="pl-detected" ${plUi.detected ? "checked" : ""}> Herkende betalingen tonen</label></div>
       <div class="pl-sum"><span>Te betalen <b class="neg">${eur(sum(out))}</b></span><span>Al betaald <b class="pos">${eur(sum(out.filter(i => i.paid)))}</b></span><span>Nog open <b style="color:var(--gold)">${eur(sum(out.filter(i => !i.paid)))}</b></span>${inc.length ? `<span>Verwachte inkomsten <b class="pos">${eur(sum(inc))}</b></span>` : ""}<span class="muted">${inPeriod.length} item${inPeriod.length === 1 ? "" : "s"}</span></div></section>`;
     h += `<section class="card">${plUi.view === "jaar" ? plYear(items) : plUi.view === "dag" ? plDay(items) : plGrid(items, from, to)}
-      <div class="pl-legend"><span style="--c:var(--magenta);--b:rgba(255,43,214,.08)">Gepland</span><span style="--c:var(--accent);--b:rgba(0,229,255,.06)">Herkend (verwacht)</span><span style="--c:var(--gold);--b:rgba(255,201,52,.1)">Binnenkort</span><span style="--c:var(--neg);--b:rgba(255,42,109,.12)">Te laat</span><span style="--c:var(--pos);--b:rgba(0,255,163,.07)">Betaald</span></div></section>`;
+      <div class="pl-legend"><span style="--c:var(--magenta);--b:rgba(var(--magenta-rgb), .08)">Gepland</span><span style="--c:var(--accent);--b:rgba(var(--accent-rgb), .06)">Herkend (verwacht)</span><span style="--c:var(--gold);--b:rgba(var(--gold-rgb), .1)">Binnenkort</span><span style="--c:var(--neg);--b:rgba(var(--neg-rgb), .12)">Te laat</span><span style="--c:var(--pos);--b:rgba(var(--pos-rgb), .07)">Betaald</span></div></section>`;
     h += `<div class="grid-2">${soonCard(30)}${detectedCard()}</div>`;
     return h;
   }
@@ -3067,7 +3210,7 @@ if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, 
     const x = i => L + i / (n - 1 || 1) * iw, y = v => T + (top - v) / top * ih;
     let g = ""; for (let v = 0; v <= top + 1e-9; v += step) g += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end">${v >= 1000 ? (v / 1000).toLocaleString("nl-BE") + "k" : v}</text>`;
     const path = c => c.map((v, i) => (i ? "L" : "M") + x(i).toFixed(1) + "," + y(v).toFixed(1)).join("");
-    g += `<path d="${path(base.curve)}" fill="none" stroke="var(--muted)" stroke-width="2" stroke-dasharray="5 4"/><path d="${path(snow.curve)}" fill="none" stroke="var(--gold)" stroke-width="2" style="filter:drop-shadow(0 0 4px rgba(255,201,52,.7))"/><path d="${path(aval.curve)}" fill="none" stroke="var(--accent)" stroke-width="2" style="filter:drop-shadow(0 0 4px rgba(0,229,255,.8))"/>`;
+    g += `<path d="${path(base.curve)}" fill="none" stroke="var(--muted)" stroke-width="2" stroke-dasharray="5 4"/><path d="${path(snow.curve)}" fill="none" stroke="var(--gold)" stroke-width="2" style="filter:drop-shadow(0 0 4px rgba(var(--gold-rgb), .7))"/><path d="${path(aval.curve)}" fill="none" stroke="var(--accent)" stroke-width="2" style="filter:drop-shadow(0 0 4px rgba(var(--accent-rgb), .8))"/>`;
     for (let yr = 1; yr * 12 < n; yr++) g += `<text x="${x(yr * 12)}" y="${H - 6}" text-anchor="middle">+${yr} jaar</text>`;
     for (let i = 0; i < n; i += Math.max(1, Math.round(n / 60))) g += `<rect x="${x(i) - iw / n}" y="${T}" width="${2 * iw / n}" height="${ih}" fill="transparent" data-tip="${esc(`<b style="text-transform:capitalize">${esc(when(i))}</b><br>Zoals nu: ${eur0(base.curve[i] ?? 0)}<br>Lawine: ${eur0(aval.curve[i] ?? 0)}<br>Sneeuwbal: ${eur0(snow.curve[i] ?? 0)}`)}"/>`;
     const row = (lab, r, col) => `<tr><td><span style="display:inline-block;width:10px;height:3px;background:${col};vertical-align:middle;margin-right:8px"></span>${lab}</td><td class="num" style="text-transform:capitalize">${r.never ? "—" : esc(when(r.months))}</td><td class="r num">${r.never ? "—" : r.months + " mnd"}</td><td class="r num neg">${eur(r.interest)}</td><td class="r num ${r === base ? "muted" : "pos"}">${r === base ? "—" : (base.months - r.months > 0 ? (base.months - r.months) + " mnd sneller · " : "") + eur(Math.max(0, base.interest - r.interest)) + " minder rente"}</td></tr>`;
@@ -3157,6 +3300,7 @@ if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, 
       case "price-ok": state.ignoredPrice = state.ignoredPrice || []; state.ignoredPrice.push(el.dataset.key); save(); render(); break;
       case "pin-open": pinDialog(); break;
       case "install": installApp(); break;
+      case "theme-open": themeDialog(); break;
       case "folder-open": folderDialog(); break;
       case "folder-resume": folderBackup(true); break;
       case "export-csv": offerFile(`transacties-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(state), "text/csv"); break;
@@ -3388,6 +3532,7 @@ if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, 
 
   $("#main").innerHTML = `<p class="muted" style="padding:40px 0;text-align:center">Gegevens laden…</p>`;
   loadState().then(st => { state = st; ui.month = state.transactions.length ? state.transactions[0].date.slice(0, 7) : todayYm();
+      syncThemeColor();
       const start = () => {
         updateInstallUi(); if (state.transactions.length) askPersist();
         if (liteMode()) { liteLoadCache(); liteFromLocal(); return; }
