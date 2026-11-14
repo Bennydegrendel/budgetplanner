@@ -651,6 +651,48 @@ body.dragging::after { border-radius: var(--r-card); background: rgba(var(--pane
 .foot { font-family: var(--font-mono); text-transform: var(--case-ui); letter-spacing: .08em; font-size: 11px; }
 a.hint, .legend a { color: var(--accent); }
 @media (prefers-reduced-motion: reduce) { body::before { display: none; } }
+/* ================= BREDE SCHERMEN (stap 7a) =================
+   Vanaf 1600 px: inhoud breder + vast zijpaneel rechts (niet op het Overzicht, daar staat het al). */
+#side { display: none; }
+@media (min-width: 1600px) {
+  .bar { max-width: 1760px; }
+  .shell { max-width: 1760px; margin: 0 auto; padding: 0 24px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; align-items: start; }
+  .shell > main { max-width: none; margin: 0; padding-left: 0; padding-right: 0; min-width: 0; }
+  body.has-side .shell { grid-template-columns: minmax(0, 1fr) 360px; }
+  body.has-side #side { display: grid; gap: 20px; align-content: start; position: sticky; top: 61px; padding: 24px 0; max-height: calc(100vh - 61px); overflow-y: auto; scrollbar-width: thin; }
+  #side .card { padding: 16px 18px; }
+  #side .cat-row { grid-template-columns: 112px 1fr 82px; }
+}
+/* ================= SMALLE SCHERMEN (stap 7b) =================
+   Tot 900 px: menuknop ☰ met alle tabbladen i.p.v. een veegbalk die buiten beeld loopt.
+   Tot 700 px: kaartjes 2 per rij, meldingen inklapbaar. */
+.nav-toggle { display: none; }
+.fold { display: block; } .fold > summary { cursor: pointer; list-style: none; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary::after { content: "▸"; margin-left: auto; transition: transform .2s ease; } .fold[open] > summary::after { transform: rotate(90deg); }
+.fold[open] > summary { margin-bottom: 8px; } .fold > div + div { margin-top: 6px; }
+.fold-hint { font-weight: 400; opacity: .7; font-size: .9em; } .fold[open] .fold-hint { display: none; }
+@media (max-width: 900px) {
+  .nav-toggle { display: inline-flex; margin-right: auto; }
+  header nav { display: none; }
+  header.nav-open nav { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; position: absolute; left: 0; right: 0; top: 100%; padding: 10px 16px 14px; background: var(--panel); border-bottom: 1px solid rgba(var(--accent-rgb), .35); box-shadow: 0 14px 28px rgba(var(--shade-rgb), .35); overflow: visible; animation: fx-drop .16s ease-out; }
+  header.nav-open nav a { padding: 11px 12px; border: 1px solid var(--line); border-radius: var(--r-btn); clip-path: var(--notch-sm); }
+  header.nav-open nav a[aria-current="page"] { border-color: var(--accent); background: rgba(var(--accent-rgb), .08); }
+}
+@media (max-width: 700px) {
+  .kpis { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .kpis > .kpi:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .kpi { padding: 12px 14px; } .kpi .value { font-size: 20px; }
+  .kpi .chip { white-space: normal; font-size: 10.5px; letter-spacing: .02em; line-height: 1.35; max-width: 100%; }
+}
+body.lite .nav-toggle { display: none !important; }
+/* ================= GSM-WEERGAVE (stap 7c) =================
+   Geen aparte bovenbalk: logo + titel + knoppen in één kopregel die bovenaan blijft staan. */
+body.lite header { display: none; }
+body.lite .lite-head { position: sticky; top: 0; z-index: 5; margin: -14px -14px 0; padding: calc(10px + env(safe-area-inset-top)) 14px 10px;
+  background: rgba(var(--panel-rgb), .92); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-bottom: 1px solid rgba(var(--accent-rgb), .25); }
+.lite-title { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.lite-title .brand-mark { width: 34px; height: 34px; font-size: 18px; display: grid; place-items: center; flex: none; }
 /* ================= ANIMATIES (stap 6c) =================
    Kort en spaarzaam. Alles valt weg bij "minder beweging" (zie onderaan).
    #main.enter wordt kort gezet als je van tabblad wisselt of de app opent. */
@@ -707,6 +749,7 @@ dialog[open] { animation: fx-pop .18s ease-out; }
 <header>
   <div class="bar">
     <div class="brand" title="Budgetplanner"><span class="brand-mark" aria-hidden="true">€</span><span class="brand-text">Budgetplanner</span></div>
+    <button class="btn nav-toggle" id="btn-nav" type="button" aria-expanded="false" aria-controls="nav">☰ <span id="nav-cur">Overzicht</span></button>
     <nav id="nav" aria-label="Onderdelen">
       <a href="#overzicht">Overzicht</a>
       <a href="#transacties">Transacties</a>
@@ -737,7 +780,7 @@ dialog[open] { animation: fx-pop .18s ease-out; }
   </div>
 </header>
 
-<main id="main"></main>
+<div class="shell"><main id="main"></main><aside id="side" aria-label="Snel overzicht"></aside></div>
 <p class="foot">Je gegevens blijven in deze browser. Exporteer regelmatig een back-up.</p>
 
 <input type="file" id="file-csv" accept=".csv,text/csv" multiple hidden>
@@ -2008,14 +2051,14 @@ if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, 
   function liteHidden() { try { return localStorage.getItem(KEY + ".eye") === "0"; } catch (e) { return false; } }
   function viewLite() {
     const d = lite.data, ago = at => { const m = Math.round((Date.now() - new Date(at)) / 60000); return m < 60 ? `${m} min geleden` : m < 1440 ? `${Math.round(m / 60)} u geleden` : new Date(at).toLocaleDateString("nl-BE", { day: "numeric", month: "short" }) + " " + new Date(at).toLocaleTimeString("nl-BE", { hour: "2-digit", minute: "2-digit" }); };
-    let h = `<div class="lite-head"><div><h1>Overzicht</h1><p class="muted">${d ? `Bijgewerkt ${esc(ago(d.at))}` : "Nog geen gegevens"}</p></div><div class="lite-btns"><button class="btn lite-eye" data-act="lite-eye" type="button" aria-pressed="${liteHidden() ? "false" : "true"}" aria-label="${liteHidden() ? "Bedragen tonen" : "Bedragen verbergen"}">${liteHidden() ? EYE_OFF : EYE_ON}</button><button class="btn${lite.busy ? "" : " primary"}" data-act="lite-refresh" type="button" ${lite.busy ? "disabled" : ""}>${lite.busy ? "…" : "⟳"}</button></div></div>`;
+    let h = `<div class="lite-head"><div class="lite-title"><span class="brand-mark" aria-hidden="true">€</span><div><h1>Overzicht</h1><p class="muted">${d ? `Bijgewerkt ${esc(ago(d.at))}` : "Nog geen gegevens"}</p></div></div><div class="lite-btns"><button class="btn lite-eye" data-act="lite-eye" type="button" aria-pressed="${liteHidden() ? "false" : "true"}" aria-label="${liteHidden() ? "Bedragen tonen" : "Bedragen verbergen"}">${liteHidden() ? EYE_OFF : EYE_ON}</button><button class="btn${lite.busy ? "" : " primary"}" data-act="lite-refresh" type="button" ${lite.busy ? "disabled" : ""}>${lite.busy ? "…" : "⟳"}</button></div></div>`;
     if (lite.news) h += `<div class="lite-news" data-act="lite-news-ok">⚡ <b>Nieuwe update</b> van je planner · ${esc(new Date(lite.news.at).toLocaleString("nl-BE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }))}${lite.news.newTx ? ` · ${lite.news.newTx} nieuwe transactie${lite.news.newTx === 1 ? "" : "s"}` : ""}<span>✕</span></div>`;
     if (lite.status) h += `<div class="notice ${/lukte|niet|Open/.test(lite.status) ? "warn" : "info"}"><span>${esc(lite.status)}</span></div>`;
     if (!d) return h + `<section class="card"><p>Op je gsm toont de planner de samenvatting die je pc in je OneDrive zet bij elke back-up.</p><p class="muted">Schakel op je pc de OneDrive-back-up in (Back-up → OneDrive-back-up). Tik dan hier op <b>⟳</b> en kies in OneDrive het bestand <b>budgetplanner-mobiel.txt</b>.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" data-act="lite-refresh" type="button">Samenvatting kiezen</button><button class="btn" data-act="import-json" type="button">Back-up terugzetten</button></div></section>` + liteFoot();
     const k = d.k, kp = (l, v, c, cls) => `<div class="kpi" style="--k:${c}"><div class="label">${l}</div><div class="value num"><span class="${cls}">${v}</span></div></div>`;
     h += `<div class="lite-kpis">${kp("Inkomsten", eur0(k.inc), "var(--pos)", "pos")}${kp("Uitgaven", eur0(k.exp), "var(--neg)", "neg")}${kp("Gespaard", eurS(k.saved), "var(--gold)", "gold")}${kp("Netto", (k.net >= 0 ? "+" : "−") + eur0(Math.abs(k.net)), k.net >= 0 ? "var(--pos)" : "var(--neg)", k.net >= 0 ? "pos" : "neg")}</div>`;
     h += `<section class="card lite-bal"><div class="label">Saldo op rekening</div><div class="gw-amt num ${k.bal !== null && k.bal < 0 ? "neg" : ""}">${k.bal === null ? "—" : eur(k.bal)}</div>${k.uncat ? `<span class="chip warn">${k.uncat} te categoriseren</span>` : ""}</section>`;
-    if (d.price && d.price.length) h += `<div class="notice warn" style="flex-direction:column;align-items:stretch;gap:4px"><b style="font-size:12px;letter-spacing:.08em;text-transform:var(--case-ui)">⚠ Duurder geworden</b>${d.price.map(p => `<span>${esc(p.t)}: <span class="num">${eur(p.o)}</span> → <b class="neg num">${eur(p.n)}</b></span>`).join("")}</div>`;
+    if (d.price && d.price.length) h += `<details class="notice warn fold"><summary>⚠ ${d.price.length} prijsstijging${d.price.length === 1 ? "" : "en"} <span class="fold-hint">tik om te zien</span></summary><div style="display:grid;gap:4px">${d.price.map(p => `<span>${esc(p.t)}: <span class="num">${eur(p.o)}</span> → <b class="neg num">${eur(p.n)}</b></span>`).join("")}</div></details>`;
     if (d.soon.length) h += `<section class="card"><div class="card-head"><h2>Binnenkort</h2></div><div class="soon-list">${d.soon.map(x => { const late = x.d < todayS(); return `<div class="row-i" style="grid-template-columns:62px 1fr auto"><span class="num dt ${late ? "neg" : x.d <= addD(todayS(), 3) ? "gold" : "muted"}" style="font-size:12.5px">${late ? "te laat" : x.d === todayS() ? "vandaag" : fmtDate(x.d).slice(0, 5)}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.t)}${x.auto ? ' <span class="muted" style="font-size:11px">verwacht</span>' : ""}</span><span class="num ${x.k > 0 ? "pos" : "neg"}">${x.a ? (x.k > 0 ? "+" : "−") + eur0(x.a) : ""}</span></div>`; }).join("")}</div></section>`;
     if (d.fc) { const pts = d.fc.pts, W = 340, H = 80, mx = Math.max(...pts, d.fc.warn), mn = Math.min(...pts, d.fc.warn, 0), x = i => i / (pts.length - 1) * W, y = v => 4 + (mx - v) / ((mx - mn) || 1) * (H - 8);
       let p = `M0,${y(pts[0])}`; pts.forEach((v, i) => { if (i) p += `H${x(i).toFixed(1)}V${y(v).toFixed(1)}`; });
@@ -2133,6 +2176,9 @@ if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, 
   /* ---------- prijsstijgingen ---------- */
   function priceNotice() {
     const list = priceChanges(state); if (!list.length) return "";
+    const rows = list.slice(0, 5).map(p => `<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><span>${esc(p.title)}: <span class="num">${eur(p.old)}</span> → <b class="num neg">${eur(p.now)}</b> (+${p.pct}%) sinds ${fmtDate(p.date)}</span><button class="btn small ghost" data-act="price-ok" data-key="${esc(p.key)}" type="button">Gezien</button></div>`).join("");
+    // op een smal scherm ingeklapt tot één regel (tik om te openen)
+    if (narrow()) return `<details class="notice warn fold"><summary>⚠ ${list.length} prijsstijging${list.length === 1 ? "" : "en"} <span class="fold-hint">tik om te zien</span></summary>${rows}</details>`;
     return `<div class="notice warn" style="flex-direction:column;align-items:stretch;gap:6px"><b style="font-family:var(--font-display);letter-spacing:.08em;text-transform:var(--case-ui);font-size:12px">⚠ Duurder geworden</b>${list.slice(0, 5).map(p => `<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><span>${esc(p.title)}: <span class="num">${eur(p.old)}</span> → <b class="num neg">${eur(p.now)}</b> (+${p.pct}%) sinds ${fmtDate(p.date)}</span><button class="btn small ghost" data-act="price-ok" data-key="${esc(p.key)}" type="button">Gezien</button></div>`).join("")}</div>`;
   }
 
@@ -3396,8 +3442,38 @@ if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, 
     updateBadge();
     document.querySelectorAll("#nav a").forEach(a => { if (a.getAttribute("href") === "#" + r) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
     if (focusId) { const el = document.getElementById(focusId); if (el) { el.focus(); try { el.setSelectionRange(selStart, selStart); } catch (e) {} } }
+    renderSide(r);
+    const cur = document.querySelector(`#nav a[href="#${r}"]`); $("#nav-cur").textContent = cur ? cur.firstChild.textContent.trim() : ""; navOpen(false);
     afterRender(r + (r === "overzicht" ? ui.period : ""));
   }
+  /* ---------- smalle schermen (stap 7b) ---------- */
+  const narrow = () => window.matchMedia && matchMedia("(max-width: 700px)").matches;
+  function navOpen(open) { const h = $("header"); h.classList.toggle("nav-open", open); $("#btn-nav").setAttribute("aria-expanded", String(open)); }
+  $("#btn-nav").addEventListener("click", e => { e.stopPropagation(); navOpen(!$("header").classList.contains("nav-open")); });
+  document.addEventListener("click", e => { if (!e.target.closest("header")) navOpen(false); });
+  /* ---------- zijpaneel op brede schermen (stap 7a) ---------- */
+  const wide = () => window.matchMedia && matchMedia("(min-width: 1600px)").matches;
+  function renderSide(r) {
+    const show = !liteMode() && r !== "overzicht" && state.transactions.length > 0 && wide();
+    document.body.classList.toggle("has-side", show);
+    $("#side").innerHTML = show ? soonCard(14, true) + budgetSide() + goalsSide() : "";
+  }
+  function budgetSide() {
+    const ym = todayYm(), env = envelopes(state, ym);
+    const rows = state.categories.map(c => ({ c, e: env[c.name] })).filter(x => x.e && x.e.available > 0)
+      .map(x => ({ n: x.c.name, left: Math.round((x.e.available - x.e.spent) * 100) / 100, pct: Math.min(1, Math.max(0, x.e.spent / x.e.available)) }))
+      .sort((a, b) => b.pct - a.pct);
+    const head = `<div class="card-head"><h2>Resterend budget</h2><a class="hint" href="#budget" style="text-transform:capitalize">${esc(monthShort(ym))}</a></div>`;
+    if (!rows.length) return `<section class="card">${head}<p class="muted" style="margin:0;font-size:13px">Stel budgetten in bij <a class="hint" href="#budget">Budget</a>.</p></section>`;
+    return `<section class="card">${head}<div class="cats">${rows.map(x => `<div class="cat-row"><span class="name">${esc(x.n)}</span><span class="track"><span class="fill${x.left < 0 ? " over" : ""}" style="width:${(x.pct * 100).toFixed(1)}%"></span></span><span class="amt num ${x.left < 0 ? "neg" : ""}">${x.left < 0 ? "−" : ""}${eur0(Math.abs(x.left))}</span></div>`).join("")}</div></section>`;
+  }
+  function goalsSide() {
+    if (!state.goals.length) return "";
+    return `<section class="card"><div class="card-head"><h2>Spaardoelen</h2><a class="hint" href="#spaardoelen">Alle</a></div>${state.goals.map((g, i) => { const pr = goalProgress(state, g);
+      return `<div class="lite-goal"><div class="gw-top"><span class="gw-name"><i style="background:${SERIES[i % SERIES.length]}"></i>${esc(g.name)}</span><b class="gold num">${eurS(pr.total)}${pr.target ? `<span class="muted" style="font-weight:400"> / ${eur0(pr.target)}</span>` : ""}</b></div><div class="gw-bar"><span style="width:${((pr.pct || 0) * 100).toFixed(1)}%"></span></div></div>`; }).join("")}</section>`;
+  }
+  let sideT = null, wasWide = null;
+  window.addEventListener("resize", () => { clearTimeout(sideT); sideT = setTimeout(() => { const w = wide(); if (w !== wasWide) { wasWide = w; if (!liteMode()) renderSide(route()); } }, 150); });
   /* ---------- animaties ----------
      Alleen als je van scherm wisselt (niet bij elke wijziging: dat zou storen). */
   let lastView = null;
