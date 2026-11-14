@@ -1270,7 +1270,8 @@ function monthSummary(state, ym) {
   return s;
 }
 
-function goalProgress(state, g) {
+function goalProgress(state, g) { return withSav(state, goalSav(state, g), () => goalProgressOne(state, g)); }
+function goalProgressOne(state, g) {
   const deposited = Math.round(savMoves(state).filter(m => m.goal === g.name).reduce((s, m) => s + m.effect, 0) * 100) / 100;
   const total = Math.round(((+g.start || 0) + deposited) * 100) / 100;
   const target = +g.target || 0;
@@ -1485,7 +1486,36 @@ function creditStatus(state, cr) {
 }
 
 /* ---------- spaarrekening (afgeleid uit de zichtrekening) ---------- */
-function savConf(state) { if (!state.savings) state.savings = { iban: "", anchor: null, entries: [], pending: [], transfers: [] }; const s = state.savings; s.entries = s.entries || []; s.pending = s.pending || []; s.transfers = s.transfers || []; return s; }
+/* ---------- meerdere spaarrekeningen (stap 8d) ----------
+   state.savings = de eerste spaarrekening (zoals altijd), state.savingsMore = de andere, elk { iban, anchor, entries, pending, transfers }.
+   De spaarfuncties hieronder rekenen telkens voor ÉÉN "actieve" spaarrekening (SAV_ACTIVE = rekeningnummer zonder spaties).
+   withSav() zet die tijdelijk; savAll() telt alle spaarrekeningen samen. Een doel hoort bij g.sav (leeg = de eerste). */
+let SAV_ACTIVE = "";
+function emptySav(iban) { return { iban: iban || "", anchor: null, entries: [], pending: [], transfers: [] }; }
+function fixSav(s) { s.entries = s.entries || []; s.pending = s.pending || []; s.transfers = s.transfers || []; return s; }
+function syncSavConfs(state) {
+  if (!state.savings) state.savings = emptySav(); fixSav(state.savings);
+  state.savingsMore = (state.savingsMore || []).map(fixSav);
+  const have = () => [state.savings.iban, ...state.savingsMore.map(x => x.iban)].map(normIban).filter(Boolean);
+  // een spaarrekening die enkel als rekeningnummer op het tabblad Spaar stond, krijgt ook een plaats in de rekeningenlijst (naam aanpasbaar in Profiel)
+  state.accounts = state.accounts || {};
+  for (const sc of [state.savings, ...state.savingsMore]) { const n = normIban(sc.iban); if (n && !Object.keys(state.accounts).some(k => normIban(k) === n)) state.accounts[fmtIban(n)] = { type: "spaar", name: "Spaarrekening" }; }
+  for (const k of Object.keys(state.accounts || {})) {
+    if (state.accounts[k].type !== "spaar" || have().includes(normIban(k))) continue;
+    if (!normIban(state.savings.iban)) state.savings.iban = k; else state.savingsMore.push(emptySav(k));
+  }
+}
+function savKeys(state) { syncSavConfs(state); return [normIban(state.savings.iban), ...state.savingsMore.map(x => normIban(x.iban))]; }
+function activeSav(state) { const keys = savKeys(state); return keys.includes(SAV_ACTIVE) ? SAV_ACTIVE : keys[0]; }
+function setSav(key) { SAV_ACTIVE = normIban(key); }
+function withSav(state, key, fn) { const keep = SAV_ACTIVE; SAV_ACTIVE = normIban(key); try { return fn(); } finally { SAV_ACTIVE = keep; } }
+function goalSav(state, g) { const keys = savKeys(state), k = normIban(g && g.sav); return k && keys.includes(k) ? k : keys[0]; }
+function savGoals(state) { const k = activeSav(state); return state.goals.filter(g => goalSav(state, g) === k); }
+function savConf(state) {
+  syncSavConfs(state); const k = activeSav(state);
+  if (k === normIban(state.savings.iban)) return state.savings;
+  return state.savingsMore.find(x => normIban(x.iban) === k) || state.savings;
+}
 function normIban(x) { return String(x || "").replace(/\s/g, "").toUpperCase(); }
 function makeRef(name, taken) {
   let base = "SP-" + String(name || "DOEL").toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9]/g, "").slice(0, 12);
@@ -1499,13 +1529,15 @@ function isSavMove(state, t) {
   const sc = savConf(state), ib = normIban(sc.iban);
   if (ib && normIban(t.counterparty) === ib) return true;
   if (ib && txText(t).replace(/\s/g, "").includes(ib)) return true;
-  if (refGoal(state, t)) return true;
-  return state.goals.some(g => g.name === t.cat);
+  const gs = savGoals(state), s = txText(t);
+  if (gs.some(g => g.ref && s.includes(g.ref.toUpperCase()))) return true;
+  return gs.some(g => g.name === t.cat);
 }
 function moveGoal(state, t) {
   if (t.goal !== undefined && t.goal !== null && t.goal !== "") return t.goal;
   if (t.goal === "") return null;               // bewust niet toegewezen
-  return refGoal(state, t) || (state.goals.some(g => g.name === t.cat) ? t.cat : null);
+  const gs = savGoals(state), s = txText(t), r = gs.find(g => g.ref && s.includes(g.ref.toUpperCase()));
+  return r ? r.name : gs.some(g => g.name === t.cat) ? t.cat : null;
 }
 /* Alle bewegingen op de spaarrekening: uit je zichtrekening (effect = −bedrag) en manuele ingaven (rente, premies, correcties). */
 function savMoves(state) {
@@ -1516,7 +1548,8 @@ function savMoves(state) {
   const tr = sc.transfers.flatMap(x => [{ date: x.date, effect: -x.amount, goal: x.from, src: "transfer", leg: "out", e: x, checked: true, auto: false }, { date: x.date, effect: +x.amount, goal: x.to, src: "transfer", leg: "in", e: x, checked: true, auto: false }]);
   return [...bank, ...man, ...tr].sort((a, b) => b.date.localeCompare(a.date));
 }
-function hasSavings(state) { const sc = savConf(state); return !!(sc.iban || sc.anchor || sc.entries.length || savMoves(state).length); }
+function hasSavingsOne(state) { const sc = savConf(state); return !!(sc.iban || sc.anchor || sc.entries.length || savMoves(state).length); }
+function hasSavings(state) { return savKeys(state).some(k => withSav(state, k, () => hasSavingsOne(state))); }
 function moveId(m) { return m.src === "bank" ? m.t.id : m.src === "transfer" ? m.e.id + "|" + m.leg : m.e.id; }
 /* Telt een beweging al mee in het afgestemde saldo? Vóór de afstemdatum: ja. Op dezelfde dag: alleen als ze al bekend was
    toen je afstemde (anders is ze daarna gebeurd of later geïmporteerd). */
@@ -1540,7 +1573,7 @@ function savingsBalance(state) {
 }
 function savingsSummary(state) {
   const bal = savingsBalance(state), mv = savMoves(state);
-  const goals = state.goals.map(g => ({ g, p: goalProgress(state, g) }));
+  const goals = savGoals(state).map(g => ({ g, p: goalProgress(state, g) }));
   const allocated = Math.round(goals.reduce((s, x) => s + x.p.total, 0) * 100) / 100;
   const y = String(new Date().getFullYear());
   return { bal, goals, moves: mv, allocated, unallocated: bal.set ? Math.round((bal.total - allocated) * 100) / 100 : null,
@@ -1548,8 +1581,19 @@ function savingsSummary(state) {
     inYear: mv.filter(m => m.src !== "transfer" && m.date.startsWith(y) && m.effect > 0).reduce((s, m) => s + m.effect, 0),
     outYear: mv.filter(m => m.src !== "transfer" && m.date.startsWith(y) && m.effect < 0).reduce((s, m) => s - m.effect, 0) };
 }
+/* Alle spaarrekeningen samen (Overzicht, Vermogen, gsm). parts = per spaarrekening { key, s } met s = savingsSummary. */
+function savAll(state) {
+  const parts = savKeys(state).map(k => ({ key: k, s: withSav(state, k, () => savingsSummary(state)) }));
+  const setParts = parts.filter(x => x.s.bal.set), sum = f => Math.round(parts.reduce((a, x) => a + f(x.s), 0) * 100) / 100;
+  return { parts,
+    bal: { set: setParts.length > 0, total: setParts.length ? Math.round(setParts.reduce((a, x) => a + x.s.bal.total, 0) * 100) / 100 : null },
+    goals: parts.flatMap(x => x.s.goals), moves: parts.flatMap(x => x.s.moves.map(m => Object.assign({ sav: x.key }, m))).sort((a, b) => b.date.localeCompare(a.date)),
+    allocated: sum(s => s.allocated), unallocated: parts.every(x => x.s.bal.set) ? sum(s => s.unallocated || 0) : null,
+    toCheck: sum(s => s.toCheck), open: sum(s => s.open), inYear: sum(s => s.inYear), outYear: sum(s => s.outYear) };
+}
 /* Geplande opnames/stortingen die intussen in je bankafschrift staan, worden afgevinkt. */
-function resolvePending(state) {
+function resolvePending(state) { return savKeys(state).reduce((n, k) => n + withSav(state, k, () => resolvePendingOne(state)), 0); }
+function resolvePendingOne(state) {
   const sc = savConf(state), mv = savMoves(state).filter(m => m.src === "bank"); let n = 0;
   sc.pending = sc.pending.filter(p => {
     const hit = mv.find(m => m.goal === p.goal && Math.abs(Math.abs(m.effect) - p.amount) < 0.005 && Math.sign(m.effect) === (p.type === "opname" ? -1 : 1) && m.date >= addDays(p.date, -5));
@@ -1729,7 +1773,7 @@ function toCsv(state) {
   return "﻿" + lines.join("\r\n");
 }
 
-if (typeof module !== "undefined") module.exports = { cardMatch, applyCards, transferFlows, OWN_CAT, ownTransfer, applyOwnTransfers, ownConflicts, MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
+if (typeof module !== "undefined") module.exports = { savKeys, activeSav, setSav, withSav, goalSav, savGoals, savAll, syncSavConfs, cardMatch, applyCards, transferFlows, OWN_CAT, ownTransfer, applyOwnTransfers, ownConflicts, MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
 
 </script>
 <script>
@@ -1826,7 +1870,7 @@ if (typeof module !== "undefined") module.exports = { cardMatch, applyCards, tra
     })();
   }
   let state = newState();
-  const ui = { month: null, txAll: false, txSearch: "", txCat: "", open: new Set(), period: "maand", year: null, ruleSug: null, folderAsk: false, acc: "" };
+  const ui = { month: null, txAll: false, txSearch: "", txCat: "", open: new Set(), period: "maand", year: null, ruleSug: null, folderAsk: false, acc: "", sav: "" };
   ui.month = todayYm();
 
   /* ---------- helpers ---------- */
@@ -2142,7 +2186,7 @@ if (typeof module !== "undefined") module.exports = { cardMatch, applyCards, tra
   /* ---------- mobiele samenvatting ---------- */
   function buildSummary() {
     const t = todayS(), ym = t.slice(0, 7), s = monthSummary(state, ym), b = balanceAt(state, ym);
-    const sm = savingsSummary(state), savedM = hasSavings(state) ? sm.moves.filter(x => x.date.startsWith(ym) && x.src !== "transfer").reduce((a, x) => a + x.effect, 0) : s.saved;
+    const sm = savAll(state), savedM = hasSavings(state) ? sm.moves.filter(x => x.date.startsWith(ym) && x.src !== "transfer").reduce((a, x) => a + x.effect, 0) : s.saved;
     const f = forecast(45), nw = netWorthAt(t);
     const env = envelopes(state, ym);
     const cats = state.categories.filter(c => c.type === "Vaste kosten" || c.type === "Variabele kosten").map(c => ({ n: c.name, s: Math.round(Math.max(0, -(s.byCat[c.name] || 0)) * 100) / 100, b: env[c.name] ? Math.round(Math.max(0, env[c.name].available) * 100) / 100 : 0 })).filter(c => c.s || c.b);
@@ -2300,7 +2344,7 @@ if (typeof module !== "undefined") module.exports = { cardMatch, applyCards, tra
       ${kpi("Uitgaven", `<span class="neg">${eur0(s.expenses)}</span>`, "var(--neg)", bExp ? `${Math.round(s.expenses / bExp * 100)}% van budget ${eur0(bExp)}` : `vast ${eur0(s.fixed)} · variabel ${eur0(s.variable)}`)}
       ${(() => {
         if (!hasSavings(state)) return kpi("Gespaard", `<span class="gold">${eurS(s.saved)}</span>`, "var(--gold)", rate === null ? "deze maand" : `deze maand · ${rate}% van je inkomen`);
-        const sm = savingsSummary(state), m = sm.moves.filter(x => x.date.startsWith(ui.month)).reduce((a, x) => a + x.effect, 0);
+        const sm = savAll(state), m = sm.moves.filter(x => x.date.startsWith(ui.month) && x.src !== "transfer").reduce((a, x) => a + x.effect, 0);
         return kpi("Gespaard", `<span class="${m < 0 ? "neg" : "gold"}">${m < 0 ? "−" : ""}${eurS(Math.abs(m))}</span>`, "var(--gold)", `deze maand · totaal <span class="gold num">${eur(sm.bal.set ? sm.bal.total : sm.allocated)}</span>`);
       })()}
       ${kpi("Netto deze maand", `<span class="${s.net >= 0 ? "pos" : "neg"}">${s.net >= 0 ? "+" : "−"}${eur0(Math.abs(s.net))}</span>`, s.net >= 0 ? "var(--pos)" : "var(--neg)", s.uncatCount ? `<span class="chip warn">${s.uncatCount} te categoriseren · <button type="button" data-act="show-uncat">bekijken</button></span>` : `<span class="chip pos">alles gecategoriseerd</span>`)}
@@ -2393,8 +2437,9 @@ if (typeof module !== "undefined") module.exports = { cardMatch, applyCards, tra
   function netWorthAt(end) {
     const ym = end.slice(0, 7);
     const zb = balanceAt(state, ym), zicht = zb.set ? zb.total : 0;
-    const sb = savingsBalance(state); let spaar = 0;
-    if (sb.set) { const h = sb.history.filter(p => p.date <= end); spaar = h.length ? h[h.length - 1].value : (sb.history[0] ? sb.history[0].value : 0); }
+    let spaar = 0;
+    for (const k of savKeys(state)) { const sb = withSav(state, k, () => savingsBalance(state));
+      if (sb.set) { const h = sb.history.filter(p => p.date <= end); spaar += h.length ? h[h.length - 1].value : (sb.history[0] ? sb.history[0].value : 0); } }
     let loans = 0;
     for (const l of state.loans || []) { const st = loanStatus(state, l); if (!st.ok) continue; const pts = st.schedule.filter(p => p.ym <= ym); loans += pts.length ? pts[pts.length - 1].balance : st.schedule[0].balance; }
     let credits = 0;
@@ -2424,7 +2469,7 @@ if (typeof module !== "undefined") module.exports = { cardMatch, applyCards, tra
   function goalsWide() {
     if (!state.goals.length) return "";
     ensureGoalRefs(state);
-    const sm = savingsSummary(state), moves = sm.moves;
+    const sm = savAll(state), moves = sm.moves;
     const ym = ui.month, months = []; for (let i = 11; i >= 0; i--) months.push(shiftMonth(ym, -i));
     const tiles = sm.goals.map((x, i) => {
       const g = x.g, p = x.p, col = SERIES[i % SERIES.length];
@@ -2893,11 +2938,12 @@ if (typeof module !== "undefined") module.exports = { cardMatch, applyCards, tra
   }
 
   function viewGoals() {
+    const sk = savKeys(state), manySav = sk.length > 1;
     let h = `<div class="page-head"><div><h1>Spaardoelen</h1><p>Wat er op je spaarrekening voor elk doel staat: startbedrag plus de stortingen en opnames die je in het tabblad <a class="hint" href="#spaar">Spaar</a> aan het doel toewijst.</p></div><button class="btn" data-act="add-goal" type="button">+ Spaardoel</button></div>`;
-    h += `<section class="card"><div class="table-wrap"><table><thead><tr><th>Doel</th><th class="r">Doelbedrag</th><th class="r">Startbedrag</th><th>Streefdatum</th><th class="r">Gespaard</th><th style="min-width:160px">Voortgang</th><th class="r">Per maand nodig</th><th></th></tr></thead><tbody>`;
+    h += `<section class="card"><div class="table-wrap"><table><thead><tr><th>Doel</th>${manySav ? `<th>Spaarrekening</th>` : ""}<th class="r">Doelbedrag</th><th class="r">Startbedrag</th><th>Streefdatum</th><th class="r">Gespaard</th><th style="min-width:160px">Voortgang</th><th class="r">Per maand nodig</th><th></th></tr></thead><tbody>`;
     state.goals.forEach((g, i) => {
       const p = goalProgress(state, g);
-      h += `<tr data-i="${i}"><td><select class="cat" data-act="goal-name" aria-label="Doel">${state.categories.filter(c => c.type === "Sparen").map(c => `<option${c.name === g.name ? " selected" : ""}>${esc(c.name)}</option>`).join("")}${state.categories.some(c => c.name === g.name) ? "" : `<option selected>${esc(g.name)}</option>`}</select></td>
+      h += `<tr data-i="${i}"><td><select class="cat" data-act="goal-name" aria-label="Doel">${state.categories.filter(c => c.type === "Sparen").map(c => `<option${c.name === g.name ? " selected" : ""}>${esc(c.name)}</option>`).join("")}${state.categories.some(c => c.name === g.name) ? "" : `<option selected>${esc(g.name)}</option>`}</select></td>${manySav ? `<td><select class="cat" data-act="goal-sav" aria-label="Spaarrekening">${sk.map((k, n) => `<option value="${esc(k)}"${goalSav(state, g) === k ? " selected" : ""}>${esc(k ? accName(state, k) : "Spaarrekening " + (n + 1))}</option>`).join("")}</select></td>` : ""}
         <td class="r"><input class="cell r num" data-act="goal-target" inputmode="decimal" placeholder="—" value="${g.target ?? ""}" aria-label="Doelbedrag"></td>
         <td class="r"><input class="cell r num" data-act="goal-start" inputmode="decimal" value="${g.start || 0}" aria-label="Startbedrag"></td>
         <td><input class="cell" type="date" data-act="goal-date" value="${esc(g.deadline)}" aria-label="Streefdatum"></td>
@@ -2906,7 +2952,7 @@ if (typeof module !== "undefined") module.exports = { cardMatch, applyCards, tra
         <td class="r num">${p.perMonth ? eur(p.perMonth) : "—"}</td>
         <td class="r"><button class="btn small ghost" data-act="del-goal" type="button" aria-label="Verwijderen">✕</button></td></tr>`;
     });
-    if (!state.goals.length) h += `<tr class="empty-row"><td colspan="8">Nog geen spaardoelen.</td></tr>`;
+    if (!state.goals.length) h += `<tr class="empty-row"><td colspan="${manySav ? 9 : 8}">Nog geen spaardoelen.</td></tr>`;
     h += `</tbody></table></div><p class="muted" style="font-size:12.5px;margin:12px 0 0">Een nieuw doel heeft een categorie van het type Sparen nodig. Voeg die toe bij Budget.</p></section>`;
     return h;
   }
@@ -2915,18 +2961,21 @@ if (typeof module !== "undefined") module.exports = { cardMatch, applyCards, tra
   const ui2 = { savFilter: "check" };
   function viewSavings() {
     const sc = savConf(state); ensureGoalRefs(state);
+    const keys = savKeys(state), many = keys.length > 1, cur = activeSav(state);
+    const savName = k => accName(state, k) || "Spaarrekening";
     let h = `<div class="page-head"><div><h1>Spaar</h1><p>Je spaarrekening, opgebouwd uit de overschrijvingen op je zichtrekening en verdeeld over je spaardoelen.</p></div>
       <div class="actions"><button class="btn" data-act="goal-new" type="button">+ Spaardoel</button><button class="btn" data-act="sav-transfer" type="button">⇄ Verplaatsen</button><button class="btn" data-act="sav-move" data-type="storting" type="button">+ Storten</button><button class="btn" data-act="sav-move" data-type="opname" type="button">− Geld opnemen</button><button class="btn primary" data-act="sav-sync" type="button">Saldo afstemmen</button></div></div>`;
+    if (many) h += `<div class="acc-pick" role="group" aria-label="Spaarrekening">${keys.map((k, n) => `<button type="button" data-act="sav-pick" data-sav="${esc(k)}" aria-pressed="${k === cur}" style="--c:var(--gold)"><i></i>${esc(k ? savName(k) : "Spaarrekening " + (n + 1))}</button>`).join("")}</div>`;
     const sm = savingsSummary(state);
     const kpi = (label, value, color, sub) => `<div class="kpi" style="--k:${color}"><div class="label">${label}</div><div class="value num">${value}</div><div class="sub">${sub}</div></div>`;
     const un = sm.unallocated;
     h += `<section class="kpis">
       ${kpi("Saldo spaarrekening", sm.bal.set ? `<span class="${sm.bal.total >= 0 ? "gold" : "neg"}">${eur(sm.bal.total)}</span>` : `<span class="muted">—</span>`, "var(--gold)", sm.bal.set ? `afgestemd op ${fmtDate(sc.anchor.date)}` : `<button class="btn small" data-act="sav-sync" type="button">Saldo ingeven</button>`)}
-      ${kpi("Verdeeld over spaardoelen", `<span class="gold">${eur(sm.allocated)}</span>`, "var(--gold)", `${state.goals.length} spaardoel${state.goals.length === 1 ? "" : "en"}`)}
+      ${kpi("Verdeeld over spaardoelen", `<span class="gold">${eur(sm.allocated)}</span>`, "var(--gold)", `${savGoals(state).length} spaardoel${savGoals(state).length === 1 ? "" : "en"}`)}
       ${kpi("Niet verdeeld", un === null ? `<span class="muted">—</span>` : Math.abs(un) < 0.005 ? `<span class="pos">€ 0</span>` : `<span style="color:${un > 0 ? "var(--warn)" : "var(--neg)"}">${un > 0 ? "" : "−"}${eur(Math.abs(un))}</span>`, un === null ? "var(--line)" : Math.abs(un) < 0.005 ? "var(--pos)" : un > 0 ? "var(--warn)" : "var(--neg)", un === null ? "stel eerst je saldo in" : Math.abs(un) < 0.005 ? `<span class="chip pos">klopt met je saldo</span>` : un > 0 ? "nog toe te wijzen aan een doel" : "meer toegewezen dan er op de rekening staat")}
       ${kpi("Te controleren", sm.toCheck ? `<span style="color:var(--warn)">${sm.toCheck}</span>` : `<span class="pos">0</span>`, sm.toCheck ? "var(--warn)" : "var(--pos)", `${sm.open} zonder spaardoel · dit jaar <span class="pos">+${eur0(sm.inYear)}</span> / <span class="neg">−${eur0(sm.outYear)}</span>`)}
     </section>`;
-    if (sc.pending.length) h += `<section class="card"><div class="card-head"><h2>Gepland, nog niet in je bankafschrift</h2><span class="hint">Verdwijnt vanzelf zodra de overschrijving in je CSV staat</span></div><div class="table-wrap"><table><tbody>${sc.pending.map(p => `<tr data-pid="${esc(p.id)}"><td class="num muted">${fmtDate(p.date)}</td><td><span class="type-pill ${p.type === "opname" ? "opname" : "storting"}">${p.type === "opname" ? "Opname" : "Storting"}</span></td><td>${esc(p.goal)}</td><td>Mededeling: <code>${esc((state.goals.find(g => g.name === p.goal) || {}).ref || "")}</code></td><td class="r num ${p.type === "opname" ? "neg" : "pos"}">${p.type === "opname" ? "−" : "+"}${eur(p.amount)}</td><td class="r"><button class="btn small ghost" data-act="sav-pending-del" type="button" aria-label="Verwijderen">✕</button></td></tr>`).join("")}</tbody></table></div></section>`;
+    if (sc.pending.length) h += `<section class="card"><div class="card-head"><h2>Gepland, nog niet in je bankafschrift</h2><span class="hint">Verdwijnt vanzelf zodra de overschrijving in je CSV staat</span></div><div class="table-wrap"><table><tbody>${sc.pending.map(p => `<tr data-pid="${esc(p.id)}"><td class="num muted">${fmtDate(p.date)}</td><td><span class="type-pill ${p.type === "opname" ? "opname" : "storting"}">${p.type === "opname" ? "Opname" : "Storting"}</span></td><td>${esc(p.goal)}</td><td>Mededeling: <code>${esc((savGoals(state).find(g => g.name === p.goal) || {}).ref || "")}</code></td><td class="r num ${p.type === "opname" ? "neg" : "pos"}">${p.type === "opname" ? "−" : "+"}${eur(p.amount)}</td><td class="r"><button class="btn small ghost" data-act="sav-pending-del" type="button" aria-label="Verwijderen">✕</button></td></tr>`).join("")}</tbody></table></div></section>`;
     h += allocCard(sm);
     h += savChart(sm);
     h += savTxCard(sm);
@@ -2978,7 +3027,7 @@ if (typeof module !== "undefined") module.exports = { cardMatch, applyCards, tra
     const all = sm.moves.filter(m => !(m.src === "transfer" && m.leg === "out")), f = ui2.savFilter;
     const list = f === "check" ? all.filter(m => !m.checked) : f === "open" ? all.filter(m => !m.goal && !m.checked) : all;
     const nSug = all.filter(m => m.goal && !m.checked).length;
-    const goalOpts = (sel, chk) => `<option value="">${chk ? "— geen spaardoel —" : "— niet toegewezen —"}</option>` + state.goals.map(g => `<option${g.name === sel ? " selected" : ""}>${esc(g.name)}</option>`).join("");
+    const goalOpts = (sel, chk) => `<option value="">${chk ? "— geen spaardoel —" : "— niet toegewezen —"}</option>` + savGoals(state).map(g => `<option${g.name === sel ? " selected" : ""}>${esc(g.name)}</option>`).join("");
     let h = `<section class="card"><div class="card-head"><h2>Bewegingen spaarrekening</h2><span class="hint">Overschrijvingen van en naar je spaarrekening uit je zichtrekening, plus manuele ingaven</span></div>
       <div class="toolbar"><div class="seg" role="group" aria-label="Filter"><button type="button" data-act="sav-f" data-f="check" aria-pressed="${f === "check"}">Te controleren (${all.filter(m => !m.checked).length})</button><button type="button" data-act="sav-f" data-f="open" aria-pressed="${f === "open"}">Zonder spaardoel (${all.filter(m => !m.goal && !m.checked).length})</button><button type="button" data-act="sav-f" data-f="all" aria-pressed="${f === "all"}">Alles (${all.length})</button></div>
       ${nSug ? `<button class="btn primary" data-act="sav-approve-all" type="button">${nSug} toegewezen goedkeuren</button>` : ""}
@@ -2999,23 +3048,23 @@ if (typeof module !== "undefined") module.exports = { cardMatch, applyCards, tra
   }
   function transferDialog() {
     ensureGoalRefs(state);
-    if (state.goals.length < 2) { toast("Je hebt minstens twee spaardoelen nodig. Maak er eerst een aan met + Spaardoel."); return; }
-    const opts = sel => state.goals.map(g => { const p = goalProgress(state, g); return `<option value="${esc(g.name)}"${g.name === sel ? " selected" : ""}>${esc(g.name)} (${eur(p.total)})</option>`; }).join("");
+    if (savGoals(state).length < 2) { toast("Je hebt minstens twee spaardoelen nodig. Maak er eerst een aan met + Spaardoel."); return; }
+    const opts = sel => savGoals(state).map(g => { const p = goalProgress(state, g); return `<option value="${esc(g.name)}"${g.name === sel ? " selected" : ""}>${esc(g.name)} (${eur(p.total)})</option>`; }).join("");
     dialog(`<h3>Verplaatsen tussen spaardoelen</h3><p>Verdeel je spaargeld anders, zonder een echte overschrijving. Het saldo van je spaarrekening blijft gelijk.</p>
       <div class="form-grid">
-        <div><label for="tr-from">Van</label><select class="input" id="tr-from">${opts(state.goals[0].name)}</select></div>
-        <div><label for="tr-to">Naar</label><select class="input" id="tr-to">${opts(state.goals[1].name)}</select></div>
+        <div><label for="tr-from">Van</label><select class="input" id="tr-from">${opts(savGoals(state)[0].name)}</select></div>
+        <div><label for="tr-to">Naar</label><select class="input" id="tr-to">${opts(savGoals(state)[1].name)}</select></div>
         <div><label for="tr-amt">Bedrag (€)</label><input class="input" id="tr-amt" inputmode="decimal"></div>
         <div><label for="tr-date">Datum</label><input class="input" type="date" id="tr-date" value="${todayS()}"></div>
         <div class="full"><label for="tr-note">Opmerking (optioneel)</label><input class="input" id="tr-note" placeholder="bv. voor de nieuwe gsm"></div>
       </div><p id="tr-info" class="muted" style="font-size:12.5px;margin:10px 0 0"></p>
       <div class="row"><button class="btn" data-close type="button">Annuleren</button><button class="btn primary" id="tr-ok" type="button">Verplaatsen</button></div>`, d => {
       const info = d.querySelector("#tr-info"), from = d.querySelector("#tr-from"), to = d.querySelector("#tr-to"), amt = d.querySelector("#tr-amt");
-      const upd = () => { const g = state.goals.find(x => x.name === from.value), p = goalProgress(state, g); info.className = "muted"; info.textContent = `Op ${g.name} staat ${eur(p.total)}.`; };
+      const upd = () => { const g = savGoals(state).find(x => x.name === from.value), p = goalProgress(state, g); info.className = "muted"; info.textContent = `Op ${g.name} staat ${eur(p.total)}.`; };
       from.addEventListener("change", upd); upd(); amt.focus();
       d.querySelector("#tr-all") ;
       d.querySelector("#tr-ok").addEventListener("click", () => {
-        const a = num(amt.value), g = state.goals.find(x => x.name === from.value), avail = goalProgress(state, g).total;
+        const a = num(amt.value), g = savGoals(state).find(x => x.name === from.value), avail = goalProgress(state, g).total;
         if (from.value === to.value) { info.className = "neg"; info.textContent = "Kies twee verschillende spaardoelen."; return; }
         if (!a || a <= 0) { info.className = "neg"; info.textContent = "Vul een positief bedrag in."; return; }
         if (a > avail + 0.005) { info.className = "neg"; info.textContent = `Er staat maar ${eur(avail)} op ${g.name}.`; return; }
@@ -3040,7 +3089,7 @@ if (typeof module !== "undefined") module.exports = { cardMatch, applyCards, tra
         const cat = state.categories.find(c => c.name.toLowerCase() === name.toLowerCase());
         if (cat && cat.type !== "Sparen") { d.querySelector("#gn-err").textContent = `Er bestaat al een categorie “${cat.name}” van het type ${cat.type}. Kies een andere naam.`; return; }
         if (!cat) state.categories.push({ name, type: "Sparen", budget: null });
-        state.goals.push({ name, target: num(d.querySelector("#gn-target").value), start: 0, deadline: d.querySelector("#gn-date").value });
+        state.goals.push({ name, target: num(d.querySelector("#gn-target").value), start: 0, deadline: d.querySelector("#gn-date").value, sav: activeSav(state) });
         ensureGoalRefs(state); save(); d.close(); render();
         toast(`Spaardoel ${name} aangemaakt · referentie ${state.goals.find(g => g.name === name).ref}`);
       });
@@ -3070,19 +3119,19 @@ if (typeof module !== "undefined") module.exports = { cardMatch, applyCards, tra
   }
   function savMoveDialog(type) {
     const sc = savConf(state); ensureGoalRefs(state);
-    if (!state.goals.length) { toast("Maak eerst een spaardoel aan bij Spaardoelen."); return; }
+    if (!savGoals(state).length) { toast("Maak eerst een spaardoel aan bij Spaardoelen."); return; }
     const opn = type === "opname";
     dialog(`<h3>${opn ? "Geld opnemen van je spaarrekening" : "Geld storten op je spaarrekening"}</h3>
       <p>${opn ? "Doe in je bankapp een overschrijving van je spaarrekening naar je zichtrekening" : "Doe in je bankapp een overschrijving van je zichtrekening naar je spaarrekening"} met de referentie hieronder in de mededeling. Zodra je de CSV van je zichtrekening importeert, wordt ze automatisch aan het juiste spaardoel ${opn ? "onttrokken" : "toegevoegd"}.</p>
       <div class="form-grid">
-        <div><label for="mv-goal">Spaardoel</label><select class="input" id="mv-goal">${state.goals.map(g => `<option>${esc(g.name)}</option>`).join("")}</select></div>
+        <div><label for="mv-goal">Spaardoel</label><select class="input" id="mv-goal">${savGoals(state).map(g => `<option>${esc(g.name)}</option>`).join("")}</select></div>
         <div><label for="mv-amt">Bedrag (€)</label><input class="input" id="mv-amt" inputmode="decimal"></div>
         <div class="full"><label>Mededeling</label><div style="display:flex;gap:8px;align-items:center"><code id="mv-ref" style="font-size:16px;padding:6px 10px;border:1px solid var(--accent);color:var(--accent)"></code><button class="btn small" id="mv-copy" type="button">Kopiëren</button></div></div>
       </div>
       <p id="mv-info" class="muted" style="font-size:12.5px;margin:10px 0 0"></p>
       <div class="row"><button class="btn" data-close type="button">Sluiten</button><button class="btn primary" id="mv-ok" type="button">Bijhouden tot het in mijn CSV staat</button></div>`, d => {
       const gs = d.querySelector("#mv-goal"), ref = d.querySelector("#mv-ref"), info = d.querySelector("#mv-info");
-      const upd = () => { const g = state.goals.find(x => x.name === gs.value); ref.textContent = g.ref; const p = goalProgress(state, g); info.textContent = `Op ${g.name} staat nu ${eur(p.total)}.`; };
+      const upd = () => { const g = savGoals(state).find(x => x.name === gs.value); ref.textContent = g.ref; const p = goalProgress(state, g); info.textContent = `Op ${g.name} staat nu ${eur(p.total)}.`; };
       gs.addEventListener("change", upd); upd();
       d.querySelector("#mv-copy").addEventListener("click", async () => { try { await navigator.clipboard.writeText(ref.textContent); toast("Referentie gekopieerd"); } catch (e) { toast("Selecteer en kopieer de referentie"); } });
       d.querySelector("#mv-ok").addEventListener("click", () => {
@@ -3099,7 +3148,7 @@ if (typeof module !== "undefined") module.exports = { cardMatch, applyCards, tra
       <div class="form-grid">
         <div><label for="se-date">Datum</label><input class="input" type="date" id="se-date" value="${new Date().toISOString().slice(0, 10)}"></div>
         <div><label for="se-amt">Bedrag (€)</label><input class="input" id="se-amt" inputmode="decimal" placeholder="bv. 12,35"></div>
-        <div><label for="se-goal">Spaardoel</label><select class="input" id="se-goal"><option value="">— niet toegewezen —</option>${state.goals.map(g => `<option>${esc(g.name)}</option>`).join("")}</select></div>
+        <div><label for="se-goal">Spaardoel</label><select class="input" id="se-goal"><option value="">— niet toegewezen —</option>${savGoals(state).map(g => `<option>${esc(g.name)}</option>`).join("")}</select></div>
         <div><label for="se-note">Omschrijving</label><input class="input" id="se-note" value="Rente"></div>
       </div><p id="se-err" class="neg" style="margin:8px 0 0;font-size:12.5px"></p>
       <div class="row"><button class="btn" data-close type="button">Annuleren</button><button class="btn primary" id="se-ok" type="button">Toevoegen</button></div>`, d => {
@@ -3607,6 +3656,7 @@ if (typeof module !== "undefined") module.exports = { cardMatch, applyCards, tra
   const VIEWS = { overzicht: viewOverview, transacties: viewTransactions, budget: viewBudget, regels: viewRules, spaardoelen: viewGoals, spaar: viewSavings, planner: viewPlanner, leningen: viewLoans, profiel: viewProfile };
   const route = () => { const r = location.hash.slice(1); return VIEWS[r] ? r : "overzicht"; };
   function render() {
+    setSav(ui.sav);   // de spaarfuncties rekenen voor de spaarrekening die op het tabblad Spaar gekozen is
     const r = route(), focusId = document.activeElement && document.activeElement.id, selStart = document.activeElement && document.activeElement.selectionStart;
     if (liteMode()) { document.body.classList.add("lite"); document.body.classList.toggle("eye-off", liteHidden()); $("#main").innerHTML = viewLite(); afterRender("lite"); return; }
     document.body.classList.remove("lite", "eye-off");
@@ -3645,9 +3695,9 @@ if (typeof module !== "undefined") module.exports = { cardMatch, applyCards, tra
     h += `</tbody></table></div><div style="margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn" data-act="acc-add" data-type="zicht" type="button" ${z.length >= MAX_ZICHT ? "disabled" : ""}>+ Zichtrekening toevoegen</button>${z.length >= MAX_ZICHT ? `<span class="muted" style="font-size:12.5px">Maximum ${MAX_ZICHT} zichtrekeningen bereikt.</span>` : ""}</div></section>`;
     h += `<section class="card" id="pf-spaar"><div class="card-head"><h2>Spaarrekeningen</h2><span class="hint">Je spaardoelen beheer je in het tabblad <a class="hint" href="#spaar">Spaar</a>.</span></div>
       <div class="table-wrap"><table><thead><tr><th>Naam</th><th>Rekeningnummer</th><th class="r">Bewegingen</th><th class="r">Saldo nu</th><th></th></tr></thead><tbody>`;
-    const sv = savingsSummary(state), svMain = normIban(savConf(state).iban);
+    const svOf = acc => withSav(state, acc, () => savingsSummary(state));
     for (const acc of sp) {
-      const known = !!state.accounts[acc], tx = txOf(acc), main = !svMain || normIban(acc) === svMain || sp.length === 1;
+      const known = !!state.accounts[acc], tx = txOf(acc), sv = svOf(acc), main = true;
       // bewegingen = stortingen/opnames via je zichtrekening + met de hand + transacties uit een CSV van de spaarrekening zelf
       const moves = main ? sv.moves.filter(m => m.src !== "transfer").length : tx.length;
       h += `<tr data-acc="${esc(acc)}"><td>${known ? `<input class="cell wide" data-act="acc-name" value="${esc(state.accounts[acc].name || "")}" placeholder="bv. Spaarrekening" aria-label="Naam van de spaarrekening">` : `<span class="muted">Spaarrekening</span>`}</td>
@@ -3853,6 +3903,7 @@ if (typeof module !== "undefined") module.exports = { cardMatch, applyCards, tra
       case "card-del": { const id = el.closest("tr").dataset.card, k = (state.cards || []).find(x => x.id === id);
         confirmDlg("Kredietkaart verwijderen?", `${k ? k.name : "De kaart"} wordt uit je lijst verwijderd. Je transacties en hun categorie blijven staan.`, "Verwijderen", () => { state.cards = state.cards.filter(x => x.id !== id); save(); render(); }); break; }
       case "acc-pick": ui.acc = el.dataset.acc || ""; render(); break;
+      case "sav-pick": ui.sav = el.dataset.sav || ""; render(); break;
       case "goto-profile": location.hash = "profiel"; break;
       case "own-fix": { const oc = ownConflicts(state); if (!state.categories.some(x => x.name === OWN_CAT)) state.categories.push({ name: OWN_CAT, type: "Overboeking", budget: null });
         oc.forEach(t => { t.cat = OWN_CAT; }); save(); render(); toast(`${oc.length} overboeking${oc.length === 1 ? "" : "en"} omgezet naar "${OWN_CAT}"`); break; }
@@ -3973,7 +4024,7 @@ if (typeof module !== "undefined") module.exports = { cardMatch, applyCards, tra
     if (el.dataset.act === "warn-below") { const v = num(el.value); state.warnBelow = v === null ? 0 : v; save(); render(); return; }
     if (el.dataset.act === "pl-detected") { plUi.detected = el.checked; render(); return; }
     if (el.dataset.act === "roll-from") { if (/^\d{4}-\d{2}$/.test(el.value)) { state.rolloverFrom = el.value; save(); render(); toast("Meenemen vanaf " + monthName(el.value)); } return; }
-    if (el.dataset.act === "sav-iban") { savConf(state).iban = el.value.trim(); save(); render(); toast("Rekeningnummer opgeslagen"); return; }
+    if (el.dataset.act === "sav-iban") { const sc = savConf(state), oldK = normIban(sc.iban); sc.iban = el.value.trim(); for (const g of state.goals) if (oldK && normIban(g.sav) === oldK) g.sav = normIban(sc.iban); ui.sav = normIban(sc.iban); save(); render(); toast("Rekeningnummer opgeslagen"); return; }
     if (el.dataset.act === "goal-ref") { const g = state.goals[+el.closest("tr").dataset.i]; const v = el.value.trim().toUpperCase(); if (!v || state.goals.some(x => x !== g && x.ref === v)) { toast("Referentie is leeg of al in gebruik"); render(); return; } g.ref = v; save(); render(); return; }
     if (el.dataset.act === "found-link-select" && el.value) { const [k, i] = el.value.split(":"); linkKeyword(k, +i, el.dataset.key); return; }
     if (!a) return;
@@ -4006,6 +4057,7 @@ if (typeof module !== "undefined") module.exports = { cardMatch, applyCards, tra
       case "rule-cat": state.rules[rowIndex(el)].cat = el.value; save(); break;
       case "goal-name": state.goals[rowIndex(el)].name = el.value; save(); render(); break;
       case "goal-target": state.goals[rowIndex(el)].target = num(el.value); save(); render(); break;
+      case "goal-sav": state.goals[rowIndex(el)].sav = el.value; save(); render(); toast("Spaardoel verplaatst naar " + accName(state, el.value)); break;
       case "goal-start": state.goals[rowIndex(el)].start = num(el.value) || 0; save(); render(); break;
       case "goal-date": state.goals[rowIndex(el)].deadline = el.value; save(); render(); break;
     }
