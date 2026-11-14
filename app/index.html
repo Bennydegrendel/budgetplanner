@@ -731,6 +731,9 @@ td.desc > .acc-mini { float: left; margin-top: 7px; }
 .kpis.acc-row.dense .kpi .chip { font-size: 9.5px; padding: 2px 5px; }
 
 @media (min-width: 701px) { .kpis.acc-row { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); } }
+/* overboeking tussen eigen rekeningen: neutraal, geen plus of min */
+.xfer { color: var(--ink); } td.amount.xfer { white-space: nowrap; } td.amount.xfer small { display: block; font-size: 11px; color: var(--muted); font-family: var(--font-body); }
+td.amount.xfer::first-letter { color: var(--accent); }
 /* ================= ANIMATIES (stap 6c) =================
    Kort en spaarzaam. Alles valt weg bij "minder beweging" (zie onderaan).
    #main.enter wordt kort gezet als je van tabblad wisselt of de app opent. */
@@ -1172,6 +1175,29 @@ function spaarList(state) {
 }
 function fmtIban(a) { return normIban(a).replace(/(.{4})/g, "$1 ").trim(); }
 function accName(state, acc) { const a = state.accounts && state.accounts[accKey(state, acc)]; return (a && a.name) || fmtIban(acc); }
+
+/* ---------- overboekingen tussen eigen zichtrekeningen (stap 8c-1) ----------
+   Een transactie waarvan de tegenpartij een van je eigen zichtrekeningen is, is geen inkomen of uitgave
+   maar een verplaatsing. Geeft de sleutel van die andere rekening terug, of null. */
+const OWN_CAT = "Eigen rekeningen";
+function ownTransfer(state, t) {
+  if (!t || !t.counterparty || !t.account) return null;
+  const cp = normIban(t.counterparty); if (!cp || cp === normIban(t.account)) return null;
+  return zichtList(state).find(k => normIban(k) === cp) || null;
+}
+/* Te categoriseren eigen overboekingen → categorie OWN_CAT (type Overboeking, wordt zo nodig aangemaakt).
+   Overboekingen die de gebruiker zelf al een andere (niet-overboeking) categorie gaf, worden NIET veranderd. */
+function applyOwnTransfers(state) {
+  const own = budgetTx(state).filter(t => !(t.splits && t.splits.length) && ownTransfer(state, t));
+  let set = 0;
+  for (const t of own) if (t.cat === UNCAT) {
+    if (!state.categories.some(x => x.name === OWN_CAT)) state.categories.push({ name: OWN_CAT, type: "Overboeking", budget: null });
+    t.cat = OWN_CAT; set++;
+  }
+  return set;
+}
+/* Eigen overboekingen met een categorie die geen overboeking is (tellen dan dubbel). */
+function ownConflicts(state) { return budgetTx(state).filter(t => ownTransfer(state, t) && t.cat !== UNCAT && typeOf(state, t.cat) !== "Overboeking" && !(t.splits && t.splits.length)); }
 
 function typeOf(state, cat) {
   const c = state.categories.find(x => x.name === cat);
@@ -1660,7 +1686,7 @@ function toCsv(state) {
   return "﻿" + lines.join("\r\n");
 }
 
-if (typeof module !== "undefined") module.exports = { MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
+if (typeof module !== "undefined") module.exports = { OWN_CAT, ownTransfer, applyOwnTransfers, ownConflicts, MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
 
 </script>
 <script>
@@ -1694,6 +1720,7 @@ if (typeof module !== "undefined") module.exports = { MAX_ZICHT, accKey, zichtLi
     for (const c of st.credits) {
       if (!c.keywords && c.entries) { const keys = [...new Set(c.entries.filter(e => e.txId).map(e => st.transactions.find(t => t.id === e.txId)).filter(Boolean).map(txRefKey))]; if (keys.length) c.keywords = keys.join(", "); }
       if (c.entries) c.entries = c.entries.filter(e => !e.txId); if (c.anchorUsed === undefined) { c.anchorUsed = null; c.anchorDate = ""; } if (c.keywords === undefined) c.keywords = ""; delete c.startBalance; delete c.startDate; }
+    applyOwnTransfers(st);
     return st;
   }
   function openDb() {
@@ -1831,7 +1858,7 @@ if (typeof module !== "undefined") module.exports = { MAX_ZICHT, accKey, zichtLi
       const r = mergeRows(state, res.rows); added += r.added; dup += r.dup; uncat += r.uncat; auto += r.auto;
       savAdded += 0;
     }
-    const sug = 0; const resolved = resolvePending(state); applyAllSplitRules(state);
+    const sug = 0; const resolved = resolvePending(state); applyAllSplitRules(state); applyOwnTransfers(state);
     if (added) { askPersist(); setTimeout(() => folderAuto("import"), 800); }
     const newSav = savMoves(state).filter(m => m.src === "bank" && !m.checked && m.date >= (minD || "0")).length;
     save();
@@ -2191,6 +2218,8 @@ if (typeof module !== "undefined") module.exports = { MAX_ZICHT, accKey, zichtLi
   }
   function notices() {
     let h = "";
+    const oc = multiAcc() ? ownConflicts(state) : [];
+    if (oc.length) h += `<div class="notice warn"><span>⇄ ${oc.length} overboeking${oc.length === 1 ? "" : "en"} tussen je eigen rekeningen ${oc.length === 1 ? "heeft" : "hebben"} een gewone categorie (bv. ${esc(oc[0].cat)}). Zo tellen ze dubbel: als uitgave op de ene rekening én via de echte uitgaven op de andere.</span><button class="btn small" data-act="own-fix" type="button">Omzetten naar overboeking</button></div>`;
     if (!storageOk) h += `<div class="notice warn"><span>${storageFull ? "De opslag van je browser is vol: je laatste wijzigingen zijn niet bewaard. Exporteer meteen een back-up en maak wat ruimte vrij op je schijf." : "Deze browser laat geen opslag toe op deze pagina. Je wijzigingen verdwijnen bij het sluiten: exporteer een back-up."}</span><button class="btn small" data-act="export-json" type="button">Back-up exporteren</button></div>`;
     else if (state.folder && state.folder.enabled && ui.folderAsk) h += `<div class="notice info"><span>☁ De browser vraagt opnieuw toestemming voor je OneDrive-map. Klik om de automatische back-up te hervatten.</span><button class="btn small primary" data-act="folder-resume" type="button">Hervatten</button></div>`;
     else if (state.folder && state.folder.enabled && state.folder.error) h += `<div class="notice warn"><span>☁ ${esc(state.folder.error)}</span><button class="btn small" data-act="folder-open" type="button">OneDrive-back-up</button></div>`;
@@ -2571,7 +2600,7 @@ if (typeof module !== "undefined") module.exports = { MAX_ZICHT, accKey, zichtLi
       <td class="num muted" style="width:96px">${fmtDate(t.date)}</td>
       <td class="desc">${accDot(t)}<div class="d" data-act="toggle-raw" title="Klik voor de volledige bankomschrijving">${esc(t.desc)}</div>${(t.tags && t.tags.length) || (t.splits && t.splits.length) ? `<div class="tagrow">${(t.splits || []).length ? `<span class="tag split" data-act="split-tx" title="Gesplitst">⑂ ${t.splits.map(x => esc(x.cat) + " " + eur0(Math.abs(x.amount))).join(" · ")}</span>` : ""}${(t.tags || []).map(g => `<span class="tag" data-act="tag-filter" data-tag="${esc(g)}">#${esc(g)}</span>`).join("")}</div>` : ""}${t.raw ? `<div class="raw">${esc(t.raw)}</div>` : ""}</td>
       <td>${t.splits && t.splits.length ? `<button class="btn small" data-act="split-tx" type="button" title="Gesplitst over ${t.splits.length} categorieën">⑂ Gesplitst</button>` : `<select class="cat${t.cat === UNCAT ? " uncat" : ""}" data-act="set-cat" aria-label="Categorie">${catOptions(t.cat)}</select>`}</td>
-      <td class="r num amount ${t.amount >= 0 ? "pos" : "neg"}">${signed(t.amount)}</td>
+      ${(() => { const o = ownTransfer(state, t); return o ? `<td class="r num amount xfer" title="Verplaatsing ${t.amount < 0 ? "naar" : "van"} ${esc(accName(state, o))}: geen inkomen of uitgave">⇄ ${eur(Math.abs(t.amount))}<small>${t.amount < 0 ? "→" : "←"} ${esc(accName(state, o))}</small></td>` : `<td class="r num amount ${t.amount >= 0 ? "pos" : "neg"}">${signed(t.amount)}</td>`; })()}
       <td class="r" style="width:176px;white-space:nowrap"><button class="btn small ghost" data-act="tag-tx" type="button" title="Labels">#</button><button class="btn small ghost" data-act="split-tx" type="button" title="Splitsen over categorieën">⑂</button><button class="btn small ghost" data-act="make-rule" type="button" title="Maak een regel op basis van deze transactie">Regel</button><button class="btn small ghost" data-act="del-tx" type="button" aria-label="Verwijderen" title="Verwijderen">✕</button></td></tr>`;
   }
 
@@ -2629,7 +2658,8 @@ if (typeof module !== "undefined") module.exports = { MAX_ZICHT, accKey, zichtLi
     if (ui.txCat) list = list.filter(t => t.cat === ui.txCat);
     if (ui.txSearch) { const q = ui.txSearch.toLowerCase(); list = list.filter(t => (t.desc + " " + t.raw + " " + t.cat).toLowerCase().includes(q)); }
     if (ui.txTag) list = list.filter(t => (t.tags || []).includes(ui.txTag));
-    const inc = list.filter(t => t.amount > 0).reduce((a, t) => a + t.amount, 0), out = list.filter(t => t.amount < 0).reduce((a, t) => a + t.amount, 0);
+    const flows = list.filter(t => !ownTransfer(state, t)), moved = list.filter(t => ownTransfer(state, t) && t.amount < 0).reduce((a, t) => a - t.amount, 0);
+    const inc = flows.filter(t => t.amount > 0).reduce((a, t) => a + t.amount, 0), out = flows.filter(t => t.amount < 0).reduce((a, t) => a + t.amount, 0);
     let h = `<div class="page-head"><div><h1>Transacties</h1><p>${budgetTx(state).length} transacties in totaal${hasSavings(state) ? " (zonder spaarrekening)" : ""}</p></div>${ui.txAll ? "" : monthSwitch()}</div>${notices()}`;
     if (!state.transactions.length) return h + emptyState();
     h += accPicker();
@@ -2641,7 +2671,7 @@ if (typeof module !== "undefined") module.exports = { MAX_ZICHT, accKey, zichtLi
       <select class="input" id="tx-cat" aria-label="Filter op categorie"><option value="">Alle categorieën</option>${[UNCAT, ...catNames()].map(n => `<option${n === ui.txCat ? " selected" : ""}>${esc(n)}</option>`).join("")}</select>
       <div class="seg" role="group" aria-label="Periode"><button type="button" data-act="tx-month" aria-pressed="${!ui.txAll}">Deze maand</button><button type="button" data-act="tx-all" aria-pressed="${ui.txAll}">Alles</button></div>
       <button class="btn" data-act="add-tx" type="button">+ Manueel toevoegen</button>
-      <span class="totals num">${list.length} rijen · <span class="pos">${signed(inc)}</span> · <span class="neg">${signed(out)}</span></span></div>
+      <span class="totals num">${list.length} rijen · <span class="pos">${signed(inc)}</span> · <span class="neg">${signed(out)}</span>${moved ? ` · <span class="xfer">⇄ ${eur(moved)}</span>` : ""}</span></div>
       <div class="table-wrap"><table><thead><tr><th>Datum</th><th>Omschrijving</th><th>Categorie</th><th class="r">Bedrag</th><th></th></tr></thead>
       <tbody>${list.length ? list.map(txRow).join("") : `<tr class="empty-row"><td colspan="5">Geen transacties voor deze selectie.</td></tr>`}</tbody></table></div></section>`;
     return h;
@@ -3596,7 +3626,7 @@ if (typeof module !== "undefined") module.exports = { MAX_ZICHT, accKey, zichtLi
         if (Object.keys(state.accounts).some(k => normIban(k) === ib)) { err.textContent = "Die rekening staat al in je lijst."; return; }
         if (zicht && zichtList(state).length >= MAX_ZICHT) { err.textContent = `Je kan maximaal ${MAX_ZICHT} zichtrekeningen hebben.`; return; }
         state.accounts[fmtIban(ib)] = { type, name, ...(zicht ? { color: zichtList(state).length % ACC_COLORS.length } : {}) };
-        save(); d.close(); render(); toast(`${name || fmtIban(ib)} toegevoegd`);
+        const n = applyOwnTransfers(state); save(); d.close(); render(); toast(`${name || fmtIban(ib)} toegevoegd${n ? ` · ${n} overboeking${n === 1 ? "" : "en"} tussen je rekeningen herkend` : ""}`);
       });
     });
   }
@@ -3613,7 +3643,7 @@ if (typeof module !== "undefined") module.exports = { MAX_ZICHT, accKey, zichtLi
   function accStats(ym) {
     const bal = balanceAt(state, ym);
     return zichtList(state).map(a => {
-      const tx = state.transactions.filter(t => sameAcc(t.account, a) && t.date.startsWith(ym));
+      const tx = state.transactions.filter(t => sameAcc(t.account, a) && t.date.startsWith(ym) && !ownTransfer(state, t));
       const per = bal.per.find(x => sameAcc(x.account, a));
       return { acc: a, name: accName(state, a), color: accColor(a), bal: per ? per.value : null,
         inn: Math.round(tx.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0) * 100) / 100,
@@ -3715,6 +3745,8 @@ if (typeof module !== "undefined") module.exports = { MAX_ZICHT, accKey, zichtLi
       case "acc-add": accAddDialog(el.dataset.type); break;
       case "acc-pick": ui.acc = el.dataset.acc || ""; render(); break;
       case "goto-profile": location.hash = "profiel"; break;
+      case "own-fix": { const oc = ownConflicts(state); if (!state.categories.some(x => x.name === OWN_CAT)) state.categories.push({ name: OWN_CAT, type: "Overboeking", budget: null });
+        oc.forEach(t => { t.cat = OWN_CAT; }); save(); render(); toast(`${oc.length} overboeking${oc.length === 1 ? "" : "en"} omgezet naar "${OWN_CAT}"`); break; }
       case "acc-open": ui.acc = el.dataset.acc; ui.txAll = false; ui.txCat = ""; ui.txSearch = ""; location.hash = "transacties"; break;
       case "acc-color": { const acc = el.closest("tr").dataset.acc, a = state.accounts[acc]; const cur = Number.isInteger(a.color) ? a.color : Math.max(0, zichtList(state).indexOf(acc)); a.color = (cur + 1) % ACC_COLORS.length; save(); render(); break; }
       case "acc-del": { const acc = el.closest("tr").dataset.acc; if (state.transactions.some(t => normIban(t.account) === normIban(acc))) break;
