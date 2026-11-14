@@ -724,6 +724,18 @@ tbody tr:hover td { background: rgba(var(--accent-rgb), .05); }
 .sub-seg button[data-v="twijfel"][aria-pressed="true"] { color: var(--warn); background: var(--warn-soft); }
 tr.sub-cancel .sub-name { text-decoration: line-through; text-decoration-color: var(--neg); }
 .sub-hidden summary { cursor: pointer; color: var(--muted); }
+.btn.f-on { border-color: var(--accent); color: var(--accent); }
+.fpanel { display: grid; gap: 12px; margin: 4px 0 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--r-card); background: rgba(var(--accent-rgb), .03); }
+.fgroup { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.flabel { width: 118px; flex: none; color: var(--muted); font-size: 12px; font-family: var(--font-display); letter-spacing: .08em; text-transform: var(--case-ui); }
+.fnum { width: 100px; }
+.fpresets { display: inline-flex; flex-wrap: wrap; gap: 4px 12px; margin-left: 6px; font-size: 13px; }
+.fcheck { display: flex; align-items: center; gap: 8px; font-size: 13.5px; }
+.frow { display: flex; flex-wrap: wrap; gap: 8px; }
+.fchips, .fsaved { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 0 0 12px; font-size: 13px; }
+.fchips .chip, .fsaved .chip { cursor: pointer; font-size: 11.5px; padding: 3px 9px; }
+.fsave-chip { display: inline-flex; align-items: center; gap: 2px; }
+@media (max-width: 520px) { .flabel { width: 100%; } }
 .close-lead p { margin: 0; font-size: 15.5px; line-height: 1.55; }
 .close-row { display: grid; grid-template-columns: 1fr auto auto; gap: 14px; align-items: baseline; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
 .close-row:last-child { border-bottom: 0; }
@@ -1176,7 +1188,7 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
     })();
   }
   let state = newState();
-  const ui = { month: null, txAll: false, txSearch: "", txCat: "", open: new Set(), period: "maand", year: null, ruleSug: null, folderAsk: false, acc: "", sav: "" };
+  const ui = { f: { dir: "", min: "", max: "", from: "", to: "", cats: [], noXfer: false }, fOpen: false, month: null, txAll: false, txSearch: "", txCat: "", open: new Set(), period: "maand", year: null, ruleSug: null, folderAsk: false, acc: "", sav: "" };
   ui.month = todayYm();
 
   /* ---------- helpers ---------- */
@@ -2222,29 +2234,81 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
     });
   }
   function viewTransactions() {
+    const f = ui.f, custom = !!(f.from || f.to);   // eigen periode gaat voor "deze maand / alles"
     let list = budgetTx(state);
     if (ui.acc && multiAcc()) list = list.filter(t => sameAcc(t.account, ui.acc));
-    if (!ui.txAll) list = list.filter(t => t.date.startsWith(ui.month));
-    if (ui.txCat) list = list.filter(t => t.cat === ui.txCat);
-    if (ui.txSearch) { const q = ui.txSearch.toLowerCase(); list = list.filter(t => (t.desc + " " + t.raw + " " + t.cat).toLowerCase().includes(q)); }
+    if (!custom && !ui.txAll) list = list.filter(t => t.date.startsWith(ui.month));
+    if (ui.txCat && !f.cats.length) list = list.filter(t => t.cat === ui.txCat);
     if (ui.txTag) list = list.filter(t => (t.tags || []).includes(ui.txTag));
+    list = filterTx(state, list, Object.assign({}, f, { q: ui.txSearch }));
+    ui.txShown = list;
     const flows = list.filter(t => !ownTransfer(state, t)), moved = list.filter(t => ownTransfer(state, t) && t.amount < 0).reduce((a, t) => a - t.amount, 0);
     const inc = flows.filter(t => t.amount > 0).reduce((a, t) => a + t.amount, 0), out = flows.filter(t => t.amount < 0).reduce((a, t) => a + t.amount, 0);
-    let h = `<div class="page-head"><div><h1>Transacties</h1><p>${budgetTx(state).length} transacties in totaal${hasSavings(state) ? " (zonder spaarrekening)" : ""}</p></div>${ui.txAll ? "" : monthSwitch()}</div>${notices()}`;
+    let h = `<div class="page-head"><div><h1>Transacties</h1><p>${budgetTx(state).length} transacties in totaal${hasSavings(state) ? " (zonder spaarrekening)" : ""}</p></div>${ui.txAll || custom ? "" : monthSwitch()}</div>${notices()}`;
     if (!state.transactions.length) return h + emptyState();
     h += accPicker();
     if (ui.txCat === UNCAT && list.length) h += uncatCard(ui.txAll ? null : ui.month);
     h += tagsCard();
     h += `<section class="card"><div class="toolbar">
-      <input class="input search" id="tx-search" type="search" placeholder="Zoeken in omschrijving" value="${esc(ui.txSearch)}" aria-label="Zoeken">
+      <input class="input search" id="tx-search" type="search" placeholder="Zoeken: tekst, #label of bedrag" value="${esc(ui.txSearch)}" aria-label="Zoeken">
       ${allTags().length ? `<select class="input" id="tx-tag" aria-label="Filter op label"><option value="">Alle labels</option>${allTags().map(g => `<option${g === ui.txTag ? " selected" : ""} value="${esc(g)}">#${esc(g)}</option>`).join("")}</select>` : ""}
-      <select class="input" id="tx-cat" aria-label="Filter op categorie"><option value="">Alle categorieën</option>${[UNCAT, ...catNames()].map(n => `<option${n === ui.txCat ? " selected" : ""}>${esc(n)}</option>`).join("")}</select>
-      <div class="seg" role="group" aria-label="Periode"><button type="button" data-act="tx-month" aria-pressed="${!ui.txAll}">Deze maand</button><button type="button" data-act="tx-all" aria-pressed="${ui.txAll}">Alles</button></div>
+      <select class="input" id="tx-cat" aria-label="Filter op categorie">${f.cats.length ? `<option selected value="">Meerdere categorieën (${f.cats.length})</option>` : ""}<option value="">Alle categorieën</option>${[UNCAT, ...catNames()].map(n => `<option${!f.cats.length && n === ui.txCat ? " selected" : ""}>${esc(n)}</option>`).join("")}</select>
+      <div class="seg" role="group" aria-label="Periode"><button type="button" data-act="tx-month" aria-pressed="${!ui.txAll && !custom}">Deze maand</button><button type="button" data-act="tx-all" aria-pressed="${ui.txAll && !custom}">Alles</button>${custom ? `<button type="button" data-act="f-toggle" aria-pressed="true">Eigen periode</button>` : ""}</div>
+      <button class="btn${filterActive(f) ? " f-on" : ""}" data-act="f-toggle" type="button" aria-expanded="${ui.fOpen}">⚲ Filters${filterCount(f) ? ` (${filterCount(f)})` : ""}</button>
       <button class="btn" data-act="add-tx" type="button">+ Manueel toevoegen</button>
       <span class="totals num">${list.length} rijen · <span class="pos">${signed(inc)}</span> · <span class="neg">${signed(out)}</span>${moved ? ` · <span class="xfer">⇄ ${eur(moved)}</span>` : ""}</span></div>
+      ${savedFiltersRow()}${ui.fOpen ? filterPanel() : ""}${filterChips()}
       <div class="table-wrap"><table><thead><tr><th>Datum</th><th>Omschrijving</th><th>Categorie</th><th class="r">Bedrag</th><th></th></tr></thead>
       <tbody>${list.length ? list.map(txRow).join("") : `<tr class="empty-row"><td colspan="5">Geen transacties voor deze selectie.</td></tr>`}</tbody></table></div></section>`;
     return h;
+  }
+
+  /* ---------- slimme filters (stap 13c) ---------- */
+  const EMPTY_F = () => ({ dir: "", min: "", max: "", from: "", to: "", cats: [], noXfer: false });
+  const filterCount = f => (f.dir ? 1 : 0) + (parseAmt(f.min) !== null || parseAmt(f.max) !== null ? 1 : 0) + (f.from || f.to ? 1 : 0) + (f.cats.length ? 1 : 0) + (f.noXfer ? 1 : 0);
+  function fPreset(v) {
+    const t = todayS(), y = +t.slice(0, 4), pm = shiftMonth(t.slice(0, 7), -1);
+    return { vm: [pm + "-01", endOfMonth(pm)], l3: [shiftMonth(t.slice(0, 7), -2) + "-01", t], jaar: [y + "-01-01", t], vj: [(y - 1) + "-01-01", (y - 1) + "-12-31"] }[v];
+  }
+  function filterPanel() {
+    const f = ui.f, free = [UNCAT, ...catNames()].filter(n => !f.cats.includes(n));
+    return `<div class="fpanel">
+      <div class="fgroup"><span class="flabel">Soort</span><div class="seg" role="group" aria-label="Soort">${[["", "Alles"], ["uit", "Uitgaven"], ["in", "Inkomsten"]].map(([v, n]) => `<button type="button" data-act="f-dir" data-v="${v}" aria-pressed="${f.dir === v}">${n}</button>`).join("")}</div></div>
+      <div class="fgroup"><span class="flabel">Bedrag</span><input class="input fnum num" data-f="min" inputmode="decimal" placeholder="van €" value="${esc(f.min)}" aria-label="Bedrag vanaf"><span class="muted">–</span><input class="input fnum num" data-f="max" inputmode="decimal" placeholder="tot €" value="${esc(f.max)}" aria-label="Bedrag tot"></div>
+      <div class="fgroup"><span class="flabel">Periode</span><input class="input" type="date" data-f="from" value="${esc(f.from)}" aria-label="Vanaf datum"><span class="muted">–</span><input class="input" type="date" data-f="to" value="${esc(f.to)}" aria-label="Tot datum">
+        <span class="fpresets">${[["vm", "Vorige maand"], ["l3", "Laatste 3 maanden"], ["jaar", "Dit jaar"], ["vj", "Vorig jaar"]].map(([v, n]) => `<button class="linkbtn" type="button" data-act="f-preset" data-v="${v}">${n}</button>`).join("")}</span></div>
+      <div class="fgroup"><span class="flabel">Categorieën</span><div class="acc-pick chart-chips">${f.cats.map(n => `<button type="button" data-act="f-cat-del" data-cat="${esc(n)}" aria-pressed="true" title="Weghalen">${esc(n)} <span class="muted">×</span></button>`).join("")}
+        <select class="cat" data-f="cat-add" aria-label="Categorie toevoegen"><option value="">+ categorie</option>${free.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join("")}</select></div></div>
+      ${multiAcc() ? `<label class="fcheck"><input type="checkbox" data-f="noXfer"${f.noXfer ? " checked" : ""}> Zonder overboekingen tussen eigen rekeningen</label>` : ""}
+      <div class="frow"><button class="btn small" data-act="f-clear" type="button">Filters wissen</button><button class="btn small" data-act="f-save" type="button">★ Filter bewaren</button><button class="btn small" data-act="f-export" type="button">⤓ Deze selectie naar Excel</button></div></div>`;
+  }
+  // wat er nu gefilterd wordt, als chips met × (ook als het paneel dicht is)
+  function filterChips() {
+    const f = ui.f, c = [];
+    if (f.dir) c.push(["dir", f.dir === "uit" ? "Enkel uitgaven" : "Enkel inkomsten"]);
+    const mn = parseAmt(f.min), mx = parseAmt(f.max);
+    if (mn !== null || mx !== null) c.push(["amt", mn !== null && mx !== null ? `${eur(mn)} – ${eur(mx)}` : mn !== null ? `vanaf ${eur(mn)}` : `tot ${eur(mx)}`]);
+    if (f.from || f.to) c.push(["per", `${f.from ? fmtDate(f.from) : "…"} – ${f.to ? fmtDate(f.to) : "…"}`]);
+    if (f.cats.length) c.push(["cats", f.cats.length <= 2 ? f.cats.join(", ") : `${f.cats.length} categorieën`]);
+    if (f.noXfer) c.push(["noXfer", "Zonder overboekingen"]);
+    if (!c.length) return "";
+    return `<div class="fchips"><span class="muted">Gefilterd op:</span>${c.map(([k, n]) => `<button class="chip" type="button" data-act="f-del" data-k="${k}" title="Deze filter weghalen">${esc(n)} ×</button>`).join("")}<button class="linkbtn" type="button" data-act="f-clear">alles wissen</button></div>`;
+  }
+  function savedFiltersRow() {
+    const l = state.savedFilters || []; if (!l.length) return "";
+    return `<div class="fsaved"><span class="muted">★ Bewaard:</span>${l.map(x => `<span class="fsave-chip"><button class="chip" type="button" data-act="f-load" data-id="${esc(x.id)}">${esc(x.name)}</button><button class="linkbtn" type="button" data-act="f-forget" data-id="${esc(x.id)}" title="Bewaarde filter verwijderen" aria-label="Verwijderen">×</button></span>`).join("")}</div>`;
+  }
+  function filterSaveDialog() {
+    dialog(`<h3>Filter bewaren</h3><p>Geef deze selectie een naam. Je vindt ze terug bovenaan de transacties, onder ★ Bewaard.</p>
+      <label for="fs-name">Naam</label><input class="input" id="fs-name" placeholder="bv. Restaurants dit jaar" autocomplete="off">
+      <div class="row"><button class="btn" data-close type="button">Annuleren</button><button class="btn primary" id="fs-ok" type="button">Bewaren</button></div>`, d => {
+      const inp = d.querySelector("#fs-name"); inp.focus();
+      const ok = () => { const name = inp.value.trim(); if (!name) { inp.focus(); return; }
+        state.savedFilters = state.savedFilters || [];
+        state.savedFilters.push({ id: "f" + Date.now().toString(36), name, f: JSON.parse(JSON.stringify(ui.f)), txCat: ui.txCat, txTag: ui.txTag || "", txSearch: ui.txSearch, acc: ui.acc, txAll: ui.txAll });
+        save(); d.close(); render(); toast(`Filter “${name}” bewaard`); };
+      d.querySelector("#fs-ok").addEventListener("click", ok); inp.addEventListener("keydown", e => { if (e.key === "Enter") ok(); });
+    });
   }
 
   function viewBudget() {
@@ -3255,6 +3319,11 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
       "Ga naar <b>Planner</b> → <b>🔁 Abonnementen</b>. Je ziet alles wat regelmatig van je rekening gaat, met de kost <b>per jaar</b> en of het duurder werd.",
       "Duid per betaling aan of je ze nog nodig hebt: <b>✓</b> nodig, <b>?</b> twijfel, <b>✕</b> opzeggen. Bovenaan zie je hoeveel je per jaar bespaart met wat op ✕ staat.",
       "Is iets geen abonnement (bv. huur)? Klik op <b>⊘</b> en het verdwijnt uit de lijst. Opgezegde betalingen verschijnen vanzelf onder <b>Gestopt</b>." ] },
+    { id: "filters", icon: "⚲", show: [["transacties", '[data-act="f-toggle"]'], ["transacties", "#tx-search"], ["transacties", '[data-act="f-toggle"]'], null], title: "Slimme filters", tab: "transacties", steps: [
+      "Ga naar <b>Transacties</b> en klik op <b>⚲ Filters</b>.",
+      "Kies wat je wil zien: <b>uitgaven</b> of <b>inkomsten</b>, een <b>bedrag</b> van/tot, een <b>periode</b> (of snel: vorige maand, laatste 3 maanden, dit jaar…) en één of meer <b>categorieën</b>. In het zoekveld kan je ook een bedrag typen, bv. 17,99.",
+      "Bovenaan zie je wat er gefilterd wordt; klik op een filter om hem weg te halen. Het totaal rechts telt enkel wat je ziet.",
+      "Gebruik je een selectie vaak? <b>★ Filter bewaren</b> en geef ze een naam. Met <b>⤓ Deze selectie naar Excel</b> download je enkel wat je ziet." ] },
     { id: "undo", icon: "↶", title: "Iets per ongeluk gewist?", tab: "", steps: [
       "Na elke wisactie verschijnt onderaan <b>↶ Ongedaan maken</b>. Klik erop en alles staat terug.",
       "Te laat? Druk op <b>Ctrl+Z</b> (Mac: Cmd+Z), tot 20 stappen terug.",
@@ -3327,7 +3396,11 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
     { sel: '[data-act="acc-open"]', t: "Transacties van deze rekening", x: "Open het tabblad Transacties met enkel deze rekening." },
     { sel: '[data-act="goto-profile"], [data-act="goto-balance"]', t: "Startsaldo ingeven", x: "Zonder startsaldo kan de app je saldo niet berekenen.", topic: "saldo", steps: true },
     { sel: '[data-act="acc-pick"]', t: "Rekening kiezen", x: "Toon de transacties van één rekening, of van alle rekeningen samen (met een gekleurd bolletje per rekening)." },
-    { sel: "#tx-search", t: "Zoeken", x: "Zoek op omschrijving, tegenpartij of bedrag." },
+    { sel: "#tx-search", t: "Zoeken", x: "Zoek op omschrijving, tegenpartij, categorie of #label. Typ je een bedrag (bv. 17,99), dan vind je ook alle transacties van dat bedrag." },
+    { sel: '[data-act="f-toggle"]', t: "Filters", x: "Combineer filters: uitgaven of inkomsten, bedrag van/tot, een eigen periode en meerdere categorieën. Bewaar een selectie die je vaak gebruikt.", topic: "filters", steps: true },
+    { sel: '[data-act="f-save"]', t: "Filter bewaren", x: "Bewaar alle huidige filters (ook zoektekst, label en rekening) onder een naam. Eén klik op ★ Bewaard zet ze terug." },
+    { sel: '[data-act="f-load"]', t: "Bewaarde filter", x: "Zet deze bewaarde selectie terug." },
+    { sel: '[data-act="f-export"]', t: "Selectie naar Excel", x: "Download enkel de transacties die je nu ziet als .csv-bestand voor Excel." },
     { sel: "#tx-cat", t: "Filter op categorie", x: "Toon enkel de transacties van één categorie." },
     { sel: '[data-act="set-cat"]', t: "Categorie kiezen", x: "Kies de categorie van deze transactie. De app onthoudt je keuze voor dezelfde tegenpartij." },
     { sel: '[data-act="tag-tx"]', t: "Labels (#)", x: "Geef een transactie een label, bv. #vakantie2026. Klik later op het label om alles met dat label te zien." },
@@ -3774,8 +3847,20 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
       case "next-year": ui.year++; render(); break;
       case "open-month": ui.month = el.dataset.month; ui.period = "maand"; hideTip(); render(); window.scrollTo(0, 0); break;
       case "show-group": { const k = el.closest("tr").dataset.key; const t = state.transactions.find(x => merchantKey(x) === k); ui.txCat = UNCAT; ui.txSearch = t ? t.desc.replace(/\s*\(.*$/, "").replace(/\s*·.*$/, "") : ""; location.hash = "transacties"; render(); break; }
-      case "tx-month": ui.txAll = false; render(); break;
-      case "tx-all": ui.txAll = true; render(); break;
+      case "tx-month": ui.txAll = false; ui.f.from = ui.f.to = ""; render(); break;
+      case "tx-all": ui.txAll = true; ui.f.from = ui.f.to = ""; render(); break;
+      case "f-toggle": ui.fOpen = !ui.fOpen; render(); break;
+      case "f-dir": ui.f.dir = el.dataset.v; render(); break;
+      case "f-preset": { const [a, b] = fPreset(el.dataset.v); ui.f.from = a; ui.f.to = b; render(); break; }
+      case "f-cat-del": ui.f.cats = ui.f.cats.filter(n => n !== el.dataset.cat); render(); break;
+      case "f-del": { const k = el.dataset.k, f = ui.f; if (k === "amt") f.min = f.max = ""; else if (k === "per") f.from = f.to = ""; else if (k === "cats") f.cats = []; else if (k === "dir") f.dir = ""; else f[k] = false; render(); break; }
+      case "f-clear": ui.f = EMPTY_F(); ui.txCat = ""; ui.txTag = ""; ui.txSearch = ""; render(); break;
+      case "f-save": filterSaveDialog(); break;
+      case "f-export": offerFile(`transacties-selectie-${todayS()}.csv`, toCsv(state, ui.txShown || []), "text/csv"); break;
+      case "f-load": { const x = (state.savedFilters || []).find(v => v.id === el.dataset.id); if (!x) break;
+        ui.f = Object.assign(EMPTY_F(), JSON.parse(JSON.stringify(x.f))); ui.txCat = x.txCat || ""; ui.txTag = x.txTag || ""; ui.txSearch = x.txSearch || ""; ui.acc = x.acc || ""; ui.txAll = !!x.txAll; render(); toast(`Filter “${x.name}”`); break; }
+      case "f-forget": { const x = (state.savedFilters || []).find(v => v.id === el.dataset.id); if (!x) break;
+        confirmDel("Bewaarde filter verwijderen?", `“${x.name}” verdwijnt uit je bewaarde filters. Je transacties veranderen niet.`, "Verwijderen", "Bewaarde filter verwijderd", () => { state.savedFilters = state.savedFilters.filter(v => v !== x); save(); render(); }); break; }
       case "toggle-raw": { const id = el.closest("tr").dataset.id; ui.open.has(id) ? ui.open.delete(id) : ui.open.add(id); el.closest("tr").classList.toggle("open"); break; }
       case "del-tx": { const t = txById(el); confirmDel("Transactie verwijderen?", `${t.desc} (${signed(t.amount)}) wordt verwijderd.`, "Verwijderen", "Transactie verwijderd", () => { state.transactions = state.transactions.filter(x => x !== t); save(); render(); }); break; }
       case "make-rule": ruleDialog(txById(el)); break;
@@ -3820,7 +3905,11 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
   document.addEventListener("change", e => {
     const el = e.target, a = el.dataset.act;
     if (a === "chart-cat-add" && el.value) { setChartPref({ cats: [...chartCatsNow(), el.value] }); render(); return; }
-    if (el.id === "tx-cat") { ui.txCat = el.value; render(); return; }
+    if (el.id === "tx-cat") { ui.txCat = el.value; ui.f.cats = []; render(); return; }
+    if (el.dataset.f && el.closest(".fpanel")) { const k = el.dataset.f;
+      if (k === "cat-add") { if (el.value) { if (ui.txCat && !ui.f.cats.length) ui.f.cats.push(ui.txCat); ui.f.cats.push(el.value); ui.txCat = ""; } }
+      else if (k === "noXfer") ui.f.noXfer = el.checked; else ui.f[k] = el.value;
+      render(); return; }
     if (el.id === "tx-tag") { ui.txTag = el.value; if (el.value) ui.txAll = true; render(); return; }
     if (el.dataset.act === "sav-goal") {
       const tr = el.closest("tr"), id = tr.dataset.id;

@@ -949,11 +949,11 @@ function plansToIcs(state) {
   return lines.join("\r\n");
 }
 
-function toCsv(state) {
+function toCsv(state, list) {
   const esc = v => { v = String(v ?? ""); return /[;"\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
   const head = ["Datum", "Omschrijving", "Categorie", "Type", "Bedrag", "Rekening", "Omzetnummer", "Tegenpartij", "Bankomschrijving"];
   const lines = [head.join(";")];
-  for (const t of state.transactions) {
+  for (const t of list || state.transactions) {
     const [y, m, d] = t.date.split("-");
     lines.push([`${d}/${m}/${y}`, t.desc, t.cat, typeOf(state, t.cat), t.amount.toFixed(2).replace(".", ","), t.account, t.omzet, t.counterparty, t.raw].map(esc).join(";"));
   }
@@ -1049,4 +1049,28 @@ function subscriptions(state, todayStr) {
 }
 function addD0(d, n) { const x = pd(d); x.setDate(x.getDate() + n); return ds(x); }
 
-if (typeof module !== "undefined") module.exports = { subscriptions, PER_YEAR, monthClose, belfiusDesc, catByName, parentOf, groupOf, mainCats, subsOf, savKeys, activeSav, setSav, withSav, goalSav, savGoals, savAll, syncSavConfs, cardMatch, applyCards, transferFlows, OWN_CAT, ownTransfer, applyOwnTransfers, ownConflicts, MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
+/* ---------- slimme filters (stap 13c) ----------
+   f = { dir: ""|"uit"|"in", min, max (bedrag zonder teken), from, to (JJJJ-MM-DD), cats: [..], noXfer: bool, q: zoektekst }.
+   Zoektekst die een bedrag is (bv. "17,99" of "-17.99") zoekt ook op dat bedrag. */
+function parseAmt(v) { if (v === null || v === undefined || v === "") return null; const n = parseFloat(String(v).trim().replace(/\s/g, "").replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", ".")); return isNaN(n) ? null : n; }
+function filterTx(state, list, f) {
+  f = f || {}; const min = parseAmt(f.min), max = parseAmt(f.max), cats = f.cats && f.cats.length ? new Set(f.cats) : null;
+  const q = (f.q || "").trim().toLowerCase(), qAmt = /^[-+]?\s*€?\s*\d+([.,]\d{1,2})?$/.test(q) ? Math.abs(parseAmt(q.replace(/[€+\s]/g, ""))) : null;
+  return list.filter(t => {
+    if (f.dir === "uit" && t.amount >= 0) return false;
+    if (f.dir === "in" && t.amount <= 0) return false;
+    const a = Math.abs(t.amount);
+    if (min !== null && a < min - 0.005) return false;
+    if (max !== null && a > max + 0.005) return false;
+    if (f.from && t.date < f.from) return false;
+    if (f.to && t.date > f.to) return false;
+    if (cats && !cats.has(t.cat) && !(t.splits || []).some(x => cats.has(x.cat))) return false;
+    if (f.noXfer && ownTransfer(state, t)) return false;
+    if (q) { const txt = (t.desc + " " + t.raw + " " + t.cat + " " + (t.tags || []).map(g => "#" + g).join(" ")).toLowerCase();
+      if (!txt.includes(q) && !(qAmt !== null && Math.abs(a - qAmt) < 0.005)) return false; }
+    return true;
+  });
+}
+const filterActive = f => !!(f && (f.dir || parseAmt(f.min) !== null || parseAmt(f.max) !== null || f.from || f.to || (f.cats && f.cats.length) || f.noXfer));
+
+if (typeof module !== "undefined") module.exports = { filterTx, filterActive, parseAmt, subscriptions, PER_YEAR, monthClose, belfiusDesc, catByName, parentOf, groupOf, mainCats, subsOf, savKeys, activeSav, setSav, withSav, goalSav, savGoals, savAll, syncSavConfs, cardMatch, applyCards, transferFlows, OWN_CAT, ownTransfer, applyOwnTransfers, ownConflicts, MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
