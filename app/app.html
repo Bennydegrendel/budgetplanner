@@ -717,6 +717,13 @@ tbody tr:hover td { background: rgba(var(--accent-rgb), .05); }
 
 .notice { border-radius: var(--r-card); border-left: 3px solid currentColor; }
 .tooltip { background: rgba(var(--shade-rgb), .96); color: var(--ink); border: 1px solid var(--accent); border-radius: var(--r-card); box-shadow: 0 0 18px rgba(var(--accent-rgb), calc(.35 * var(--glow))); font-family: var(--font-body); font-size: 13.5px; }
+.sub-seg { display: inline-flex; margin-right: 4px; vertical-align: middle; }
+.sub-seg button { padding: 4px 9px; min-width: 30px; }
+.sub-seg button[data-v="weg"][aria-pressed="true"] { color: var(--neg); background: var(--neg-soft); }
+.sub-seg button[data-v="ok"][aria-pressed="true"] { color: var(--pos); background: var(--pos-soft); }
+.sub-seg button[data-v="twijfel"][aria-pressed="true"] { color: var(--warn); background: var(--warn-soft); }
+tr.sub-cancel .sub-name { text-decoration: line-through; text-decoration-color: var(--neg); }
+.sub-hidden summary { cursor: pointer; color: var(--muted); }
 .close-lead p { margin: 0; font-size: 15.5px; line-height: 1.55; }
 .close-row { display: grid; grid-template-columns: 1fr auto auto; gap: 14px; align-items: baseline; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
 .close-row:last-child { border-bottom: 0; }
@@ -1698,6 +1705,29 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
     h += goalsWide();
     h += `<div class="stack">${chartsCard()}${transferCard()}</div>`;
     h += `<div class="grid-2"><div class="stack"><section class="card" id="cat-card">${catChart(s)}</section>${groupCards(s)}${debtCard()}${uncatHtml}</div><div class="stack">${(state.plans.length || detectRecurring(state).length) ? soonCard(14, true) : ""}${carryCard()}</div></div>`;
+    return h;
+  }
+
+  /* ---------- abonnementen en vaste betalingen (stap 13b) ---------- */
+  const SUB_REVIEW = [["ok", "✓", "Nodig"], ["twijfel", "?", "Twijfel"], ["weg", "✕", "Opzeggen"]];
+  function viewSubs() {
+    const all = subscriptions(state, todayS()), act = all.filter(x => x.active && x.review !== "geen"), stopped = all.filter(x => !x.active && x.review !== "geen"), hidden = all.filter(x => x.review === "geen");
+    const sum = (l, k) => l.reduce((a, x) => a + x[k], 0), dearer = act.filter(x => x.pct !== null && x.pct >= 3), cancel = act.filter(x => x.review === "weg"), doubt = act.filter(x => x.review === "twijfel");
+    let h = `<div class="page-head"><div><h1>Abonnementen</h1><p>Alles wat regelmatig van je rekening gaat: abonnementen, verzekeringen, energie, huur… Herkend uit je transacties.</p></div><div class="actions"><button class="btn" data-act="goto-planner" type="button">← Planner</button></div></div>`;
+    if (!all.length) return h + `<section class="card"><p class="muted" style="margin:0">Nog geen terugkerende betalingen gevonden. Daarvoor zijn minstens 3 betalingen aan dezelfde partij in een vast ritme nodig.</p></section>`;
+    const kpi = (label, value, color, sub) => `<div class="kpi" style="--k:${color}"><div class="label">${label}</div><div class="value num">${value}</div><div class="sub">${sub}</div></div>`;
+    h += `<section class="kpis">${kpi("Per maand", `<span class="neg">${eur0(sum(act, "perMonth"))}</span>`, "var(--neg)", `${act.length} actieve betaling${act.length === 1 ? "" : "en"}`)}
+      ${kpi("Per jaar", `<span class="neg">${eur0(sum(act, "perYear"))}</span>`, "var(--neg)", `betaald laatste 12 maanden: ${eur0(sum(act, "paid12"))}`)}
+      ${kpi("Duurder geworden", `<span class="${dearer.length ? "neg" : "muted"}">${dearer.length}</span>`, "var(--warn)", dearer.length ? `samen +${eur0(dearer.reduce((a, x) => a + (x.amount - x.was) * PER_YEAR[x.repeat], 0))} per jaar` : "t.o.v. een jaar geleden")}
+      ${kpi("Mogelijke besparing", `<span class="${cancel.length ? "pos" : "muted"}">${eur0(sum(cancel, "perYear"))}</span>`, "var(--pos)", `per jaar, als je opzegt wat op ✕ staat${doubt.length ? ` · twijfel: ${eur0(sum(doubt, "perYear"))}` : ""}`)}</section>`;
+    const evo = x => x.pct === null || Math.abs(x.pct) < 3 ? `<span class="muted">stabiel</span>` : `<span class="${x.pct > 0 ? "neg" : "pos"}" title="${esc(`${eur(x.was)} op ${fmtDate(x.wasDate)}`)}">${x.pct > 0 ? "▲ +" : "▼ "}${x.pct}%</span> <small class="muted">sinds ${esc(monthShort(x.wasDate.slice(0, 7)))} ${x.wasDate.slice(0, 4)}</small>`;
+    const row = x => `<tr data-key="${esc(x.key)}" class="${x.review === "weg" ? "sub-cancel" : ""}"><td><b class="sub-name">${esc(x.title)}</b><div class="muted" style="font-size:12px">${esc(x.cat)}${multiAcc() ? ` · ${esc(accName(state, x.account))}` : ""}</div></td>
+      <td class="muted">${REPEATS[x.repeat]}</td><td class="r num">${eur(x.amount)}</td><td class="r num"><b>${eur0(x.perYear)}</b></td><td>${evo(x)}</td><td class="muted num">${fmtDate(x.last)}</td>
+      <td class="r" style="white-space:nowrap">${x.active ? `<span class="seg sub-seg" role="group" aria-label="Nog nodig?">${SUB_REVIEW.map(([v, ic, lbl]) => `<button type="button" data-act="sub-review" data-v="${v}" aria-pressed="${x.review === v}" title="${lbl}">${ic}</button>`).join("")}</span>` : ""}<button class="btn small ghost" data-act="sub-review" data-v="${x.review === "geen" ? "" : "geen"}" type="button" title="${x.review === "geen" ? "Terug in de lijst zetten" : "Geen abonnement: uit de lijst halen"}">${x.review === "geen" ? "↺" : "⊘"}</button></td></tr>`;
+    const table = (list, empty) => list.length ? `<div class="table-wrap"><table><thead><tr><th>Betaling</th><th>Ritme</th><th class="r">Bedrag</th><th class="r">Per jaar</th><th>Evolutie</th><th>Laatst</th><th class="r">Nog nodig?</th></tr></thead><tbody>${list.map(row).join("")}</tbody></table></div>` : `<p class="muted" style="margin:0">${empty}</p>`;
+    h += `<section class="card"><div class="card-head"><h2>Actief</h2><span class="hint">Duid aan wat je nog nodig hebt: ✓ nodig · ? twijfel · ✕ opzeggen. ⊘ = geen abonnement (uit de lijst).</span></div>${table(act, "Geen actieve terugkerende betalingen.")}</section>`;
+    if (stopped.length) h += `<section class="card"><div class="card-head"><h2>Gestopt</h2><span class="hint">Niet meer betaald sinds de laatste datum: opgezegd of verlopen</span></div>${table(stopped, "")}</section>`;
+    if (hidden.length) h += `<details class="card fold sub-hidden"><summary>⊘ ${hidden.length} verborgen (geen abonnement)</summary>${table(hidden, "")}</details>`;
     return h;
   }
 
@@ -2719,7 +2749,7 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
     const out = inPeriod.filter(i => i.plan.kind !== "inkomst"), inc = inPeriod.filter(i => i.plan.kind === "inkomst");
     const sum = a => a.reduce((x, i) => x + (+i.plan.amount || 0), 0);
     let h = `<div class="page-head"><div><h1>Planner</h1><p>Geplande aankopen en terugkerende betalingen, met herinneringen. Betalingen die in je transacties opduiken, worden vanzelf afgevinkt.</p></div>
-      <div class="actions"><button class="btn" data-act="pl-ics" type="button" title="Download een agendabestand met herinneringen voor Outlook of je gsm">📅 Naar agenda</button><button class="btn primary" data-act="pl-new" type="button">+ Planning</button></div></div>`;
+      <div class="actions"><button class="btn" data-act="subs-open" type="button">🔁 Abonnementen</button><button class="btn" data-act="pl-ics" type="button" title="Download een agendabestand met herinneringen voor Outlook of je gsm">📅 Naar agenda</button><button class="btn primary" data-act="pl-new" type="button">+ Planning</button></div></div>`;
     h += `<section class="card"><div class="pl-bar"><div class="seg" role="group" aria-label="Weergave">${["dag", "week", "maand", "jaar"].map(v => `<button type="button" data-act="pl-view" data-v="${v}" aria-pressed="${plUi.view === v}">${v}</button>`).join("")}</div>
       <div class="month"><button type="button" data-act="pl-prev" aria-label="Vorige">‹</button><span class="pl-title" style="text-transform:capitalize">${esc(plTitle())}</span><button type="button" data-act="pl-next" aria-label="Volgende">›</button></div>
       <button class="btn small" data-act="pl-today" type="button">Vandaag</button>
@@ -3221,6 +3251,10 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
       "Klik op het <b>Overzicht</b> op <b>📋 Maandafsluiting</b>. Na afloop van een maand verschijnt er ook vanzelf een melding.",
       "Je ziet wat er in en uit ging, vergeleken met je gemiddelde van de vorige 6 maanden en met vorig jaar, je grootste uitgaven, wat opviel (categorieën, overschreden budgetten, prijsstijgingen) en hoeveel je spaarde.",
       "Met ‹ en › blader je naar een andere maand." ] },
+    { id: "abo", icon: "🔁", show: [["planner", '[data-act="subs-open"]'], ["abonnementen", '[data-act="sub-review"]'], null], title: "Abonnementen nakijken", tab: "planner", steps: [
+      "Ga naar <b>Planner</b> → <b>🔁 Abonnementen</b>. Je ziet alles wat regelmatig van je rekening gaat, met de kost <b>per jaar</b> en of het duurder werd.",
+      "Duid per betaling aan of je ze nog nodig hebt: <b>✓</b> nodig, <b>?</b> twijfel, <b>✕</b> opzeggen. Bovenaan zie je hoeveel je per jaar bespaart met wat op ✕ staat.",
+      "Is iets geen abonnement (bv. huur)? Klik op <b>⊘</b> en het verdwijnt uit de lijst. Opgezegde betalingen verschijnen vanzelf onder <b>Gestopt</b>." ] },
     { id: "undo", icon: "↶", title: "Iets per ongeluk gewist?", tab: "", steps: [
       "Na elke wisactie verschijnt onderaan <b>↶ Ongedaan maken</b>. Klik erop en alles staat terug.",
       "Te laat? Druk op <b>Ctrl+Z</b> (Mac: Cmd+Z), tot 20 stappen terug.",
@@ -3324,6 +3358,8 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
     { sel: '[data-act="sav-sync"]', t: "Saldo afstemmen", x: "Vul het saldo van je bank in, dan rekent de app vanaf daar verder." },
     { sel: '[data-act="sav-approve-all"]', t: "Goedkeuren", x: "Keur alle bewegingen goed waarvoor de app al een spaardoel vond." },
     { sel: '[data-act="pl-new"]', t: "Planning toevoegen", x: "Zet een toekomstige betaling of inkomst in de planner, eventueel terugkerend.", topic: "plan", steps: true },
+    { sel: '[data-act="subs-open"]', t: "Abonnementen", x: "Alles wat regelmatig van je rekening gaat, met de kost per jaar, prijsevolutie en wat je zou besparen door op te zeggen.", topic: "abo" },
+    { sel: '[data-act="sub-review"]', t: "Nog nodig?", x: "✓ nodig · ? twijfel · ✕ opzeggen (telt mee in de mogelijke besparing). ⊘ haalt een betaling uit de lijst als het geen abonnement is. Nogmaals klikken wist je keuze." },
     { sel: '[data-act="pl-ics"]', t: "Naar agenda", x: "Download de planning als .ics-bestand voor Outlook, Google of je gsm-agenda." },
     { sel: '[data-act="pl-today"], [data-act="pl-prev"], [data-act="pl-next"]', t: "Bladeren", x: "Ga naar vandaag, of een periode terug of vooruit." },
     { sel: '[data-act="pl-view"]', t: "Weergave", x: "Kies hoe de planner eruitziet." },
@@ -3404,7 +3440,7 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
     if (tab && location.hash !== "#" + tab) { location.hash = tab; setTimeout(go, 450); } else go();
   }
 
-  const VIEWS = { afsluiting: viewClose, help: viewHelp, overzicht: viewOverview, transacties: viewTransactions, budget: viewBudget, regels: viewRules, spaardoelen: viewGoals, spaar: viewSavings, planner: viewPlanner, leningen: viewLoans, profiel: viewProfile };
+  const VIEWS = { abonnementen: viewSubs, afsluiting: viewClose, help: viewHelp, overzicht: viewOverview, transacties: viewTransactions, budget: viewBudget, regels: viewRules, spaardoelen: viewGoals, spaar: viewSavings, planner: viewPlanner, leningen: viewLoans, profiel: viewProfile };
   const route = () => { const r = location.hash.slice(1); return VIEWS[r] ? r : "overzicht"; };
   function render() {
     setSav(ui.sav);   // de spaarfuncties rekenen voor de spaarrekening die op het tabblad Spaar gekozen is
@@ -3416,7 +3452,7 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
     document.querySelectorAll("#nav a").forEach(a => { if (a.getAttribute("href") === "#" + r) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
     if (focusId) { const el = document.getElementById(focusId); if (el) { el.focus(); try { el.setSelectionRange(selStart, selStart); } catch (e) {} } }
     renderSide(r);
-    const cur = document.querySelector(`#nav a[href="#${r}"]`); $("#nav-cur").textContent = cur ? cur.firstChild.textContent.trim() : r === "profiel" ? "Profiel" : r === "help" ? "Help" : r === "afsluiting" ? "Maandafsluiting" : ""; navOpen(false);
+    const cur = document.querySelector(`#nav a[href="#${r}"]`); $("#nav-cur").textContent = cur ? cur.firstChild.textContent.trim() : r === "profiel" ? "Profiel" : r === "help" ? "Help" : r === "afsluiting" ? "Maandafsluiting" : r === "abonnementen" ? "Abonnementen" : ""; navOpen(false);
     $("#btn-profile").classList.toggle("active", r === "profiel"); updateProfileLabel();
     afterRender(r + (r === "overzicht" ? ui.period : ""));
     tutPaint();
@@ -3651,6 +3687,11 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
       case "install": installApp(); break;
       case "theme-open": themeDialog(); break;
       case "close-open": if (el.dataset.ym) ui.month = el.dataset.ym; else if (ui.month >= todayYm()) ui.month = prevYm(); ui.period = "maand"; location.hash = "afsluiting"; break;
+      case "subs-open": location.hash = "abonnementen"; break;
+      case "goto-planner": location.hash = "planner"; break;
+      case "sub-review": { const key = el.closest("tr").dataset.key, v = el.dataset.v; state.subs = state.subs || {};
+        const cur = (state.subs[key] && state.subs[key].review) || "", nv = v === cur ? "" : v;   // nogmaals klikken = keuze wissen
+        if (nv) state.subs[key] = { review: nv }; else delete state.subs[key]; save(); render(); break; }
       case "close-later": ui.closeLater = true; render(); break;
       case "goto-overview": location.hash = "overzicht"; break;
       case "help-open": location.hash = "help"; window.scrollTo(0, 0); break;
