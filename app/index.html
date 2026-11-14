@@ -22,7 +22,7 @@
     document.documentElement.dataset.mode = t.m === "light" ? "light" : "dark";
     // lettertypes van het gekozen thema (de andere worden pas geladen als je het themavenster opent)
     window.THEME_FONTS = {
-      cyberpunk: "https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700;800&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap",
+      cyberpunk: "https://fonts.googleapis.com/css2?family=Zen+Dots&family=Orbitron:wght@500;600;700;800&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap",
       synthwave: "https://fonts.googleapis.com/css2?family=Audiowide&family=Exo+2:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap",
       matrix: "https://fonts.googleapis.com/css2?family=VT323&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap",
       oceaan: "https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Nunito:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" };
@@ -67,7 +67,8 @@
   --bar-track: #161616;
   --shadow: 0 0 0 1px rgba(var(--accent-rgb), .04), 0 0 28px rgba(var(--accent-rgb), .05);
   --s1: #00e5ff; --s2: #ff2bd6; --s3: #f5e83b; --s4: #9d7bff;
-  --font-display: "Orbitron", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Zen Dots", "Orbitron", "Segoe UI", system-ui, sans-serif;   /* titels en subtitels */
+  --font-figure: "Orbitron", "Segoe UI", system-ui, sans-serif;               /* grote bedragen (data) */
   --font-body: "Rajdhani", "Segoe UI", system-ui, sans-serif;
   --font-mono: "Share Tech Mono", ui-monospace, "Consolas", monospace;
   /* vorm en karakter (per thema anders, zie de thema-blokken) */
@@ -179,19 +180,24 @@
 .theme-tile[aria-pressed="true"] { outline: 2px solid var(--magenta); outline-offset: -2px; box-shadow: 0 0 14px rgba(var(--magenta-rgb), .45); }
 .theme-tile:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 /* ---- vorm en karakter per thema (geldt voor donker én licht) ---- */
+/* Cyberpunk: titels in Zen Dots (breder) → kaartlabels mogen naar een tweede regel in plaats van afgekort te worden */
+[data-theme="cyberpunk"] .kpi .label { font-size: 11px; letter-spacing: .06em; white-space: normal; overflow: visible; line-height: 1.3; }
 [data-theme="synthwave"] {
+  --font-figure: var(--font-display);
   --font-display: "Audiowide", "Segoe UI", system-ui, sans-serif; --font-body: "Exo 2", "Segoe UI", system-ui, sans-serif; --font-mono: "Space Mono", ui-monospace, monospace;
   --font-hero: var(--font-display); --notch: none; --notch-sm: none;
   --r-card: 12px; --r-btn: 8px; --r-field: 8px; --r-pill: 999px; --r-bar: 999px; --r-sm: 6px;
   --case-title: uppercase; --case-ui: uppercase; --title-spacing: .08em; --corner: 0; --hero-size: 26px; --body-size: 15px; --body-weight: 400;
 }
 [data-theme="matrix"] {
+  --font-figure: var(--font-display);
   --font-display: "IBM Plex Mono", ui-monospace, monospace; --font-body: "IBM Plex Mono", ui-monospace, monospace; --font-mono: "IBM Plex Mono", ui-monospace, monospace;
   --font-hero: "VT323", "IBM Plex Mono", monospace; --notch: none; --notch-sm: none;
   --r-card: 0; --r-btn: 0; --r-field: 0; --r-pill: 0; --r-bar: 0; --r-sm: 0;
   --case-title: lowercase; --case-ui: lowercase; --title-spacing: 0; --corner: .8; --hero-size: 40px; --body-size: 13.5px; --body-weight: 400;
 }
 [data-theme="oceaan"] {
+  --font-figure: var(--font-display);
   --font-display: "Quicksand", "Segoe UI", system-ui, sans-serif; --font-body: "Nunito", "Segoe UI", system-ui, sans-serif; --font-mono: "JetBrains Mono", ui-monospace, monospace;
   --font-hero: var(--font-display); --notch: none; --notch-sm: none;
   --r-card: 18px; --r-btn: 12px; --r-field: 10px; --r-pill: 999px; --r-bar: 999px; --r-sm: 8px;
@@ -287,7 +293,7 @@ main { max-width: 1180px; margin: 0 auto; padding: 24px; display: grid; gap: 20p
 .kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; box-shadow: var(--shadow); position: relative; overflow: hidden; }
 .kpi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--k, var(--line)); }
 .kpi .label { color: var(--muted); font-size: 12.5px; font-weight: 500; }
-.kpi .value { font-family: var(--font-display); font-size: 26px; font-weight: 600; letter-spacing: -.02em; margin-top: 4px; }
+.kpi .value { font-family: var(--font-figure); font-size: 26px; font-weight: 600; letter-spacing: -.02em; margin-top: 4px; }
 .kpi .sub { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
 
 .grid-2 { display: grid; grid-template-columns: 1.35fr 1fr; gap: 20px; align-items: start; }
@@ -403,7 +409,7 @@ dialog textarea { width: 100%; height: 160px; font: 12px ui-monospace, monospace
 .loan-head h2 { font-size: 16px; display: flex; align-items: center; gap: 8px; }
 .loan-head .dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
 .loan-sub { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
-.loan-big { font-family: var(--font-display); font-size: 26px; font-weight: 600; letter-spacing: -.02em; margin: 14px 0 2px; }
+.loan-big { font-family: var(--font-figure); font-size: 26px; font-weight: 600; letter-spacing: -.02em; margin: 14px 0 2px; }
 .facts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 16px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
 .facts div { font-size: 12.5px; color: var(--muted); }
 .facts b { display: block; color: var(--ink); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -446,7 +452,7 @@ dialog textarea { width: 100%; height: 160px; font: 12px ui-monospace, monospace
 .gw-name { font-family: var(--font-display); font-size: 13px; letter-spacing: .1em; text-transform: var(--case-ui); display: flex; align-items: center; gap: 8px; }
 .gw-name i { width: 9px; height: 9px; display: inline-block; }
 .gw-ref { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); }
-.gw-amt { font-family: var(--font-display); font-size: 26px; font-weight: 700; color: var(--gold); text-shadow: 0 0 10px rgba(var(--gold-rgb), .7), 0 0 24px rgba(var(--amber-rgb), .3); margin-top: 6px; }
+.gw-amt { font-family: var(--font-figure); font-size: 26px; font-weight: 700; color: var(--gold); text-shadow: 0 0 10px rgba(var(--gold-rgb), .7), 0 0 24px rgba(var(--amber-rgb), .3); margin-top: 6px; }
 .gw-amt small { font-family: var(--font-mono); font-size: 13px; color: var(--muted); text-shadow: none; font-weight: 400; margin-left: 6px; }
 .gw-bar { position: relative; height: 12px; background: var(--bar-track); margin: 10px 0 6px; }
 .gw-bar span { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, var(--gold-dark), var(--gold)); box-shadow: 0 0 12px rgba(var(--gold-rgb), .65); }
@@ -590,7 +596,7 @@ nav a[aria-current="page"] { color: var(--accent); border-bottom-color: var(--ac
 .card h2, .kpi .label { font-family: var(--font-display); font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: var(--case-ui); color: var(--accent); }
 .kpi .label { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kpi::before { width: 3px; box-shadow: 0 0 12px var(--k, transparent); }
-.kpi .value, .loan-big { font-family: var(--font-display); font-weight: 700; letter-spacing: .02em; text-shadow: 0 0 12px rgba(var(--ink-rgb), calc(.18 * var(--glow))); }
+.kpi .value, .loan-big { font-family: var(--font-figure); font-weight: 700; letter-spacing: .02em; text-shadow: 0 0 12px rgba(var(--ink-rgb), calc(.18 * var(--glow))); }
 .kpi .value .pos, .loan-big.pos, .value .pos { text-shadow: 0 0 14px rgba(var(--pos-rgb), calc(.55 * var(--glow))); }
 td.amount.pos, .amount.pos, b.pos, .num.pos { text-shadow: 0 0 8px rgba(var(--pos-rgb), calc(.55 * var(--glow))); }
 td.amount.neg, .amount.neg, b.neg, .num.neg { text-shadow: 0 0 8px rgba(var(--neg-rgb), calc(.55 * var(--glow))); }
