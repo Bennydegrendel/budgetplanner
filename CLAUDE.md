@@ -83,7 +83,7 @@ Werk ze in volgorde af. Na elke stap: commit, korte uitleg, en wacht op Benny vo
 - [x] **Stap 5 – OneDrive-back-up via de OneDrive-map.** Desktop (Edge/Chrome): de gebruiker kiest één keer een map die de OneDrive-app synchroniseert (File System Access API, `showDirectoryPicker`; de map-toegang staat in IndexedDB onder sleutel `"dirHandle"`). De app schrijft daar dezelfde bestanden als v1.0: `budgetplanner-backup.json.gz`, `budgetplanner-backup-JJJJ-MM.json.gz` en `budgetplanner-mobiel.txt`, automatisch na een import, bij openen (max. 1×/dag) en bij wegklikken na een wijziging. Na een herstart kan de browser opnieuw toestemming vragen → melding "Hervatten". Gsm: ⟳ opent het kiesvenster, de gebruiker kiest `budgetplanner-mobiel.txt` uit OneDrive (of een volledige back-up); nieuwer → "⚡ Nieuwe update". *Waarom niet MSAL/Graph zoals eerst gepland:* een app registreren in Microsoft Entra lukt niet met een persoonlijk Microsoft-account zonder eigen tenant (fout AADSTS50020); daarvoor is een Azure-account met creditcard nodig. Kan later alsnog bovenop deze oplossing komen.
 - [ ] **Stap 6 – Thema's (licht/donker).** Op vraag van Benny vóór de layout.
   - [x] 6a – Opkuis: alle losse kleuren naar tokens (pixelvergelijking vóór/na: 0 verschillen).
-  - [ ] 6b – Licht/donker + themakiezer, voor de volledige app en de gsm-weergave.
+  - [x] 6b – Licht/donker + themakiezer, voor de volledige app en de gsm-weergave.
   - [ ] 6c – Animaties (kort en spaarzaam, respecteert "minder beweging").
 - [ ] **Stap 7 – Layout voor elk scherm.** Gsm-weergave verfijnen en de lege ruimte op brede schermen benutten (bv. breder raster of zijpaneel met "binnenkort te betalen", spaardoelen, resterend budget).
 
