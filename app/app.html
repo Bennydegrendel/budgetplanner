@@ -13,6 +13,11 @@
 <meta name="apple-mobile-web-app-title" content="Budget">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <script>
+  // Thema van dit toestel meteen zetten (anders flitst eerst het standaardthema)
+  (function () { let t = {}; try { t = JSON.parse(localStorage.getItem("budgetplanner.v1.theme") || "{}"); } catch (e) {}
+    const ok = ["cyberpunk", "synthwave", "matrix", "oceaan"];
+    document.documentElement.dataset.theme = ok.includes(t.t) ? t.t : "cyberpunk";
+    document.documentElement.dataset.mode = t.m === "light" ? "light" : "dark"; })();
   // Het manifest ("typeplaatje" voor installeren) alleen laden als de app via een webadres draait;
   // als los bestand (file://) geeft de browser er anders een foutmelding op.
   if (/^https?:$/.test(location.protocol)) { const l = document.createElement("link"); l.rel = "manifest"; l.href = "manifest.webmanifest"; document.head.appendChild(l); }
@@ -32,6 +37,8 @@
   --accent-rgb: 0, 229, 255; --magenta-rgb: 255, 43, 214; --pos-rgb: 0, 255, 163; --neg-rgb: 255, 42, 109;
   --gold-rgb: 255, 201, 52; --warn-rgb: 245, 232, 59; --muted-rgb: 154, 154, 154; --ink-rgb: 230, 241, 255;
   --amber-rgb: 255, 170, 0; --shade-rgb: 0, 0, 0;
+  --panel: #0a0a0a; --panel-rgb: 0, 0, 0;   /* menu, dialogen, bovenbalk, meldingen */
+  --scan: .35;                       /* sterkte van de scanlijnen */
   --on-accent: #000;                 /* tekst op een felle knop/badge */
   --gold-dark: #b8860b;              /* begin van het verloop in spaarbalken */
   --field: rgba(4, 4, 4, .9);        /* achtergrond van invulvelden */
@@ -59,6 +66,102 @@
   --notch-sm: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
   color-scheme: dark;
 }
+/* ================= THEMA'S =================
+   4 thema's × donker/licht. Elk thema vult dezelfde tokens in; de rest van de stijl blijft gelijk.
+   <html data-theme="…" data-mode="dark|light"> wordt gezet door het scriptje in <head> (keuze per toestel). */
+[data-theme="cyberpunk"][data-mode="dark"] {
+  --bg: #000000; --surface: #0b0b0b; --ink: #e6f1ff; --muted: #9a9a9a; --line: #262626;
+  --accent: #00e5ff; --magenta: #ff2bd6; --pos: #00ffa3; --neg: #ff2a6d; --gold: #ffc934; --warn: #f5e83b;
+  --accent-rgb: 0, 229, 255; --magenta-rgb: 255, 43, 214; --pos-rgb: 0, 255, 163; --neg-rgb: 255, 42, 109;
+  --gold-rgb: 255, 201, 52; --warn-rgb: 245, 232, 59; --muted-rgb: 154, 154, 154; --ink-rgb: 230, 241, 255; --amber-rgb: 255, 170, 0;
+  --bar: #00e5ff; --bar-track: #161616; --s1: #00e5ff; --s2: #ff2bd6; --s3: #f5e83b; --s4: #9d7bff;
+  --panel: #0a0a0a; --panel-rgb: 0, 0, 0; --scan: .35; --on-accent: #000; --gold-dark: #b8860b; --field: rgba(4, 4, 4, .9);
+  --head-top: rgba(14, 14, 14, .96); --head-bottom: rgba(6, 6, 6, .96); --grid-line: rgba(255, 255, 255, .025); --backdrop: rgba(15, 20, 27, .45); --menu-shadow: 0 8px 24px rgba(20, 32, 51, .12);
+  color-scheme: dark;
+}
+[data-theme="cyberpunk"][data-mode="light"] {
+  --bg: #ffffff; --surface: #f7f9fb; --ink: #0a0f1a; --muted: #5c6470; --line: #dfe3e8;
+  --accent: #0095b3; --magenta: #e0109b; --pos: #00a364; --neg: #e3124f; --gold: #c48a00; --warn: #857400;
+  --accent-rgb: 0, 149, 179; --magenta-rgb: 224, 16, 155; --pos-rgb: 0, 163, 100; --neg-rgb: 227, 18, 79;
+  --gold-rgb: 196, 138, 0; --warn-rgb: 133, 116, 0; --muted-rgb: 92, 100, 112; --ink-rgb: 10, 15, 26; --amber-rgb: 230, 140, 0;
+  --bar: #0095b3; --bar-track: #eceff3; --s1: #0095b3; --s2: #e0109b; --s3: #c9a700; --s4: #7a52ff;
+  --panel: #ffffff; --panel-rgb: 255, 255, 255; --scan: .07; --on-accent: #ffffff; --gold-dark: #8a6100; --field: #ffffff;
+  --head-top: rgba(255, 255, 255, .96); --head-bottom: rgba(248, 250, 252, .96); --grid-line: rgba(0, 0, 0, .035); --backdrop: rgba(20, 25, 35, .35); --menu-shadow: 0 8px 24px rgba(20, 32, 51, .15);
+  color-scheme: light;
+}
+[data-theme="synthwave"][data-mode="dark"] {
+  --bg: #13062b; --surface: #1b0b38; --ink: #f7ecff; --muted: #a993c9; --line: #3b2468;
+  --accent: #ff8a3d; --magenta: #ff3caa; --pos: #72f1b8; --neg: #fe4450; --gold: #fede5d; --warn: #f9d71c;
+  --accent-rgb: 255, 138, 61; --magenta-rgb: 255, 60, 170; --pos-rgb: 114, 241, 184; --neg-rgb: 254, 68, 80;
+  --gold-rgb: 254, 222, 93; --warn-rgb: 249, 215, 28; --muted-rgb: 169, 147, 201; --ink-rgb: 247, 236, 255; --amber-rgb: 255, 140, 60;
+  --bar: #ff8a3d; --bar-track: #2a1650; --s1: #ff8a3d; --s2: #ff3caa; --s3: #fede5d; --s4: #2de2e6;
+  --panel: #1a0a35; --panel-rgb: 19, 6, 43; --scan: .25; --on-accent: #13062b; --gold-dark: #c9952b; --field: rgba(19, 6, 43, .9);
+  --head-top: rgba(32, 12, 62, .96); --head-bottom: rgba(22, 8, 46, .96); --grid-line: rgba(255, 60, 170, .06); --backdrop: rgba(10, 2, 25, .6); --menu-shadow: 0 8px 24px rgba(0, 0, 0, .4);
+  color-scheme: dark;
+}
+[data-theme="synthwave"][data-mode="light"] {
+  --bg: #fff5fb; --surface: #ffffff; --ink: #2a0f45; --muted: #7d6696; --line: #f0d6ea;
+  --accent: #e8620c; --magenta: #d81b8c; --pos: #0e9a6a; --neg: #d7263d; --gold: #b8860b; --warn: #a37c00;
+  --accent-rgb: 232, 98, 12; --magenta-rgb: 216, 27, 140; --pos-rgb: 14, 154, 106; --neg-rgb: 215, 38, 61;
+  --gold-rgb: 184, 134, 11; --warn-rgb: 163, 124, 0; --muted-rgb: 125, 102, 150; --ink-rgb: 42, 15, 69; --amber-rgb: 232, 98, 12;
+  --bar: #e8620c; --bar-track: #f6e6f1; --s1: #e8620c; --s2: #d81b8c; --s3: #c99a00; --s4: #0ea5b5;
+  --panel: #ffffff; --panel-rgb: 255, 255, 255; --scan: .06; --on-accent: #ffffff; --gold-dark: #8a6100; --field: #ffffff;
+  --head-top: rgba(255, 255, 255, .96); --head-bottom: rgba(255, 245, 251, .96); --grid-line: rgba(216, 27, 140, .05); --backdrop: rgba(42, 15, 69, .35); --menu-shadow: 0 8px 24px rgba(42, 15, 69, .15);
+  color-scheme: light;
+}
+[data-theme="matrix"][data-mode="dark"] {
+  --bg: #000300; --surface: #020b02; --ink: #c6ffc6; --muted: #5e8c5e; --line: #0e2a0e;
+  --accent: #00ff41; --magenta: #39ff14; --pos: #00ff41; --neg: #ff3b3b; --gold: #d4ff00; --warn: #e6ff4d;
+  --accent-rgb: 0, 255, 65; --magenta-rgb: 57, 255, 20; --pos-rgb: 0, 255, 65; --neg-rgb: 255, 59, 59;
+  --gold-rgb: 212, 255, 0; --warn-rgb: 230, 255, 77; --muted-rgb: 94, 140, 94; --ink-rgb: 198, 255, 198; --amber-rgb: 200, 255, 0;
+  --bar: #00ff41; --bar-track: #061806; --s1: #00ff41; --s2: #9dff9d; --s3: #d4ff00; --s4: #00c8ff;
+  --panel: #010801; --panel-rgb: 0, 8, 0; --scan: .45; --on-accent: #000000; --gold-dark: #6b8000; --field: rgba(0, 8, 0, .9);
+  --head-top: rgba(2, 14, 2, .96); --head-bottom: rgba(0, 6, 0, .96); --grid-line: rgba(0, 255, 65, .04); --backdrop: rgba(0, 10, 0, .6); --menu-shadow: 0 8px 24px rgba(0, 0, 0, .5);
+  color-scheme: dark;
+}
+[data-theme="matrix"][data-mode="light"] {
+  --bg: #f3fbf3; --surface: #ffffff; --ink: #062b06; --muted: #4c7a4c; --line: #cfe6cf;
+  --accent: #00862b; --magenta: #00a336; --pos: #00862b; --neg: #c62828; --gold: #7a8c00; --warn: #8a7d00;
+  --accent-rgb: 0, 134, 43; --magenta-rgb: 0, 163, 54; --pos-rgb: 0, 134, 43; --neg-rgb: 198, 40, 40;
+  --gold-rgb: 122, 140, 0; --warn-rgb: 138, 125, 0; --muted-rgb: 76, 122, 76; --ink-rgb: 6, 43, 6; --amber-rgb: 122, 140, 0;
+  --bar: #00862b; --bar-track: #e4f2e4; --s1: #00a336; --s2: #5cb85c; --s3: #a0b400; --s4: #0b84a5;
+  --panel: #ffffff; --panel-rgb: 255, 255, 255; --scan: .05; --on-accent: #ffffff; --gold-dark: #4d5900; --field: #ffffff;
+  --head-top: rgba(255, 255, 255, .96); --head-bottom: rgba(243, 251, 243, .96); --grid-line: rgba(0, 134, 43, .05); --backdrop: rgba(6, 43, 6, .3); --menu-shadow: 0 8px 24px rgba(6, 43, 6, .15);
+  color-scheme: light;
+}
+[data-theme="oceaan"][data-mode="dark"] {
+  --bg: #03141f; --surface: #072233; --ink: #e2f3ff; --muted: #7fa2bb; --line: #12384f;
+  --accent: #2ed3c6; --magenta: #3b9dff; --pos: #4ade80; --neg: #ff6b81; --gold: #ffd166; --warn: #ffe066;
+  --accent-rgb: 46, 211, 198; --magenta-rgb: 59, 157, 255; --pos-rgb: 74, 222, 128; --neg-rgb: 255, 107, 129;
+  --gold-rgb: 255, 209, 102; --warn-rgb: 255, 224, 102; --muted-rgb: 127, 162, 187; --ink-rgb: 226, 243, 255; --amber-rgb: 255, 170, 80;
+  --bar: #2ed3c6; --bar-track: #0b2c40; --s1: #2ed3c6; --s2: #3b9dff; --s3: #ffd166; --s4: #b48cff;
+  --panel: #061d2c; --panel-rgb: 3, 20, 31; --scan: .15; --on-accent: #03141f; --gold-dark: #c99a2e; --field: rgba(3, 20, 31, .9);
+  --head-top: rgba(8, 36, 54, .96); --head-bottom: rgba(4, 24, 37, .96); --grid-line: rgba(46, 211, 198, .035); --backdrop: rgba(1, 10, 18, .6); --menu-shadow: 0 8px 24px rgba(0, 0, 0, .4);
+  color-scheme: dark;
+}
+[data-theme="oceaan"][data-mode="light"] {
+  --bg: #f2f8fc; --surface: #ffffff; --ink: #0a2540; --muted: #5a7892; --line: #d3e3ef;
+  --accent: #0c8f9a; --magenta: #1d6fe0; --pos: #15803d; --neg: #d92d4b; --gold: #b7791f; --warn: #9a6b00;
+  --accent-rgb: 12, 143, 154; --magenta-rgb: 29, 111, 224; --pos-rgb: 21, 128, 61; --neg-rgb: 217, 45, 75;
+  --gold-rgb: 183, 121, 31; --warn-rgb: 154, 107, 0; --muted-rgb: 90, 120, 146; --ink-rgb: 10, 37, 64; --amber-rgb: 183, 121, 31;
+  --bar: #0c8f9a; --bar-track: #e5eff6; --s1: #0c8f9a; --s2: #1d6fe0; --s3: #d39e00; --s4: #7c5cd6;
+  --panel: #ffffff; --panel-rgb: 255, 255, 255; --scan: .04; --on-accent: #ffffff; --gold-dark: #7a4f10; --field: #ffffff;
+  --head-top: rgba(255, 255, 255, .96); --head-bottom: rgba(242, 248, 252, .96); --grid-line: rgba(12, 143, 154, .05); --backdrop: rgba(10, 37, 64, .3); --menu-shadow: 0 8px 24px rgba(10, 37, 64, .15);
+  color-scheme: light;
+}
+.theme-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0 4px; }
+.theme-tile { all: unset; box-sizing: border-box; cursor: pointer; background: var(--bg); color: var(--ink); border: 1px solid var(--line); padding: 10px; clip-path: var(--notch-sm); display: grid; gap: 8px; }
+.theme-tile .tt-card { background: var(--surface); border: 1px solid var(--line); padding: 8px 10px; }
+.theme-tile .tt-name { font-family: var(--font-display); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+.theme-tile .tt-amt { font-family: var(--font-mono); font-size: 15px; color: var(--pos); }
+.theme-tile .tt-dots { display: flex; gap: 5px; } .theme-tile .tt-dots i { width: 14px; height: 6px; display: block; }
+.theme-tile[aria-pressed="true"] { outline: 2px solid var(--magenta); outline-offset: -2px; box-shadow: 0 0 14px rgba(var(--magenta-rgb), .45); }
+.theme-tile:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* afgeleide tokens opnieuw uitrekenen op elk element met een thema (ook de voorbeeldtegels in het themavenster) */
+[data-theme] { --accent-soft: rgba(var(--accent-rgb), .10); --pos-soft: rgba(var(--pos-rgb), .12); --neg-soft: rgba(var(--neg-rgb), .14); --warn-soft: rgba(var(--warn-rgb), .12);
+  --shadow: 0 0 0 1px rgba(var(--accent-rgb), .04), 0 0 28px rgba(var(--accent-rgb), .05); }
+/* lichte varianten: geen wazige gloed rond tekst (leest slecht op een lichte ondergrond) */
+[data-mode="light"] body, [data-mode="light"] body * { text-shadow: none !important; }
 * { box-sizing: border-box; }
 html, body { margin: 0; }
 body { background: var(--bg); color: var(--ink); font: 14px/1.5 var(--font-body); -webkit-font-smoothing: antialiased; }
@@ -393,7 +496,7 @@ body {
   background-attachment: fixed;
 }
 body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 60;
-  background: repeating-linear-gradient(to bottom, transparent 0 2px, rgba(var(--shade-rgb), .22) 2px 3px); opacity: .35; }
+  background: repeating-linear-gradient(to bottom, transparent 0 2px, rgba(var(--shade-rgb), .22) 2px 3px); opacity: var(--scan); }
 ::selection { background: var(--magenta); color: var(--on-accent); }
 .num, .amount, .amt, td.cell, .totals, .gauge-legend b, .facts b, .month span { font-family: var(--font-mono); letter-spacing: 0; }
 h1, h2, h3 { letter-spacing: .06em; text-transform: uppercase; }
@@ -401,7 +504,7 @@ h1, h2, h3 { letter-spacing: .06em; text-transform: uppercase; }
 .page-head h1::after { content: ""; display: block; width: 64px; height: 3px; margin-top: 8px; background: linear-gradient(90deg, var(--magenta), var(--accent)); box-shadow: 0 0 10px rgba(var(--magenta-rgb), .6); }
 .page-head p { font-size: 14.5px; }
 
-header { background: rgba(var(--shade-rgb), .9); backdrop-filter: blur(8px); border-bottom: 1px solid rgba(var(--accent-rgb), .35); box-shadow: 0 0 22px rgba(var(--accent-rgb), .12); }
+header { background: rgba(var(--panel-rgb), .9); backdrop-filter: blur(8px); border-bottom: 1px solid rgba(var(--accent-rgb), .35); box-shadow: 0 0 22px rgba(var(--accent-rgb), .12); }
 .brand { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .1em; font-size: 15px; text-shadow: 0 0 10px rgba(var(--accent-rgb), .5); }
 .brand-mark { background: var(--magenta); color: var(--on-accent); border-radius: 0; clip-path: var(--notch-sm); box-shadow: 0 0 12px var(--magenta); }
 nav a { text-transform: uppercase; letter-spacing: .06em; font-weight: 600; font-size: 13px; padding-left: 8px; padding-right: 8px; }
@@ -464,17 +567,17 @@ tbody tr:hover td { background: rgba(var(--accent-rgb), .05); }
 
 .notice { border-radius: 0; border-left: 3px solid currentColor; }
 .tooltip { background: rgba(var(--shade-rgb), .96); color: var(--ink); border: 1px solid var(--accent); border-radius: 0; box-shadow: 0 0 18px rgba(var(--accent-rgb), .35); font-family: var(--font-body); font-size: 13.5px; }
-.toast { background: rgba(var(--shade-rgb), .96); color: var(--accent); border: 1px solid var(--accent); border-radius: 0; box-shadow: 0 0 20px rgba(var(--accent-rgb), .4); text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
-.menu-list { background: #0a0a0a; border-color: var(--accent); border-radius: 0; box-shadow: 0 0 20px rgba(var(--accent-rgb), .25); }
+.toast { background: rgba(var(--panel-rgb), .96); color: var(--accent); border: 1px solid var(--accent); border-radius: 0; box-shadow: 0 0 20px rgba(var(--accent-rgb), .4); text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
+.menu-list { background: var(--panel); border-color: var(--accent); border-radius: 0; box-shadow: 0 0 20px rgba(var(--accent-rgb), .25); }
 .menu-list button { border-radius: 0; }
 .menu-list button:hover { background: rgba(var(--accent-rgb), .1); color: var(--accent); }
-dialog { background: #0a0a0a; border: 1px solid var(--accent); border-radius: 0; clip-path: var(--notch); box-shadow: 0 0 40px rgba(var(--accent-rgb), .25); }
+dialog { background: var(--panel); border: 1px solid var(--accent); border-radius: 0; clip-path: var(--notch); box-shadow: 0 0 40px rgba(var(--accent-rgb), .25); }
 dialog h3 { font-family: var(--font-display); color: var(--accent); }
 dialog::backdrop { background: rgba(var(--shade-rgb), .8); }
 dialog textarea { border-radius: 0; background: var(--bg); }
 .drop { border: 1px dashed var(--accent); }
 .drop.over { background: rgba(var(--accent-rgb), .08); }
-body.dragging::after { border-radius: 0; background: rgba(var(--shade-rgb), .9); color: var(--accent); font-family: var(--font-display); text-transform: uppercase; letter-spacing: .1em; text-shadow: 0 0 14px var(--accent); }
+body.dragging::after { border-radius: 0; background: rgba(var(--panel-rgb), .9); color: var(--accent); font-family: var(--font-display); text-transform: uppercase; letter-spacing: .1em; text-shadow: 0 0 14px var(--accent); }
 
 .heat td.cell.cur { box-shadow: inset 0 -2px 0 var(--magenta); }
 .foot { font-family: var(--font-mono); text-transform: uppercase; letter-spacing: .08em; font-size: 11px; }
@@ -505,6 +608,7 @@ a.hint, .legend a { color: var(--accent); }
           <button type="button" data-act="export-json" role="menuitem">Back-up exporteren<small>Alles in één .json-bestand</small></button>
           <button type="button" data-act="folder-open" role="menuitem">OneDrive-back-up<small>Automatisch een kopie + gsm-samenvatting in je OneDrive</small></button>
           <button type="button" data-act="import-json" role="menuitem">Back-up terugzetten<small>Laad een eerder geëxporteerd .json-bestand</small></button>
+          <button type="button" data-act="theme-open" role="menuitem">Thema<small>Cyberpunk, Synthwave, Matrix of Oceaan · donker of licht</small></button>
           <button type="button" data-act="install" role="menuitem" id="mi-install">App installeren<small>Als programma op je pc of gsm, werkt ook offline</small></button>
           <button type="button" data-act="pin-open" role="menuitem">Pincode<small>De planner afschermen met een code</small></button>
           <button type="button" data-act="export-csv" role="menuitem">Transacties naar Excel<small>.csv met puntkomma, opent in Excel</small></button>
@@ -716,6 +820,34 @@ a.hint, .legend a { color: var(--accent); }
       });
     return false;
   }
+  /* ---------- thema's ----------
+     De keuze hoort bij dit toestel (localStorage), niet bij de back-up: zo kan je gsm licht en je pc donker zijn. */
+  const THEMES = [["cyberpunk", "Cyberpunk"], ["synthwave", "Synthwave"], ["matrix", "Matrix"], ["oceaan", "Oceaan"]];
+  function getTheme() { const r = document.documentElement; return { t: r.dataset.theme || "cyberpunk", m: r.dataset.mode || "dark" }; }
+  function applyTheme(th) {
+    const r = document.documentElement; r.dataset.theme = th.t; r.dataset.mode = th.m;
+    try { localStorage.setItem(KEY + ".theme", JSON.stringify(th)); } catch (e) {}
+    syncThemeColor();
+  }
+  // statusbalk/titelbalk in de kleur van de achtergrond van het thema
+  function syncThemeColor() { const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() || "#000000"; }
+  function themeDialog() {
+    const draw = () => { const cur = getTheme();
+      return `<h3>Thema</h3><p class="muted" style="margin:4px 0 10px">Geldt voor dit toestel. Je gegevens veranderen niet.</p>
+        <div class="seg" role="group" aria-label="Donker of licht"><button type="button" data-tm="dark" aria-pressed="${cur.m === "dark"}">☾ Donker</button><button type="button" data-tm="light" aria-pressed="${cur.m === "light"}">☀ Licht</button></div>
+        <div class="theme-tiles">${THEMES.map(([id, name]) => `<button type="button" class="theme-tile" data-tt="${id}" data-theme="${id}" data-mode="${cur.m}" aria-pressed="${cur.t === id}"><span class="tt-name">${name}</span><span class="tt-card"><span class="muted" style="font-size:11px">Saldo</span><br><span class="tt-amt">€ 1.234</span></span><span class="tt-dots"><i style="background:var(--accent)"></i><i style="background:var(--magenta)"></i><i style="background:var(--gold)"></i><i style="background:var(--pos)"></i><i style="background:var(--neg)"></i></span></button>`).join("")}</div>
+        <div class="row"><button class="btn primary" data-close type="button">Klaar</button></div>`; };
+    dialog(`<div id="th-box">${draw()}</div>`, d => {
+      const box = d.querySelector("#th-box");
+      box.addEventListener("click", e => {
+        if (e.target.closest("[data-close]")) { d.close(); return; }
+        const tm = e.target.closest("[data-tm]"), tt = e.target.closest("[data-tt]"); if (!tm && !tt) return;
+        const cur = getTheme(); applyTheme({ t: tt ? tt.dataset.tt : cur.t, m: tm ? tm.dataset.tm : cur.m });
+        box.innerHTML = draw();
+      });
+    });
+  }
+
   /* ---------- installeren als app (PWA) ---------- */
   let installPrompt = null;   // de browser geeft dit als hij rechtstreeks kan installeren (Edge, Chrome, Android)
   const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true;
@@ -967,7 +1099,7 @@ a.hint, .legend a { color: var(--accent); }
     h += `<section class="card"><div class="card-head"><h2>Laatste transacties</h2></div><div class="soon-list">${d.tx.map(x => `<div class="row-i" style="grid-template-columns:48px 1fr auto"><span class="num dt muted" style="font-size:12px">${fmtDate(x.d).slice(0, 5)}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.s)}<br><span class="muted" style="font-size:11.5px">${esc(x.c)}</span></span><span class="num ${x.a >= 0 ? "pos" : "neg"}">${signed(x.a)}</span></div>`).join("")}</div></section>`;
     return h + liteFoot();
   }
-  function liteFoot() { return `<p class="foot">Alleen bekijken · wijzigen doe je op je pc${lite.data && lite.data.src === "bestand" ? "<br>Bijwerken: ⟳ en kies budgetplanner-mobiel.txt in OneDrive" : ""}<br><button class="btn small ghost" data-act="lite-full" type="button">Volledige planner openen</button>${isStandalone() ? "" : `<br><button class="btn small ghost" data-act="install" type="button">⤓ App installeren</button>`}</p>`; }
+  function liteFoot() { return `<p class="foot">Alleen bekijken · wijzigen doe je op je pc${lite.data && lite.data.src === "bestand" ? "<br>Bijwerken: ⟳ en kies budgetplanner-mobiel.txt in OneDrive" : ""}<br><button class="btn small ghost" data-act="lite-full" type="button">Volledige planner openen</button><br><button class="btn small ghost" data-act="theme-open" type="button">🎨 Thema</button>${isStandalone() ? "" : `<br><button class="btn small ghost" data-act="install" type="button">⤓ App installeren</button>`}</p>`; }
 
   /* ---------- pincode ---------- */
   async function sha(t) { const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join(""); }
@@ -2362,6 +2494,7 @@ a.hint, .legend a { color: var(--accent); }
       case "price-ok": state.ignoredPrice = state.ignoredPrice || []; state.ignoredPrice.push(el.dataset.key); save(); render(); break;
       case "pin-open": pinDialog(); break;
       case "install": installApp(); break;
+      case "theme-open": themeDialog(); break;
       case "folder-open": folderDialog(); break;
       case "folder-resume": folderBackup(true); break;
       case "export-csv": offerFile(`transacties-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(state), "text/csv"); break;
@@ -2593,6 +2726,7 @@ a.hint, .legend a { color: var(--accent); }
 
   $("#main").innerHTML = `<p class="muted" style="padding:40px 0;text-align:center">Gegevens laden…</p>`;
   loadState().then(st => { state = st; ui.month = state.transactions.length ? state.transactions[0].date.slice(0, 7) : todayYm();
+      syncThemeColor();
       const start = () => {
         updateInstallUi(); if (state.transactions.length) askPersist();
         if (liteMode()) { liteLoadCache(); liteFromLocal(); return; }
