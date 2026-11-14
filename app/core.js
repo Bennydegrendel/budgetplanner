@@ -354,6 +354,20 @@ function applyOwnTransfers(state) {
   }
   return set;
 }
+/* Stromen tussen eigen zichtrekeningen in een maand: [{from, to, total, count}] (stap 8c-2).
+   Telt de uitgaande kant; een inkomende enkel als de verzendende rekening die maand niet ingelezen is. */
+function transferFlows(state, ym) {
+  const tx = budgetTx(state).filter(t => t.date.startsWith(ym)), seen = new Set(tx.map(t => normIban(t.account))), m = new Map();
+  for (const t of tx) {
+    const o = ownTransfer(state, t); if (!o) continue;
+    let from, to;
+    if (t.amount < 0) { from = accKey(state, t.account); to = o; }
+    else { if (seen.has(normIban(o))) continue; from = o; to = accKey(state, t.account); }
+    const k = from + ">" + to, x = m.get(k) || { from, to, total: 0, count: 0 };
+    x.total += Math.abs(t.amount); x.count++; m.set(k, x);
+  }
+  return [...m.values()].map(x => Object.assign(x, { total: Math.round(x.total * 100) / 100 })).sort((a, b) => b.total - a.total);
+}
 /* Eigen overboekingen met een categorie die geen overboeking is (tellen dan dubbel). */
 function ownConflicts(state) { return budgetTx(state).filter(t => ownTransfer(state, t) && t.cat !== UNCAT && typeOf(state, t.cat) !== "Overboeking" && !(t.splits && t.splits.length)); }
 
@@ -690,7 +704,8 @@ function stepDate(start, repeat, n) {
 }
 function planOccurrences(plan, from, to) {
   const out = []; if (!plan.date) return out;
-  if (!plan.repeat || plan.repeat === "none") { if (plan.date >= from && plan.date <= to) out.push(plan.date); return out; }
+  // onbekende herhaling (bv. uit een vreemde back-up) telt als eenmalig, anders zou ze elke dag terugkomen
+  if (!plan.repeat || plan.repeat === "none" || !(plan.repeat in REPEATS)) { if (plan.date >= from && plan.date <= to) out.push(plan.date); return out; }
   for (let n = 0; n < 2000; n++) {
     const d = stepDate(plan.date, plan.repeat, n);
     if (plan.until && d > plan.until) break;
@@ -741,7 +756,7 @@ function detectRecurring(state) {
     if (ageDays > med * 2 + tol) continue;          // gestopt
     const amts = byDate.slice(-3).map(t => Math.abs(t.amount)).sort((a, b) => a - b);
     let next = stepDate(last.date, repeat, 1); let n = 1; while (next < today && n < 24) next = stepDate(last.date, repeat, ++n);
-    out.push({ key, match: k, title: last.desc.replace(/\s*\(.*$/, "").replace(/\s*·.*$/, "").replace(/^Domicili[eë]ring\s+/i, ""), cat: last.cat, kind: last.amount < 0 ? "uitgave" : "inkomst", amount: Math.round(amts[1] * 100) / 100, repeat, last: last.date, next, count: byDate.length, varies: amts[2] - amts[0] > Math.max(2, amts[1] * 0.1) });
+    out.push({ key, match: k, account: last.account, title: last.desc.replace(/\s*\(.*$/, "").replace(/\s*·.*$/, "").replace(/^Domicili[eë]ring\s+/i, ""), cat: last.cat, kind: last.amount < 0 ? "uitgave" : "inkomst", amount: Math.round(amts[1] * 100) / 100, repeat, last: last.date, next, count: byDate.length, varies: amts[2] - amts[0] > Math.max(2, amts[1] * 0.1) });
   }
   return out.sort((a, b) => a.next.localeCompare(b.next));
 }
@@ -750,7 +765,7 @@ function agenda(state, from, to, withDetected) {
   const items = [];
   for (const p of (state.plans || [])) for (const d of planOccurrences(p, from, to)) items.push({ date: d, plan: p, ...occStatus(state, p, d) });
   if (withDetected) for (const r of detectRecurring(state)) {
-    const pseudo = { id: "auto:" + r.key, title: r.title, amount: r.amount, kind: r.kind, repeat: r.repeat, date: r.next, match: r.match, cat: r.cat, auto: true };
+    const pseudo = { id: "auto:" + r.key, title: r.title, amount: r.amount, kind: r.kind, repeat: r.repeat, date: r.next, match: r.match, cat: r.cat, account: r.account, auto: true };
     for (const d of planOccurrences(pseudo, from, to)) items.push({ date: d, plan: pseudo, detected: r, paid: false });
   }
   return items.sort((a, b) => a.date.localeCompare(b.date) || (a.plan.title || "").localeCompare(b.plan.title || ""));
@@ -844,4 +859,4 @@ function toCsv(state) {
   return "﻿" + lines.join("\r\n");
 }
 
-if (typeof module !== "undefined") module.exports = { OWN_CAT, ownTransfer, applyOwnTransfers, ownConflicts, MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
+if (typeof module !== "undefined") module.exports = { transferFlows, OWN_CAT, ownTransfer, applyOwnTransfers, ownConflicts, MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
