@@ -4,7 +4,7 @@
      Zo krijgt iedereen updates meteen, en werkt het offline toch.
    - Lettertypes van Google: één keer ophalen en daarna uit de bewaarde kopie.
    Je gegevens zitten NIET hierin: die staan in IndexedDB en worden nooit door dit script verstuurd. */
-const CACHE = "budgetplanner-app-v1";
+const CACHE = "budgetplanner-app-v2";
 const FONTS = "budgetplanner-fonts-v1";
 const CORE = ["./", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/favicon-32.png", "./icons/apple-touch-icon.png"];
 
@@ -22,7 +22,10 @@ self.addEventListener("activate", e => {
 async function networkFirst(req) {
   const cache = await caches.open(CACHE);
   try {
-    const res = await Promise.race([fetch(req), new Promise((_, rej) => setTimeout(() => rej(new Error("traag")), 4000))]);
+    // cache: "no-cache" = altijd bij de server navragen of er een nieuwere versie is (GitHub laat de browser
+    // anders tot 10 minuten een oude kopie gebruiken). Is er niets veranderd, dan komt er niets opnieuw binnen.
+    const fresh = req.mode === "navigate" ? fetch(req.url, { cache: "no-cache", credentials: "same-origin" }) : fetch(req, { cache: "no-cache" });
+    const res = await Promise.race([fresh, new Promise((_, rej) => setTimeout(() => rej(new Error("traag")), 4000))]);
     if (res && res.ok) cache.put(req.mode === "navigate" ? "./" : req, res.clone());
     return res;
   } catch (err) {
