@@ -276,6 +276,46 @@ function suggestRules(state) {
   return out.sort((a, b) => rank[a.source] - rank[b.source] || b.count - a.count);
 }
 
+/* Controleert een back-up (geparste JSON) vóór hij teruggezet wordt. Verandert niets.
+   Geeft { ok, error, warnings[], summary{...} }. Werkt voor back-ups uit de claude.ai-versie (v1.0) en uit de app. */
+function checkBackup(data) {
+  const fail = error => ({ ok: false, error, warnings: [], summary: null });
+  if (!data || typeof data !== "object" || Array.isArray(data)) return fail("Dit bestand bevat geen back-up van de Budgetplanner.");
+  if (data.k && data.goals && data.tx && !data.transactions) return fail("Dit is de gsm-samenvatting (budgetplanner-mobiel), geen volledige back-up. Kies het bestand budgetplanner-backup….json.");
+  if (!Array.isArray(data.transactions) || !Array.isArray(data.categories)) return fail("Dit bestand bevat geen back-up van de Budgetplanner: transacties of categorieën ontbreken.");
+  const warnings = [];
+  const okTx = data.transactions.filter(t => t && /^\d{4}-\d{2}-\d{2}$/.test(t.date || "") && typeof t.amount === "number" && isFinite(t.amount));
+  const bad = data.transactions.length - okTx.length;
+  if (bad && bad > data.transactions.length * 0.05) return fail(`${bad} van de ${data.transactions.length} transacties zijn onleesbaar (geen geldige datum of bedrag). Het bestand is waarschijnlijk beschadigd.`);
+  if (bad) warnings.push(`${bad} onleesbare transactie${bad === 1 ? "" : "s"} word${bad === 1 ? "t" : "en"} overgeslagen.`);
+  const cats = new Set(data.categories.map(c => c && c.name).filter(Boolean));
+  const unknownCats = [...new Set(okTx.map(t => t.cat).filter(c => c && c !== UNCAT && c !== SAV_CAT && !cats.has(c)))];
+  if (unknownCats.length) warnings.push(`${unknownCats.length} categorie${unknownCats.length === 1 ? "" : "ën"} in transacties sta${unknownCats.length === 1 ? "at" : "an"} niet in de lijst (${unknownCats.slice(0, 3).join(", ")}${unknownCats.length > 3 ? "…" : ""}).`);
+  const dates = okTx.map(t => t.date).sort();
+  const accs = Object.values(data.accounts || {});
+  const len = k => Array.isArray(data[k]) ? data[k].length : 0;
+  const summary = {
+    exportedAt: data.exportedAt || null,
+    from: dates[0] || null, to: dates[dates.length - 1] || null,
+    transactions: okTx.length, skipped: bad,
+    uncat: okTx.filter(t => t.cat === UNCAT).length,
+    categories: data.categories.length, rules: len("rules"), splitRules: len("splitRules"),
+    goals: len("goals"), loans: len("loans"), credits: len("credits"), plans: len("plans"),
+    accounts: accs.length, savingsAccounts: accs.filter(a => a && a.type === "spaar").length,
+    pin: !!(data.pin && data.pin.hash),
+    fromClaude: !!data.cloud,
+  };
+  return { ok: true, error: null, warnings, summary };
+}
+/* Maakt een back-up klaar om terug te zetten: onleesbare transacties eruit, oude claude.ai-instellingen weg. */
+function cleanBackup(data) {
+  const st = JSON.parse(JSON.stringify(data));
+  st.transactions = st.transactions.filter(t => t && /^\d{4}-\d{2}-\d{2}$/.test(t.date || "") && typeof t.amount === "number" && isFinite(t.amount));
+  delete st.cloud;        // OneDrive via de Claude-koppeling bestaat niet in de app
+  delete st.exportedAt;
+  return st;
+}
+
 function typeOf(state, cat) {
   const c = state.categories.find(x => x.name === cat);
   return c ? c.type : "Onbekend";
@@ -763,4 +803,4 @@ function toCsv(state) {
   return "﻿" + lines.join("\r\n");
 }
 
-if (typeof module !== "undefined") module.exports = { suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
+if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };

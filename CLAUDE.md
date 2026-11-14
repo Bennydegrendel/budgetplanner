@@ -28,6 +28,7 @@ Doel van de standalone app: **overal installeerbaar bij iedereen** (Windows, Mac
 - **Opslag:** IndexedDB, database `"budgetplanner"`, store `"kv"`, sleutel `"state"` (JSON-string), met localStorage als terugval (sleutel `budgetplanner.v1`). In de PWA blijft dit zo; de gegevens horen bij het webadres (origin) van de app.
 - **PWA (stap 3):** `app/manifest.webmanifest` (naam, iconen, kleuren), `app/sw.js` (service worker: app *network-first* met bewaarde kopie voor offline, Google Fonts *cache-first*; bewaart nooit gegevens), iconen in `app/icons/` (opnieuw maken: `node tools/iconen.js`). Manifest en service worker worden alleen geladen via http(s), niet als los bestand. Knop/menu-item **App installeren** + `navigator.storage.persist()` na de eerste gegevens.
 - Back-up exporteren/importeren = één `.json`-bestand met de volledige `state`. Hiermee zet Benny zijn gegevens over van de claude.ai-versie naar de app (stap 4).
+  Terugzetten (stap 4): `checkBackup(data)` in `core.js` controleert en vat samen (periode, aantallen, waarschuwingen; herkent de gsm-samenvatting en kapotte bestanden), `cleanBackup(data)` haalt onleesbare transacties en de oude `cloud`-instellingen eruit, daarna `hydrate()`. Ook `.json.gz` werkt.
 
 ### Stijl (cyberpunk – behouden)
 Zwarte achtergrond. Tokens: `--accent #00e5ff`, `--magenta #ff2bd6`, `--gold #ffc934` (sparen/saldo), `--pos #00ffa3`, `--neg #ff2a6d`. Fonts: Orbitron (titels), Rajdhani (tekst), Share Tech Mono (bedragen). Afgeschuinde hoeken via `clip-path`. Logo: roze € in een afgeschuind blokje.

@@ -744,19 +744,54 @@ a.hint, .legend a { color: var(--accent); }
     if (ok) toast("Back-up opgeslagen");
   }
   async function importJson(file) {
+    let data;
     try {
       let buf = await file.arrayBuffer();
       const u8 = new Uint8Array(buf);
       if (u8[0] === 0x1f && u8[1] === 0x8b) buf = await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer();
-      const data = JSON.parse(decodeBytes(buf));
-      if (!data || !Array.isArray(data.transactions) || !Array.isArray(data.categories)) throw new Error("x");
-      confirmDlg("Back-up terugzetten?", `Dit vervangt je huidige gegevens door de back-up met ${data.transactions.length} transacties.`, "Terugzetten", () => {
-        state = Object.assign(newState(), data); delete state.exportedAt; save();
-        ui.month = state.transactions.length ? state.transactions[0].date.slice(0, 7) : todayYm();
-        render(); askPersist(); toast("Back-up teruggezet");
+      const txt = decodeBytes(buf), a = txt.indexOf("{"), b = txt.lastIndexOf("}");
+      data = JSON.parse(a >= 0 ? txt.slice(a, b + 1) : txt);
+    } catch (e) { data = null; }
+    const chk = checkBackup(data);
+    if (!chk.ok) { dialog(`<h3>Back-up niet teruggezet</h3><p>${esc(chk.error || "Dit bestand kon niet gelezen worden.")}</p><p class="muted" style="font-size:12.5px">Bestand: ${esc(file.name)}. Er is niets veranderd aan je gegevens.</p><div class="row"><button class="btn primary" data-close type="button">OK</button></div>`); return; }
+    const m = chk.summary, n = (x, een, meer) => `${x} ${x === 1 ? een : meer}`;
+    const rows = [
+      ["Periode", m.from ? `${fmtDate(m.from)} tot ${fmtDate(m.to)}` : "geen transacties"],
+      ["Transacties", `${m.transactions}${m.uncat ? ` <span class="muted">(${m.uncat} te categoriseren)</span>` : ""}`],
+      ["Categorieën", m.categories],
+      ["Regels", `${m.rules}${m.splitRules ? ` <span class="muted">+ ${n(m.splitRules, "splitsregel", "splitsregels")}</span>` : ""}`],
+      ["Spaardoelen", m.goals],
+      ["Leningen & kredieten", m.loans + m.credits],
+      ["Planner", n(m.plans, "item", "items")],
+      ["Rekeningen", `${m.accounts}${m.savingsAccounts ? ` <span class="muted">(waarvan ${m.savingsAccounts} spaar)</span>` : ""}`],
+    ];
+    const notes = [...chk.warnings];
+    if (m.pin) notes.push("De back-up heeft een pincode. Die blijft gelden: je hebt hem nodig als je de app opnieuw opent.");
+    if (m.fromClaude) notes.push("De OneDrive-instellingen van de claude.ai-versie worden niet overgenomen; die werken hier niet.");
+    const cur = state.transactions.length;
+    dialog(`<h3>Back-up terugzetten?</h3>
+      <p>${m.exportedAt ? `Back-up van <b>${esc(new Date(m.exportedAt).toLocaleString("nl-BE", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }))}</b>` : "Back-up"}${m.fromClaude ? " uit de claude.ai-versie" : ""}. Dit zit erin:</p>
+      <table style="font-size:13.5px;margin:6px 0 10px"><tbody>${rows.map(([k, v]) => `<tr><td class="muted" style="padding:3px 14px 3px 0">${k}</td><td class="num" style="padding:3px 0"><b>${v}</b></td></tr>`).join("")}</tbody></table>
+      ${notes.length ? `<div class="notice info" style="flex-direction:column;align-items:stretch;gap:4px;margin:0 0 8px">${notes.map(x => `<span>• ${esc(x)}</span>`).join("")}</div>` : ""}
+      ${cur ? `<div class="notice warn" style="margin:0"><span>Je huidige gegevens in deze app (<b>${cur}</b> transacties) worden <b>vervangen</b>. Exporteer ze eerst als je ze wil bewaren.</span><button class="btn small" id="bk-save" type="button">Eerst exporteren</button></div>` : ""}
+      <div class="row"><button class="btn" data-close type="button">Annuleren</button><button class="btn primary" id="bk-ok" type="button">Terugzetten</button></div>`, d => {
+      const sv = d.querySelector("#bk-save"); if (sv) sv.addEventListener("click", () => exportJson());
+      d.querySelector("#bk-ok").addEventListener("click", () => {
+        d.close();
+        state = hydrate(cleanBackup(data)); ui.ruleSug = null; ui.txAll = false; ui.txCat = ""; ui.txSearch = "";
+        ui.month = state.transactions.length ? state.transactions[0].date.slice(0, 7) : todayYm(); ui.year = +ui.month.slice(0, 4);
+        if (state.pin && state.pin.hash) setUnlocked();
+        save(); askPersist();
+        if (liteMode()) { liteRefresh(false); return; }
+        if (location.hash !== "#overzicht") location.hash = "overzicht";
+        render(); window.scrollTo(0, 0);
+        dialog(`<h3>Back-up teruggezet</h3><p><b>${m.transactions}</b> transacties, <b>${m.categories}</b> categorieën, <b>${m.rules}</b> regels en <b>${m.goals}</b> spaardoelen staan nu in de app.</p>
+          <p class="muted" style="font-size:12.5px">Tip: maak af en toe een nieuwe back-up via Back-up → Back-up exporteren.</p>
+          <div class="row"><button class="btn primary" data-close type="button">Naar mijn overzicht</button></div>`);
       });
-    } catch (e) { toast("Dit is geen geldige back-up van de budgetplanner."); }
+    });
   }
+
 
   /* ---------- mobiele samenvatting ---------- */
   function buildSummary() {
@@ -811,7 +846,7 @@ a.hint, .legend a { color: var(--accent); }
     let h = `<div class="lite-head"><div><h1>Overzicht</h1><p class="muted">${d ? `Bijgewerkt ${esc(ago(d.at))}` : "Nog geen gegevens"}</p></div><div class="lite-btns"><button class="btn lite-eye" data-act="lite-eye" type="button" aria-pressed="${liteHidden() ? "false" : "true"}" aria-label="${liteHidden() ? "Bedragen tonen" : "Bedragen verbergen"}">${liteHidden() ? EYE_OFF : EYE_ON}</button><button class="btn${lite.busy ? "" : " primary"}" data-act="lite-refresh" type="button" ${lite.busy ? "disabled" : ""}>${lite.busy ? "…" : "⟳"}</button></div></div>`;
     if (lite.news) h += `<div class="lite-news" data-act="lite-news-ok">⚡ <b>Nieuwe update</b> van je planner · ${esc(new Date(lite.news.at).toLocaleString("nl-BE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }))}${lite.news.newTx ? ` · ${lite.news.newTx} nieuwe transactie${lite.news.newTx === 1 ? "" : "s"}` : ""}<span>✕</span></div>`;
     if (lite.status) h += `<div class="notice ${/lukte|niet|Open/.test(lite.status) ? "warn" : "info"}"><span>${esc(lite.status)}</span></div>`;
-    if (!d) return h + `<section class="card"><p>Er staan nog geen gegevens op dit toestel.</p><p class="muted">Open hieronder de volledige planner en zet een back-up terug of importeer een CSV van je bank.</p></section>` + liteFoot();
+    if (!d) return h + `<section class="card"><p>Er staan nog geen gegevens op dit toestel.</p><p class="muted">Zet een back-up terug (bv. uit de claude.ai-versie of van je pc), of open de volledige planner om een CSV van je bank te importeren.</p><button class="btn primary" data-act="import-json" type="button">Back-up terugzetten</button></section>` + liteFoot();
     const k = d.k, kp = (l, v, c, cls) => `<div class="kpi" style="--k:${c}"><div class="label">${l}</div><div class="value num"><span class="${cls}">${v}</span></div></div>`;
     h += `<div class="lite-kpis">${kp("Inkomsten", eur0(k.inc), "var(--pos)", "pos")}${kp("Uitgaven", eur0(k.exp), "var(--neg)", "neg")}${kp("Gespaard", eurS(k.saved), "var(--gold)", "gold")}${kp("Netto", (k.net >= 0 ? "+" : "−") + eur0(Math.abs(k.net)), k.net >= 0 ? "var(--pos)" : "var(--neg)", k.net >= 0 ? "pos" : "neg")}</div>`;
     h += `<section class="card lite-bal"><div class="label">Saldo op rekening</div><div class="gw-amt num ${k.bal !== null && k.bal < 0 ? "neg" : ""}">${k.bal === null ? "—" : eur(k.bal)}</div>${k.uncat ? `<span class="chip warn">${k.uncat} te categoriseren</span>` : ""}</section>`;
@@ -876,7 +911,7 @@ a.hint, .legend a { color: var(--accent); }
       <h2>Begin met je bankafschrift</h2>
       <p>Download je transacties als CSV in Home'Bank of de ING-app en sleep het bestand hierheen. Bekende winkels en je loon worden meteen gecategoriseerd. Bestanden die overlappen, geven geen dubbels.</p>
       <button class="btn primary" data-act="pick-csv" type="button">CSV-bestand kiezen</button>
-      <p class="muted" style="margin:14px auto 0;font-size:12.5px">Heb je al een back-up? <button class="btn small ghost" data-act="import-json" type="button">Back-up terugzetten</button></p>
+      <p class="muted" style="margin:14px auto 0;font-size:12.5px">Gebruikte je de Budgetplanner al op claude.ai, of heb je een back-up? Exporteer daar via <b>Back-up → Back-up exporteren</b> en zet het bestand hier terug: <button class="btn small ghost" data-act="import-json" type="button">Back-up terugzetten</button></p>
     </section>`;
   }
 
