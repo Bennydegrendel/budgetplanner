@@ -56,6 +56,11 @@ Daarnaast hangt v1.0 af van `window.claude` (alleen beschikbaar binnen claude.ai
 
 Wie Claude wil gebruiken, gebruikt de versie op claude.ai. Geen API-sleutel-optie inbouwen tenzij Benny erom vraagt.
 
+## Afwijkingen in de standalone app (op vraag van Benny)
+
+- **Blanco start:** een nieuwe gebruiker krijgt geen standaardcategorieën, -regels of -spaardoelen (`DEFAULT_*` in `core.js` zijn leeg).
+- **Regels → "Transacties analyseren":** `suggestRules(state)` in `core.js` stelt regels voor (uit eigen keuzes, een lijst bekende Belgische bedrijven `RULE_HINTS`, en terugkerende onbekende tegenpartijen). Niets wordt toegepast tot de gebruiker aanvinkt en goedkeurt; ontbrekende categorieën worden pas dan aangemaakt.
+
 ## Stappenplan standalone app
 
 Werk ze in volgorde af. Na elke stap: commit, korte uitleg, en wacht op Benny voor de volgende.

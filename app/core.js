@@ -1,38 +1,9 @@
 /* ---------- Kernlogica: CSV-import, categoriseren, berekeningen ---------- */
-const DEFAULT_CATEGORIES = [
-  { name: "Loon", type: "Inkomen", budget: null },
-  { name: "Andere inkomsten", type: "Inkomen", budget: null },
-  { name: "Huur", type: "Vaste kosten", budget: null },
-  { name: "Lening / krediet", type: "Vaste kosten", budget: null },
-  { name: "Energie & water", type: "Vaste kosten", budget: null },
-  { name: "Internet & gsm", type: "Vaste kosten", budget: null },
-  { name: "Verzekeringen", type: "Vaste kosten", budget: null },
-  { name: "Abonnementen", type: "Vaste kosten", budget: null },
-  { name: "Bankkosten", type: "Vaste kosten", budget: null },
-  { name: "Boodschappen", type: "Variabele kosten", budget: null },
-  { name: "Vervoer", type: "Variabele kosten", budget: null },
-  { name: "Lunch & uit eten", type: "Variabele kosten", budget: null },
-  { name: "Vrije tijd & hobby", type: "Variabele kosten", budget: null },
-  { name: "Kleding", type: "Variabele kosten", budget: null },
-  { name: "Gezondheid", type: "Variabele kosten", budget: null },
-  { name: "Cadeaus & giften", type: "Variabele kosten", budget: null },
-  { name: "Diversen", type: "Variabele kosten", budget: null },
-  { name: "Noodfonds", type: "Sparen", budget: null },
-  { name: "Vakantie", type: "Sparen", budget: null },
-  { name: "Opname krediet", type: "Overboeking", budget: null },
-];
-const DEFAULT_RULES = [
-  ["SalaryPayment", "Loon"], ["Kostenafrekening", "Bankkosten"],
-  ["NMBS", "Vervoer"], ["DE LIJN", "Vervoer"],
-  ["DELHAIZE", "Boodschappen"], ["COLRUYT", "Boodschappen"], ["ALDI", "Boodschappen"],
-  ["LIDL", "Boodschappen"], ["CARREFOUR", "Boodschappen"], ["ALBERT HEIJN", "Boodschappen"],
-  ["Prime Video", "Abonnementen"],
-  ["NETFLIX", "Abonnementen"], ["SPOTIFY", "Abonnementen"], ["DISNEY", "Abonnementen"],
-].map(([keyword, cat]) => ({ keyword, cat }));
-const DEFAULT_GOALS = [
-  { name: "Noodfonds", target: null, start: 0, deadline: "" },
-  { name: "Vakantie", target: null, start: 0, deadline: "" },
-];
+/* Een nieuwe gebruiker begint blanco: geen categorieën, regels of spaardoelen.
+   Regels stelt de planner voor met "Transacties analyseren" (zie suggestRules). */
+const DEFAULT_CATEGORIES = [];
+const DEFAULT_RULES = [];
+const DEFAULT_GOALS = [];
 const UNCAT = "Te categoriseren";
 const TYPES = ["Inkomen", "Vaste kosten", "Variabele kosten", "Sparen", "Overboeking"];
 const BUDGET_TYPES = ["Inkomen", "Vaste kosten", "Variabele kosten", "Sparen"];
@@ -227,6 +198,82 @@ function uncatGroups(state, ym) {
     const x = g.get(k); x.count++; x.total = Math.round((x.total + amt) * 100) / 100; x.ids.push(t.id);
   }
   return [...g.values()].sort((a, b) => b.count - a.count || Math.abs(b.total) - Math.abs(a.total));
+}
+
+/* Kennis van bekende Belgische bedrijven: [trefwoord, categorie, type].
+   Wordt alleen gebruikt om regels VOOR TE STELLEN; de gebruiker keurt ze goed. */
+const RULE_HINTS = [
+  ["SalaryPayment", "Loon", "Inkomen"], ["Groeipakket", "Andere inkomsten", "Inkomen"], ["Kinderbijslag", "Andere inkomsten", "Inkomen"],
+  ["Kostenafrekening", "Bankkosten", "Vaste kosten"],
+  ["Cofidis", "Lening / krediet", "Vaste kosten"], ["Buy Way", "Lening / krediet", "Vaste kosten"], ["Alpha Credit", "Lening / krediet", "Vaste kosten"],
+  ["Proximus", "Internet & gsm", "Vaste kosten"], ["Telenet", "Internet & gsm", "Vaste kosten"], ["Orange Belgium", "Internet & gsm", "Vaste kosten"], ["Mobile Vikings", "Internet & gsm", "Vaste kosten"], ["Scarlet", "Internet & gsm", "Vaste kosten"], ["VOO ", "Internet & gsm", "Vaste kosten"],
+  ["Engie", "Energie & water", "Vaste kosten"], ["Luminus", "Energie & water", "Vaste kosten"], ["Eneco", "Energie & water", "Vaste kosten"], ["Fluvius", "Energie & water", "Vaste kosten"], ["Farys", "Energie & water", "Vaste kosten"], ["Watergroep", "Energie & water", "Vaste kosten"], ["Pidpa", "Energie & water", "Vaste kosten"], ["Water-link", "Energie & water", "Vaste kosten"],
+  ["AG Insurance", "Verzekeringen", "Vaste kosten"], ["Ethias", "Verzekeringen", "Vaste kosten"], ["Baloise", "Verzekeringen", "Vaste kosten"], ["Allianz", "Verzekeringen", "Vaste kosten"], ["Vivium", "Verzekeringen", "Vaste kosten"], ["DVV ", "Verzekeringen", "Vaste kosten"], ["Mutualiteit", "Verzekeringen", "Vaste kosten"], ["Helan", "Verzekeringen", "Vaste kosten"], ["Solidaris", "Verzekeringen", "Vaste kosten"], ["Partenamut", "Verzekeringen", "Vaste kosten"],
+  ["Netflix", "Abonnementen", "Vaste kosten"], ["Spotify", "Abonnementen", "Vaste kosten"], ["Disney", "Abonnementen", "Vaste kosten"], ["Prime Video", "Abonnementen", "Vaste kosten"], ["Streamz", "Abonnementen", "Vaste kosten"], ["Apple.com", "Abonnementen", "Vaste kosten"], ["YouTube", "Abonnementen", "Vaste kosten"],
+  ["Delhaize", "Boodschappen", "Variabele kosten"], ["Colruyt", "Boodschappen", "Variabele kosten"], ["Aldi", "Boodschappen", "Variabele kosten"], ["Lidl", "Boodschappen", "Variabele kosten"], ["Carrefour", "Boodschappen", "Variabele kosten"], ["Albert Heijn", "Boodschappen", "Variabele kosten"], ["Jumbo", "Boodschappen", "Variabele kosten"], ["Intermarch", "Boodschappen", "Variabele kosten"], ["Okay ", "Boodschappen", "Variabele kosten"], ["Bio-Planet", "Boodschappen", "Variabele kosten"], ["Kruidvat", "Boodschappen", "Variabele kosten"],
+  ["NMBS", "Vervoer", "Variabele kosten"], ["SNCB", "Vervoer", "Variabele kosten"], ["De Lijn", "Vervoer", "Variabele kosten"], ["STIB", "Vervoer", "Variabele kosten"], ["Shell", "Vervoer", "Variabele kosten"], ["TotalEnergies", "Vervoer", "Variabele kosten"], ["Esso", "Vervoer", "Variabele kosten"], ["Lukoil", "Vervoer", "Variabele kosten"], ["Texaco", "Vervoer", "Variabele kosten"], ["DATS 24", "Vervoer", "Variabele kosten"], ["Interparking", "Vervoer", "Variabele kosten"], ["Q-Park", "Vervoer", "Variabele kosten"],
+  ["McDonald", "Lunch & uit eten", "Variabele kosten"], ["Burger King", "Lunch & uit eten", "Variabele kosten"], ["Starbucks", "Lunch & uit eten", "Variabele kosten"], ["Exki", "Lunch & uit eten", "Variabele kosten"], ["Panos", "Lunch & uit eten", "Variabele kosten"], ["Domino", "Lunch & uit eten", "Variabele kosten"], ["Deliveroo", "Lunch & uit eten", "Variabele kosten"], ["Takeaway", "Lunch & uit eten", "Variabele kosten"], ["Frituur", "Lunch & uit eten", "Variabele kosten"],
+  ["Zara", "Kleding", "Variabele kosten"], ["H&M", "Kleding", "Variabele kosten"], ["Primark", "Kleding", "Variabele kosten"], ["C&A", "Kleding", "Variabele kosten"], ["JBC", "Kleding", "Variabele kosten"], ["Zalando", "Kleding", "Variabele kosten"], ["Zeeman", "Kleding", "Variabele kosten"],
+  ["Apotheek", "Gezondheid", "Variabele kosten"], ["Pharmacie", "Gezondheid", "Variabele kosten"], ["Multipharma", "Gezondheid", "Variabele kosten"], ["Tandarts", "Gezondheid", "Variabele kosten"],
+  ["Decathlon", "Vrije tijd & hobby", "Variabele kosten"], ["Kinepolis", "Vrije tijd & hobby", "Variabele kosten"], ["Fnac", "Vrije tijd & hobby", "Variabele kosten"], ["MediaMarkt", "Vrije tijd & hobby", "Variabele kosten"], ["Coolblue", "Vrije tijd & hobby", "Variabele kosten"], ["Steam", "Vrije tijd & hobby", "Variabele kosten"], ["PlayStation", "Vrije tijd & hobby", "Variabele kosten"],
+  ["Bol.com", "Diversen", "Variabele kosten"], ["Amazon", "Diversen", "Variabele kosten"], ["IKEA", "Diversen", "Variabele kosten"], ["Action ", "Diversen", "Variabele kosten"], ["HEMA", "Diversen", "Variabele kosten"],
+];
+
+/* Zoektekst van een transactie zoals de regels hem zien (kleine letters). */
+function ruleText(t) { return (t.search || ((t.raw || "") + " " + (t.desc || "") + " " + (t.counterparty || ""))).toLowerCase(); }
+
+/* Woorden die niets zeggen over wie de tegenpartij is. */
+const RULE_STOP = new Set(["van", "naar", "betaling", "bancontact", "maestro", "debit", "mastercard", "visa", "domiciliëring", "domiciliering", "europese", "overschrijving", "instantoverschrijving", "sepa", "nv", "bv", "bvba", "sa", "srl"]);
+
+/* Zoekt een leesbaar trefwoord dat in ALLE gegeven transacties voorkomt. */
+function ruleKeyword(txs) {
+  const base = String(txs[0].desc || "").split(" · ")[0].replace(/\s*\([^)]*\)\s*$/, "");
+  const words = base.split(/\s+/).filter(w => w && !/\d/.test(w) && !RULE_STOP.has(w.toLowerCase()));
+  const texts = txs.map(ruleText);
+  const fits = k => k.length >= 3 && texts.every(x => x.includes(k.toLowerCase()));
+  for (let n = Math.min(words.length, 4); n >= 1; n--) {
+    const k = words.slice(0, n).join(" ");
+    if (fits(k)) return k;
+  }
+  const cp = txs[0].counterparty;                   // terugval: rekeningnummer van de tegenpartij
+  if (cp && txs.every(t => t.counterparty === cp)) return cp;
+  return null;
+}
+
+/* Analyseert de transacties en stelt nieuwe regels voor. Verandert niets aan de state.
+   Geeft [{keyword, cat, type, isNew, source, count, total, example}] met source:
+   "geleerd" (uit je eigen keuzes), "bekend" (bekend bedrijf), "terugkerend" (kies zelf een categorie). */
+function suggestRules(state) {
+  const cats = new Map(state.categories.map(c => [c.name, c.type]));
+  const have = new Set(state.rules.map(r => (r.keyword || "").toLowerCase()).filter(Boolean));
+  const free = budgetTx(state).filter(t => categorize(ruleText(t), state.rules) === UNCAT);   // nog door geen regel gevangen
+  const out = [], taken = new Set();
+  const add = (keyword, cat, type, source, txs) => {
+    const k = keyword.toLowerCase(); if (have.has(k)) return;
+    const prev = out.find(o => o.keyword.toLowerCase() === k); if (prev) return;
+    txs.forEach(t => taken.add(t));
+    out.push({ keyword, cat, type: cat ? (cats.get(cat) || type) : "", isNew: !!cat && !cats.has(cat), source,
+      count: txs.length, total: Math.round(txs.reduce((a, t) => a + t.amount, 0) * 100) / 100, example: txs[0].desc });
+  };
+  const byKey = list => { const m = new Map(); for (const t of list) { const k = merchantKey(t); if (!k) continue; if (!m.has(k)) m.set(k, []); m.get(k).push(t); } return m; };
+  // 1. geleerd: zelfde tegenpartij, minstens 2 keer, altijd dezelfde categorie
+  for (const txs of byKey(free.filter(t => t.cat !== UNCAT && !(t.splits && t.splits.length))).values()) {
+    if (txs.length < 2 || new Set(txs.map(t => t.cat)).size !== 1) continue;
+    const kw = ruleKeyword(txs); if (kw) add(kw, txs[0].cat, "", "geleerd", txs);
+  }
+  // 2. bekende bedrijven
+  const open = free.filter(t => t.cat === UNCAT && !taken.has(t));
+  for (const [kw, cat, type] of RULE_HINTS) {
+    const txs = open.filter(t => !taken.has(t) && ruleText(t).includes(kw.toLowerCase()));
+    if (txs.length) add(kw.trim(), cat, type, "bekend", txs);
+  }
+  // 3. terugkerend maar onbekend: zelf een categorie kiezen
+  for (const txs of byKey(open.filter(t => !taken.has(t))).values()) {
+    if (txs.length < 2) continue;
+    const kw = ruleKeyword(txs); if (kw) add(kw, "", "", "terugkerend", txs);
+  }
+  const rank = { geleerd: 0, bekend: 1, terugkerend: 2 };
+  return out.sort((a, b) => rank[a.source] - rank[b.source] || b.count - a.count);
 }
 
 function typeOf(state, cat) {
@@ -716,4 +763,4 @@ function toCsv(state) {
   return "﻿" + lines.join("\r\n");
 }
 
-if (typeof module !== "undefined") module.exports = { setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
+if (typeof module !== "undefined") module.exports = { suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };

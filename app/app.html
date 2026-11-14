@@ -531,7 +531,6 @@ a.hint, .legend a { color: var(--accent); }
     for (const c of st.credits) {
       if (!c.keywords && c.entries) { const keys = [...new Set(c.entries.filter(e => e.txId).map(e => st.transactions.find(t => t.id === e.txId)).filter(Boolean).map(txRefKey))]; if (keys.length) c.keywords = keys.join(", "); }
       if (c.entries) c.entries = c.entries.filter(e => !e.txId); if (c.anchorUsed === undefined) { c.anchorUsed = null; c.anchorDate = ""; } if (c.keywords === undefined) c.keywords = ""; delete c.startBalance; delete c.startDate; }
-    if (!st.categories.some(c => c.type === "Overboeking")) st.categories.push({ name: "Opname krediet", type: "Overboeking", budget: null });
     return st;
   }
   function openDb() {
@@ -591,7 +590,7 @@ a.hint, .legend a { color: var(--accent); }
     })();
   }
   let state = newState();
-  const ui = { month: null, txAll: false, txSearch: "", txCat: "", open: new Set(), period: "maand", year: null };
+  const ui = { month: null, txAll: false, txSearch: "", txCat: "", open: new Set(), period: "maand", year: null, ruleSug: null };
   ui.month = todayYm();
 
   /* ---------- helpers ---------- */
@@ -657,7 +656,8 @@ a.hint, .legend a { color: var(--accent); }
     const period = minD ? `${fmtDate(minD)} tot ${fmtDate(maxD)}` : "";
     dialog(`<h3>Import klaar</h3>
       <p>${period ? `Bestand met transacties van <b>${period}</b>.<br>` : ""}<b>${added}</b> nieuwe transactie${added === 1 ? "" : "s"} toegevoegd · ${dup} stond${dup === 1 ? "" : "en"} er al in${auto ? ` · ${auto} herkend van eerder` : ""} · ${uncat} te categoriseren.${newSav ? `<br><b>${newSav}</b> beweging${newSav === 1 ? "" : "en"} van of naar je spaarrekening te controleren in Spaar.` : ""}${resolved ? `<br>${resolved} geplande spaarverrichting${resolved === 1 ? "" : "en"} teruggevonden en afgevinkt.` : ""}</p>
-      <div class="row"><button class="btn" data-close type="button">Sluiten</button>${newSav ? `<button class="btn" id="imp-sav" type="button">Naar Spaar</button>` : ""}${minD ? `<button class="btn" id="imp-tx" type="button">Bekijk transacties</button><button class="btn primary" id="imp-year" type="button">Bekijk ${maxD.slice(0, 4)}</button>` : ""}</div>`, d => {
+      <div class="row"><button class="btn" data-close type="button">Sluiten</button>${uncat ? `<button class="btn" id="imp-rules" type="button">🔍 Regels voorstellen</button>` : ""}${newSav ? `<button class="btn" id="imp-sav" type="button">Naar Spaar</button>` : ""}${minD ? `<button class="btn" id="imp-tx" type="button">Bekijk transacties</button><button class="btn primary" id="imp-year" type="button">Bekijk ${maxD.slice(0, 4)}</button>` : ""}</div>`, d => {
+      const ir = d.querySelector("#imp-rules"); if (ir) ir.addEventListener("click", () => { d.close(); analyzeRules(); });
       const sv = d.querySelector("#imp-sav"); if (sv) sv.addEventListener("click", () => { d.close(); location.hash = "spaar"; });
       const y = d.querySelector("#imp-year"), t = d.querySelector("#imp-tx");
       if (y) y.addEventListener("click", () => { d.close(); ui.period = "jaar"; ui.year = +maxD.slice(0, 4); if (location.hash !== "#overzicht") location.hash = "overzicht"; render(); window.scrollTo(0, 0); });
@@ -1352,7 +1352,8 @@ a.hint, .legend a { color: var(--accent); }
   }
   function viewRules() {
     let h = `<div class="page-head"><div><h1>Regels</h1><p>Bevat de bankomschrijving het trefwoord, dan krijgt de transactie die categorie. De eerste passende regel wint.</p></div>
-      <button class="btn primary" data-act="apply-rules" type="button">Toepassen op te categoriseren</button></div>`;
+      <div class="actions"><button class="btn primary" data-act="rules-analyze" type="button" ${state.transactions.length ? "" : "disabled"} title="Zoekt in je transacties naar regels die je kan goedkeuren">🔍 Transacties analyseren</button><button class="btn" data-act="apply-rules" type="button">Toepassen op te categoriseren</button></div></div>`;
+    if (ui.ruleSug) h += ruleSugCard();
     h += `<section class="card"><div class="table-wrap"><table><thead><tr><th style="width:44px">#</th><th>Trefwoord</th><th>Categorie</th><th class="r">Treffers</th><th></th></tr></thead><tbody>`;
     state.rules.forEach((r, i) => {
       const hits = r.keyword ? state.transactions.filter(t => (t.search || t.raw || "").toLowerCase().includes(r.keyword.toLowerCase())).length : 0;
@@ -1361,9 +1362,64 @@ a.hint, .legend a { color: var(--accent); }
         <td class="r num muted">${hits}</td>
         <td class="r" style="white-space:nowrap"><button class="btn small ghost" data-act="rule-up" type="button" aria-label="Omhoog" ${i ? "" : "disabled"}>↑</button><button class="btn small ghost" data-act="rule-down" type="button" aria-label="Omlaag" ${i < state.rules.length - 1 ? "" : "disabled"}>↓</button><button class="btn small ghost" data-act="del-rule" type="button" aria-label="Verwijderen">✕</button></td></tr>`;
     });
+    if (!state.rules.length) h += `<tr class="empty-row"><td colspan="5">Nog geen regels. ${state.transactions.length ? "Klik op <b>Transacties analyseren</b> om voorstellen te krijgen." : "Importeer eerst je bankafschrift (CSV) en klik dan op <b>Transacties analyseren</b>."}</td></tr>`;
     h += `</tbody></table></div><div style="margin-top:12px"><button class="btn" data-act="add-rule" type="button">+ Regel toevoegen</button></div></section>`;
     h += splitRulesCard();
     return h;
+  }
+
+  /* ---------- regels voorstellen (analyseren) ---------- */
+  const SUG_WHY = { geleerd: "Zo categoriseerde je het zelf", bekend: "Bekend bedrijf", terugkerend: "Komt terug: kies een categorie" };
+  function analyzeRules() {
+    ui.ruleSug = suggestRules(state).map(s => Object.assign(s, { on: !!s.cat }));
+    if (location.hash !== "#regels") location.hash = "regels";
+    render();
+    if (!ui.ruleSug.length) { ui.ruleSug = null; render(); toast("Geen nieuwe regels gevonden. Je regels vangen al alles wat terugkomt."); }
+    else { const c = document.getElementById("rule-sug"); if (c) c.scrollIntoView({ block: "start", behavior: "smooth" }); }
+  }
+  function ruleSugCard() {
+    const list = ui.ruleSug, nOn = list.filter(s => s.on && s.cat).length;
+    let h = `<section class="card" id="rule-sug"><div class="card-head"><h2>Voorgestelde regels</h2><span class="hint">Vink aan wat klopt en pas trefwoord of categorie aan waar nodig. Er verandert niets tot je op Goedkeuren klikt.</span></div>
+      <div class="table-wrap"><table><thead><tr><th style="width:36px"></th><th>Trefwoord</th><th>Categorie</th><th>Waarom</th><th class="r">Treffers</th><th class="r">Totaal</th><th></th></tr></thead><tbody>`;
+    list.forEach((s, i) => {
+      h += `<tr data-s="${i}"><td><input type="checkbox" data-act="rs-on" ${s.on && s.cat ? "checked" : ""} ${s.cat ? "" : "disabled"} aria-label="Voorstel aanvinken"></td>
+        <td><input class="cell wide" data-act="rs-kw" value="${esc(s.keyword)}" aria-label="Trefwoord"><div class="muted" style="font-size:11.5px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:280px">bv. ${esc(s.example)}</div></td>
+        <td><select class="cat${s.cat ? "" : " uncat"}" data-act="rs-cat" aria-label="Categorie">${catOptions(s.cat || UNCAT)}<option value="__new">+ Nieuwe categorie…</option></select>${s.isNew ? `<div style="margin-top:3px"><span class="chip">nieuw · ${esc(s.type)}</span></div>` : ""}</td>
+        <td class="muted" style="font-size:12.5px">${SUG_WHY[s.source]}</td>
+        <td class="r num muted">${s.count}</td>
+        <td class="r num ${s.total >= 0 ? "pos" : "neg"}">${signed(s.total)}</td>
+        <td class="r"><button class="btn small ghost" data-act="rs-del" type="button" title="Voorstel weglaten" aria-label="Voorstel weglaten">✕</button></td></tr>`;
+    });
+    h += `</tbody></table></div><div class="row" style="justify-content:flex-start;flex-wrap:wrap;margin-top:12px"><button class="btn primary" data-act="rs-approve" type="button" ${nOn ? "" : "disabled"}>✓ ${nOn} regel${nOn === 1 ? "" : "s"} goedkeuren</button><button class="btn" data-act="rs-all" type="button">Alles aanvinken</button><button class="btn ghost" data-act="rs-close" type="button">Sluiten zonder goedkeuren</button></div></section>`;
+    return h;
+  }
+  function newCategoryDialog(suggest, onDone) {
+    dialog(`<h3>Nieuwe categorie</h3><label for="nc-name">Naam</label><input class="input" id="nc-name" value="${esc(suggest || "")}" placeholder="bv. Huur">
+      <label for="nc-type">Soort</label><select class="input" id="nc-type">${TYPES.map(t => `<option${t === "Variabele kosten" ? " selected" : ""}>${t}</option>`).join("")}</select>
+      <p id="nc-err" class="neg" style="margin:8px 0 0;font-size:12.5px"></p>
+      <div class="row"><button class="btn" data-close type="button">Annuleren</button><button class="btn primary" id="nc-ok" type="button">Aanmaken</button></div>`, d => {
+      const nm = d.querySelector("#nc-name"); nm.focus(); nm.select();
+      d.addEventListener("close", () => render(), { once: true });
+      d.querySelector("#nc-ok").addEventListener("click", () => {
+        const name = nm.value.trim(); if (!name || name === UNCAT) { d.querySelector("#nc-err").textContent = "Geef de categorie een naam."; return; }
+        let c = state.categories.find(x => x.name.toLowerCase() === name.toLowerCase());
+        if (!c) { c = { name, type: d.querySelector("#nc-type").value, budget: null }; state.categories.push(c); save(); }
+        onDone(c); d.close();
+      });
+    });
+  }
+  function approveRules() {
+    const chosen = ui.ruleSug.filter(s => s.on && s.cat && s.keyword.trim());
+    if (!chosen.length) { toast("Vink eerst een voorstel aan dat een categorie heeft."); return; }
+    let newCats = 0;
+    for (const s of chosen) {
+      if (!state.categories.some(c => c.name === s.cat)) { state.categories.push({ name: s.cat, type: s.type || (s.total > 0 ? "Inkomen" : "Variabele kosten"), budget: null }); newCats++; }
+      state.rules.push({ keyword: s.keyword.trim(), cat: s.cat });
+    }
+    const n = applyRules(state); save();
+    ui.ruleSug = ui.ruleSug.filter(s => !chosen.includes(s)); if (!ui.ruleSug.length) ui.ruleSug = null;
+    render();
+    toast(`${chosen.length} regel${chosen.length === 1 ? "" : "s"} toegevoegd${newCats ? ` · ${newCats} nieuwe categorie${newCats === 1 ? "" : "ën"}` : ""} · ${n} transactie${n === 1 ? "" : "s"} gecategoriseerd`);
   }
 
   function viewGoals() {
@@ -2190,6 +2246,11 @@ a.hint, .legend a { color: var(--accent); }
           d.querySelector("#srd-keep").addEventListener("click", () => go(false)); d.querySelector("#srd-undo").addEventListener("click", () => go(true)); }); break; }
       case "add-rule": state.rules.push({ keyword: "", cat: UNCAT }); save(); render(); { const ins = document.querySelectorAll('[data-act="rule-kw"]'); ins[ins.length - 1].focus(); } break;
       case "del-rule": state.rules.splice(rowIndex(el), 1); save(); render(); break;
+      case "rules-analyze": analyzeRules(); break;
+      case "rs-del": ui.ruleSug.splice(+el.closest("tr").dataset.s, 1); if (!ui.ruleSug.length) ui.ruleSug = null; render(); break;
+      case "rs-all": ui.ruleSug.forEach(s => { if (s.cat) s.on = true; }); render(); break;
+      case "rs-close": ui.ruleSug = null; render(); break;
+      case "rs-approve": approveRules(); break;
       case "rule-up": case "rule-down": { const i = rowIndex(el), j = a === "rule-up" ? i - 1 : i + 1; [state.rules[i], state.rules[j]] = [state.rules[j], state.rules[i]]; save(); render(); break; }
       case "add-goal": { const free = state.categories.filter(c => c.type === "Sparen" && !state.goals.some(g => g.name === c.name));
         if (!free.length) { goalNewDialog(); break; }
@@ -2207,6 +2268,13 @@ a.hint, .legend a { color: var(--accent); }
       if (tr.dataset.src === "manueel") { const e = savConf(state).entries.find(x => x.id === id); if (e) e.goal = el.value || null; }
       else { const t = state.transactions.find(x => x.id === id); t.goal = el.value || ""; if (el.value && state.categories.some(c => c.name === el.value)) t.cat = el.value; }
       save(); render(); return; }
+    if (a === "rs-on" || a === "rs-kw" || a === "rs-cat") {
+      const s = ui.ruleSug && ui.ruleSug[+el.closest("tr").dataset.s]; if (!s) return;
+      if (a === "rs-on") s.on = el.checked;
+      else if (a === "rs-kw") s.keyword = el.value.trim();
+      else if (el.value === "__new") { newCategoryDialog(s.cat && s.isNew ? s.cat : "", c => { s.cat = c.name; s.type = c.type; s.isNew = false; s.on = true; }); return; }
+      else { const c = state.categories.find(x => x.name === el.value); s.cat = el.value === UNCAT ? "" : el.value; s.isNew = !!s.cat && !c; if (c) s.type = c.type; s.on = !!s.cat; }
+      render(); return; }
     if (el.dataset.act === "sim-extra") { simUi.extra = Math.max(0, num(el.value) || 0); render(); return; }
     if (el.dataset.act === "warn-below") { const v = num(el.value); state.warnBelow = v === null ? 0 : v; save(); render(); return; }
     if (el.dataset.act === "pl-detected") { plUi.detected = el.checked; render(); return; }
