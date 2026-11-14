@@ -1,31 +1,35 @@
 # Budgetplanner
 
-Persoonlijke budgetplanner in één HTML-pagina, in cyberpunkstijl.
+Persoonlijke budgetplanner in cyberpunkstijl. Leerproject: van één HTML-pagina op claude.ai naar een installeerbare app.
 
-## Bestanden
+## Mappen
 
-| Bestand | Wat het is |
+| Map | Wat |
 |---|---|
-| `budgetplanner.html` | De volledige app, klaar om te openen. Gebouwd uit de twee bestanden hieronder. |
-| `app.html` | Het uitzicht en de bediening (tabbladen, knoppen, grafieken, gsm-weergave). Bevat de plek `/*__CORE__*/` waar `core.js` wordt ingevoegd. |
-| `core.js` | De rekenkern: CSV-import, categoriseren, budgetten, sparen, leningen, planner. Bevat geen schermcode. |
+| `claude-versie/` | **v1.0** zoals hij draait op claude.ai, mét Claude-functies. Bevroren. |
+| `app/` | De **standalone app** (PWA) in opbouw: zonder Claude, installeerbaar op pc en gsm. |
+| `tools/` | `build.py` voegt `core.js` in `app.html` in tot één HTML-bestand. |
+| `CLAUDE.md` | Projectdossier en stappenplan voor Claude Code. |
 
 ## Bouwen
 
-`budgetplanner.html` = `app.html` waarin `/*__CORE__*/` vervangen is door de inhoud van `core.js`.
+```
+python tools/build.py claude-versie   # -> claude-versie/budgetplanner.html
+python tools/build.py app             # -> app/index.html
+```
 
 ## Wat er in v1.0 zit
 
-- ING CSV-import met ontdubbelen en automatisch categoriseren (regels, leren, Claude-voorstellen)
+- ING CSV-import met ontdubbelen en automatisch categoriseren
 - Overzicht per maand en per jaar, budgetten per maand of per jaar, overschot meenemen
-- Spaardoelen en spaarrekening (via referenties SP-…), vrij sparen, overboekingen tussen doelen
+- Spaardoelen en spaarrekening (referenties SP-…), vrij sparen, overboekingen tussen doelen
 - Leningen & kredieten, aflossingssimulator, vermogen
 - Planner met herinneringen en .ics-export, saldoverwachting, prijsstijgingen
-- Splitsregels (bv. € 15 van elke supermarktbetaling naar Huisdieren), labels, pincode
-- OneDrive-back-up met gsm-samenvatting, lite-weergave op gsm met update-melding en oogje
-- Vraag Claude
+- Splitsregels, labels, pincode
+- OneDrive-back-up met gsm-weergave (update-melding, oogje)
+- Vraag Claude, maandrapport en Claude-voorstellen (enkel in de claude.ai-versie)
 
 ## Privacy
 
-Deze repository bevat alleen code. Je financiële gegevens staan nooit hierin:
-die blijven in je browser en in je eigen OneDrive.
+Deze repository bevat alleen code. Financiële gegevens staan er nooit in:
+die blijven in de browser en in de eigen OneDrive van de gebruiker.
