@@ -738,6 +738,14 @@ td.amount.xfer::first-letter { color: var(--accent); }
 .fc-acc { display: inline-flex; align-items: center; margin-left: 8px; color: var(--ink); }
 .fc-stats { display: flex; flex-wrap: wrap; gap: 6px 22px; align-items: baseline; margin: 0 0 8px; font-size: 13.5px; }
 .fc-warn { color: var(--neg); font-weight: 600; }
+.charts .card-head { flex-wrap: wrap; gap: 10px; }
+.chart-seg { flex-wrap: wrap; }
+.chart-ctl { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px; }
+.chart-chips { gap: 6px; }
+.chart-chips button { padding: 5px 10px; font-size: 12.5px; }
+.chart-chips button[aria-pressed="false"] i { opacity: .3; box-shadow: none; }
+.chart-add { max-width: 170px; }
+.charts .acc-mini { margin-right: 4px; }
 .flows { display: grid; gap: 10px; }
 .flow { display: grid; grid-template-columns: minmax(110px, auto) minmax(160px, 1fr) minmax(110px, auto) auto; align-items: center; gap: 12px; }
 .flow-acc { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--c); border-radius: var(--r-pill); clip-path: var(--notch-sm); font-weight: 600; font-size: 13px; white-space: nowrap; }
@@ -1440,8 +1448,7 @@ dialog[open] { animation: fx-pop .18s ease-out; }
     </section>`;
     const uncatHtml = s.uncatCount ? uncatCard(ui.month) : "";
     h += goalsWide();
-    const fcAccs = zichtList(state).length ? (multiAcc() ? zichtList(state) : [zichtList(state)[0]]) : [""];
-    h += `<div class="stack">${netWorthCard()}${fcAccs.map(a => forecastCard(a)).join("")}${transferCard()}</div>`;
+    h += `<div class="stack">${chartsCard()}${transferCard()}</div>`;
     h += `<div class="grid-2"><div class="stack"><section class="card">${catChart(s)}</section>${groupCards(s)}${debtCard()}${uncatHtml}</div><div class="stack">${(state.plans.length || detectRecurring(state).length) ? soonCard(14, true) : ""}<section class="card trend">${trendChart()}</section>${carryCard()}</div></div>`;
     return h;
   }
@@ -1491,28 +1498,119 @@ dialog[open] { animation: fx-pop .18s ease-out; }
     const nextInc = items.find(it => it.plan.kind === "inkomst" && it.date > t && it.plan.amount > 300);
     return { pts, low, start: startBal, nextInc, end: pts[pts.length - 1].value };
   }
-  function forecastCard(acc) {
-    const days = 45, f = forecast(days, acc), warn = accWarn(acc), multi = multiAcc() && acc;
-    const title = `Saldoverwachting${multi ? ` <span class="fc-acc" style="--c:${accColor(acc)}"><i class="acc-mini" style="--c:${accColor(acc)}"></i>${esc(accName(state, acc))}</span>` : ""}`;
-    if (!f) return `<section class="card"><div class="card-head"><h2>${title}</h2></div><p class="muted" style="margin:0">Vul het startsaldo${multi ? ` van ${esc(accName(state, acc))}` : ""} in bij <a class="hint" href="#profiel">Profiel</a>, dan berekent de planner hoe het saldo de komende weken evolueert.</p></section>`;
-    const wideChart = !narrow(), W = wideChart ? 1100 : 520, H = wideChart ? 200 : 170, L = 48, R = 8, T = 12, B = 22, iw = W - L - R, ih = H - T - B;
-    const vals = f.pts.map(p => p.value), mx = Math.max(...vals, warn), mn = Math.min(...vals, warn, 0);
-    const step = niceStep((mx - mn || 1) / 3), top = Math.ceil(mx / step) * step, bot = Math.floor(mn / step) * step;
-    const x = i => L + i / (f.pts.length - 1) * iw, y = v => T + (top - v) / (top - bot || 1) * ih;
-    let g = "";
-    for (let v = bot; v <= top + 1e-9; v += step) g += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${Math.abs(v) >= 1000 ? (v / 1000).toLocaleString("nl-BE") + "k" : v}</text>`;
-    g += `<line x1="${L}" x2="${W - R}" y1="${y(warn)}" y2="${y(warn)}" stroke="var(--neg)" stroke-dasharray="4 4" opacity=".8"/><text x="${W - R}" y="${y(warn) - 4}" text-anchor="end" style="fill:var(--neg)">grens ${eur0(warn)}</text>`;
-    let d = `M${x(0)},${y(f.pts[0].value)}`; f.pts.forEach((p, i) => { if (i) d += `H${x(i).toFixed(1)}V${y(p.value).toFixed(1)}`; });
-    g += `<path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2" style="filter:drop-shadow(0 0 5px rgba(var(--accent-rgb), calc(.8 * var(--glow))))"/>`;
-    const li = f.pts.indexOf(f.low);
-    g += `<circle cx="${x(li)}" cy="${y(f.low.value)}" r="4.5" fill="${f.low.value < warn ? "var(--neg)" : "var(--gold)"}" stroke="var(--bg)" stroke-width="1.5"/>`;
-    f.pts.forEach((p, i) => { if (p.items.length) g += `<circle cx="${x(i)}" cy="${y(p.value)}" r="2.5" fill="var(--accent)"/>`; g += `<rect x="${x(i) - iw / f.pts.length / 2}" y="${T}" width="${iw / f.pts.length}" height="${ih}" fill="transparent" data-tip="${esc(`<b>${fmtDate(p.date)}</b><br>Verwacht saldo: ${eur(p.value)}${p.items.map(it => `<br>${it.plan.kind === "inkomst" ? "+" : "−"}${eur(it.plan.amount || 0)} ${esc(it.plan.title)}`).join("")}`)}"/>`; });
-    (wideChart ? [0, 7, 14, 21, 28, 35, 45] : [0, 15, 30, 45]).forEach(i => { if (f.pts[i]) g += `<text x="${x(i)}" y="${H - 6}" text-anchor="${i === 0 ? "start" : i === 45 ? "end" : "middle"}">${i === 0 ? "vandaag" : fmtDate(f.pts[i].date).slice(0, 5)}</text>`; });
-    const danger = f.low.value < warn;
-    return `<section class="card chart fc-card"><div class="card-head"><h2>${title}</h2><span class="hint">Komende ${days} dagen · planner + herkende vaste betalingen</span></div>
-      <div class="fc-stats"><span>Nu <b class="num ${f.start < 0 ? "neg" : "gold"}">${eur(f.start)}</b></span><span>Laagste punt <b class="num ${danger ? "neg" : ""}">${eur(f.low.value)}</b> <span class="muted">op ${fmtDate(f.low.date)}</span></span>${f.nextInc ? `<span>Volgende inkomst <b>±${fmtDate(f.nextInc.date).slice(0, 5)}</b></span>` : ""}${danger ? `<span class="fc-warn">⚠ onder ${eur0(warn)} op ${fmtDate(f.low.date).slice(0, 5)}</span>` : ""}</div>
-      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Verwacht saldo">${g}</svg>
-      <div class="legend"><span class="muted">Grens ${eur0(warn)} · <a class="hint" href="#profiel">aanpassen in Profiel</a></span><a class="hint" href="#planner">Planner</a></div></section>`;
+  /* ---------- grafieken (stap 9a): één kaart met keuzeknoppen ---------- */
+  const CHART_VIEWS = [["saldo", "Saldoverwachting"], ["vermogen", "Vermogen"], ["cat", "Per categorie"], ["inuit", "Inkomen & uitgaven"]];
+  const CAT_COLORS = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--pos)"], MAX_CHART_CATS = CAT_COLORS.length;
+  // keuze per toestel (zoals het thema), niet in de back-up
+  function chartPref() { try { return JSON.parse(localStorage.getItem(KEY + ".chart") || "{}") || {}; } catch (e) { return {}; } }
+  function setChartPref(p) { try { localStorage.setItem(KEY + ".chart", JSON.stringify({ ...chartPref(), ...p })); } catch (e) {} }
+  const axisK = v => Math.abs(v) >= 1000 ? (v / 1000).toLocaleString("nl-BE") + "k" : String(Math.round(v * 100) / 100);
+  // gemeenschappelijk kader: breedte, schaal en rasterlijnen
+  function chartBox(vals, H0) {
+    const wide = !narrow(), W = wide ? 1100 : 520, H = H0 || (wide ? 230 : 180), L = 48, R = 8, T = 14, B = 22, iw = W - L - R, ih = H - T - B;
+    const mx = Math.max(...vals, 0), mn = Math.min(...vals, 0), step = niceStep((mx - mn || 1) / 3);
+    const top = Math.ceil(mx / step) * step || step, bot = Math.floor(mn / step) * step, y = v => T + (top - v) / (top - bot || 1) * ih;
+    let grid = ""; for (let k = 0, v = bot; v <= top + 1e-9; k++, v = bot + k * step)
+      grid += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}"${Math.abs(v) < 1e-9 ? ' style="stroke:var(--muted)"' : ""}/><text x="${L - 6}" y="${(y(v) + 4).toFixed(1)}" text-anchor="end">${axisK(v)}</text>`;
+    return { wide, W, H, L, R, T, B, iw, ih, y, grid, top, bot };
+  }
+  function chartCatsNow() { return [...document.querySelectorAll('[data-act="chart-cat-del"]')].map(b => b.dataset.cat); }
+  function chartsCard() {
+    const p = chartPref(), v = CHART_VIEWS.some(x => x[0] === p.view) ? p.view : "saldo";
+    const body = v === "vermogen" ? netWorthBody() : v === "cat" ? chartCats(p) : v === "inuit" ? chartInOut() : chartSaldo(p);
+    return `<section class="card chart charts"><div class="card-head"><h2>Grafieken</h2><div class="seg chart-seg" role="group" aria-label="Soort grafiek">${CHART_VIEWS.map(([k, n]) => `<button type="button" data-act="chart-view" data-v="${k}" aria-pressed="${k === v}">${n}</button>`).join("")}</div></div>${body}</section>`;
+  }
+
+  // Saldoverwachting: één lijn per zichtrekening (in de kleur van de rekening), optioneel alles samen
+  function chartSaldo(p) {
+    const days = 45, z = zichtList(state), multi = multiAcc(), hide = new Set(p.hide || ["*"]);
+    const want = multi ? [...z.filter(a => !hide.has(a)), ...(hide.has("*") ? [] : ["*"])] : [z[0] || ""];
+    const series = [], missing = [];
+    for (const a of want) {
+      const f = forecast(days, a === "*" ? "" : a);
+      if (!f) { if (a !== "*") missing.push(a); continue; }
+      series.push({ acc: a, f, name: a === "*" ? "Alles samen" : multi ? accName(state, a) : "Saldo", color: a === "*" ? "var(--gold)" : multi ? accColor(a) : "var(--accent)", warn: a === "*" ? null : accWarn(a) });
+    }
+    const chips = multi ? `<div class="acc-pick chart-chips" role="group" aria-label="Rekeningen tonen">${[...z, "*"].map(a => `<button type="button" data-act="chart-acc" data-acc="${esc(a)}" aria-pressed="${!hide.has(a)}" style="--c:${a === "*" ? "var(--gold)" : accColor(a)}"><i></i>${esc(a === "*" ? "Alles samen" : accName(state, a))}</button>`).join("")}</div>` : "";
+    const miss = missing.length ? `<p class="muted" style="margin:6px 0 0;font-size:13px">Geen startsaldo voor ${missing.map(a => esc(accName(state, a))).join(", ")}: vul het in bij <a class="hint" href="#profiel">Profiel</a>.</p>` : "";
+    if (!series.length) return chips + (multi && !want.length ? `<p class="muted">Kies hierboven minstens één rekening.</p>` : miss || `<p class="muted" style="margin:0">Vul het startsaldo in bij <a class="hint" href="#profiel">Profiel</a>, dan berekent de planner hoe het saldo de komende weken evolueert.</p>`);
+    const warns = [...new Map(series.filter(x => x.warn !== null).map(x => [x.warn, x])).values()];
+    const cb = chartBox([...series.flatMap(x => x.f.pts.map(q => q.value)), ...warns.map(x => x.warn)]), { W, H, L, R, T, iw, ih, y } = cb, n = series[0].f.pts.length;
+    const x = i => L + i / (n - 1) * iw;
+    let g = cb.grid;
+    for (const w of warns) g += `<line x1="${L}" x2="${W - R}" y1="${y(w.warn)}" y2="${y(w.warn)}" stroke="var(--neg)" stroke-dasharray="4 4" opacity=".8"/><text x="${W - R}" y="${y(w.warn) - 4}" text-anchor="end" style="fill:var(--neg)">grens ${eur0(w.warn)}${warns.length > 1 ? " · " + esc(w.name) : ""}</text>`;
+    for (const sr of series) {
+      const pts = sr.f.pts; let d = `M${x(0)},${y(pts[0].value).toFixed(1)}`; pts.forEach((q, i) => { if (i) d += `H${x(i).toFixed(1)}V${y(q.value).toFixed(1)}`; });
+      g += `<path d="${d}" fill="none" stroke="${sr.color}" stroke-width="2"${sr.acc === "*" ? ' stroke-dasharray="6 4"' : ""} style="filter:drop-shadow(0 0 5px ${sr.color})"/>`;
+      pts.forEach((q, i) => { if (q.items.length) g += `<circle cx="${x(i)}" cy="${y(q.value).toFixed(1)}" r="2.5" fill="${sr.color}"/>`; });
+      const li = pts.indexOf(sr.f.low), bad = sr.warn !== null && sr.f.low.value < sr.warn;
+      g += `<circle cx="${x(li)}" cy="${y(sr.f.low.value).toFixed(1)}" r="4.5" fill="${bad ? "var(--neg)" : sr.color}" stroke="var(--bg)" stroke-width="1.5"/>`;
+    }
+    for (let i = 0; i < n; i++) {
+      const tip = `<b>${fmtDate(series[0].f.pts[i].date)}</b>` + series.map(sr => { const q = sr.f.pts[i]; return `<br>${esc(sr.name)}: ${eur(q.value)}${q.items.map(it => `<br>&nbsp; ${it.plan.kind === "inkomst" ? "+" : "−"}${eur(it.plan.amount || 0)} ${esc(it.plan.title)}`).join("")}`; }).join("");
+      g += `<rect x="${(x(i) - iw / n / 2).toFixed(1)}" y="${T}" width="${(iw / n).toFixed(1)}" height="${ih}" fill="transparent" data-tip="${esc(tip)}"/>`;
+    }
+    (cb.wide ? [0, 7, 14, 21, 28, 35, 45] : [0, 15, 30, 45]).forEach(i => { if (i < n) g += `<text x="${x(i)}" y="${H - 6}" text-anchor="${i === 0 ? "start" : i === n - 1 ? "end" : "middle"}">${i === 0 ? "vandaag" : fmtDate(series[0].f.pts[i].date).slice(0, 5)}</text>`; });
+    const stats = series.map(sr => { const bad = sr.warn !== null && sr.f.low.value < sr.warn;
+      return `<span>${multi ? `<i class="acc-mini" style="--c:${sr.color}"></i>${esc(sr.name)} ` : ""}nu <b class="num ${sr.f.start < 0 ? "neg" : "gold"}">${eur(sr.f.start)}</b> · laagste <b class="num ${bad ? "neg" : ""}">${eur(sr.f.low.value)}</b> <span class="muted">op ${fmtDate(sr.f.low.date).slice(0, 5)}</span>${bad ? ` <span class="fc-warn">⚠ onder ${eur0(sr.warn)}</span>` : ""}</span>`; }).join("");
+    return `${chips}<div class="fc-stats" style="margin-top:8px">${stats}</div>
+      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Verwacht saldo per rekening, komende ${days} dagen">${g}</svg>${miss}
+      <div class="legend"><span class="muted">Komende ${days} dagen · planner + herkende vaste betalingen · grens per rekening <a class="hint" href="#profiel">in Profiel</a></span><a class="hint" href="#planner">Planner</a></div>`;
+  }
+
+  // Uitgaven (of inkomsten) per categorie, per maand (12 maanden tot de gekozen maand) of per jaar
+  function chartCats(p) {
+    const mode = p.catMode === "jaar" ? "jaar" : "maand", cats = mainCats(state).filter(c => c.type !== "Overboeking");
+    const ms = new Map(), sum = ym => { if (!ms.has(ym)) ms.set(ym, monthSummary(state, ym)); return ms.get(ym).byCat; };
+    let periods;
+    if (mode === "maand") { periods = []; for (let i = 11; i >= 0; i--) { const ym = shiftMonth(ui.month, -i); periods.push({ key: ym, label: monthShort(ym), tip: monthName(ym), yms: [ym] }); } }
+    else { const ys = state.transactions.map(t => +t.date.slice(0, 4)), y0 = Math.min(...ys), y1 = Math.max(...ys); periods = [];
+      for (let yy = Math.max(y0, y1 - 7); yy <= y1; yy++) periods.push({ key: String(yy), label: String(yy), tip: String(yy), yms: Array.from({ length: 12 }, (_, i) => `${yy}-${String(i + 1).padStart(2, "0")}`) }); }
+    const val = (c, per) => { const tot = per.yms.reduce((a, ym) => a + (sum(ym)[c.name] || 0), 0); return Math.round((c.type === "Inkomen" ? tot : -tot) * 100) / 100; };
+    let sel = (p.cats || []).map(nm => cats.find(c => c.name === nm)).filter(Boolean);
+    if (!p.cats) {   // standaard: de 3 grootste uitgavenposten van de getoonde periode
+      sel = cats.filter(c => c.type === "Vaste kosten" || c.type === "Variabele kosten").map(c => ({ c, t: periods.reduce((a, per) => a + val(c, per), 0) })).filter(x => x.t > 0).sort((a, b) => b.t - a.t).slice(0, 3).map(x => x.c);
+    }
+    const color = i => CAT_COLORS[i % CAT_COLORS.length];
+    const avg = (c) => { const filled = periods.filter(per => per.yms.some(ym => ms.get(ym) && ms.get(ym).count)); const t = periods.reduce((a, per) => a + val(c, per), 0); return filled.length ? t / filled.length : 0; };
+    const free = cats.filter(c => !sel.includes(c));
+    const controls = `<div class="chart-ctl"><div class="seg" role="group" aria-label="Per maand of per jaar"><button type="button" data-act="chart-catmode" data-v="maand" aria-pressed="${mode === "maand"}">Per maand</button><button type="button" data-act="chart-catmode" data-v="jaar" aria-pressed="${mode === "jaar"}">Per jaar</button></div>
+      <div class="acc-pick chart-chips">${sel.map((c, i) => `<button type="button" data-act="chart-cat-del" data-cat="${esc(c.name)}" aria-pressed="true" style="--c:${color(i)}" title="Weghalen uit de grafiek"><i></i>${esc(c.name)} <span class="muted">×</span></button>`).join("")}
+      ${sel.length < MAX_CHART_CATS && free.length ? `<select class="cat chart-add" data-act="chart-cat-add" aria-label="Categorie toevoegen"><option value="">+ categorie</option>${free.map(c => `<option value="${esc(c.name)}">${esc(c.name)}</option>`).join("")}</select>` : ""}</div></div>`;
+    if (!sel.length) return controls + `<p class="muted">Kies een categorie om te zien hoeveel er ${mode === "maand" ? "per maand" : "per jaar"} naartoe gaat.</p>`;
+    const data = periods.map(per => sel.map(c => val(c, per)));
+    const cb = chartBox(data.flat()), { W, H, L, T, iw, ih, y } = cb, gw = iw / periods.length, bw = Math.max(3, Math.min(22, (gw * .78) / sel.length));
+    let g = cb.grid;
+    periods.forEach((per, i) => {
+      const x0 = L + gw * i + (gw - bw * sel.length) / 2;
+      data[i].forEach((v, k) => { const yv = y(Math.max(v, 0)), h = Math.abs(y(v) - y(0)); if (h > 0.2) g += v >= 0 ? `<path d="${roundTop(x0 + k * bw + .5, yv, bw - 1, h, 3)}" fill="${color(k)}"/>` : `<rect x="${x0 + k * bw + .5}" y="${y(0)}" width="${bw - 1}" height="${h}" fill="${color(k)}" opacity=".5"/>`; });
+      const cur = mode === "maand" ? per.key === ui.month : false;
+      if (cb.wide || mode === "jaar" || i % 2 === (periods.length - 1) % 2) g += `<text x="${L + gw * i + gw / 2}" y="${H - 6}" text-anchor="middle"${cur ? ' style="fill:var(--ink);font-weight:600"' : ""}>${per.label}</text>`;
+      const tip = `<b>${esc(per.tip)}</b>` + sel.map((c, k) => `<br>${esc(c.name)}: ${eur(data[i][k])}`).join("") + (sel.length > 1 ? `<br>Samen: ${eur(data[i].reduce((a, v) => a + v, 0))}` : "");
+      g += `<rect class="hit" x="${L + gw * i}" y="${T}" width="${gw}" height="${ih}" fill="transparent" data-tip="${esc(tip)}"${mode === "maand" ? ` data-act="goto-month" data-month="${per.key}" style="cursor:pointer"` : ""}/>`;
+    });
+    return `${controls}<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Bedrag per categorie ${mode === "maand" ? "per maand" : "per jaar"}">${g}</svg>
+      <div class="legend">${sel.map((c, i) => `<span><i style="background:${color(i)}"></i>${esc(c.name)} · gem. <b class="num">${eur0(avg(c))}</b>/${mode === "maand" ? "maand" : "jaar"}</span>`).join("")}</div>`;
+  }
+
+  // Inkomen en uitgaven per maand (12 maanden tot de gekozen maand), met wat je overhoudt als lijn
+  function chartInOut() {
+    const months = []; for (let i = 11; i >= 0; i--) months.push(shiftMonth(ui.month, -i));
+    const data = months.map(m => { const s = monthSummary(state, m); return { m, inc: s.income, exp: s.expenses + Math.max(0, -s.uncat), net: s.net }; });
+    const cb = chartBox(data.flatMap(d => [d.inc, d.exp, d.net])), { W, H, L, T, iw, ih, y } = cb, gw = iw / months.length, bw = Math.min(18, gw / 3.2);
+    let g = cb.grid, line = "";
+    data.forEach((d, i) => {
+      const cx = L + gw * i + gw / 2, bar = (bx, v, col) => v > 0 ? `<path d="${roundTop(bx, y(v), bw, y(0) - y(v), 3)}" fill="${col}"${d.m === ui.month ? "" : ' opacity=".6"'}/>` : "";
+      g += bar(cx - bw - 1, d.inc, "var(--pos)") + bar(cx + 1, d.exp, "var(--neg)");
+      line += (i ? "L" : "M") + cx.toFixed(1) + "," + y(d.net).toFixed(1);
+      if (cb.wide || i % 2 === 1) g += `<text x="${cx}" y="${H - 6}" text-anchor="middle"${d.m === ui.month ? ' style="fill:var(--ink);font-weight:600"' : ""}>${monthShort(d.m)}</text>`;
+    });
+    g += `<path d="${line}" fill="none" stroke="var(--gold)" stroke-width="2" style="filter:drop-shadow(0 0 4px var(--gold))"/>` + data.map((d, i) => `<circle cx="${(L + gw * i + gw / 2).toFixed(1)}" cy="${y(d.net).toFixed(1)}" r="3" fill="${d.net >= 0 ? "var(--gold)" : "var(--neg)"}"/>`).join("");
+    data.forEach((d, i) => { g += `<rect class="hit" x="${L + gw * i}" y="${T}" width="${gw}" height="${ih}" fill="transparent" data-tip="${esc(`<b>${esc(monthName(d.m))}</b><br>Inkomsten: ${eur(d.inc)}<br>Uitgaven: ${eur(d.exp)}<br>Over: ${signed(d.net)}`)}" data-act="goto-month" data-month="${d.m}" style="cursor:pointer"/>`; });
+    const tot = data.reduce((a, d) => ({ inc: a.inc + d.inc, exp: a.exp + d.exp }), { inc: 0, exp: 0 });
+    return `<div class="fc-stats"><span>12 maanden: in <b class="num pos">${eur0(tot.inc)}</b></span><span>uit <b class="num neg">${eur0(tot.exp)}</b></span><span>over <b class="num ${tot.inc - tot.exp >= 0 ? "gold" : "neg"}">${tot.inc - tot.exp >= 0 ? "+" : "−"}${eur0(Math.abs(tot.inc - tot.exp))}</b></span></div>
+      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Inkomsten en uitgaven per maand">${g}</svg>
+      <div class="legend"><span><i style="background:var(--pos)"></i>Inkomsten</span><span><i style="background:var(--neg)"></i>Uitgaven (incl. te categoriseren)</span><span><i style="background:var(--gold)"></i>Overgehouden</span><span class="muted">Klik op een maand</span></div>`;
   }
 
   /* ---------- vermogen ---------- */
@@ -1528,7 +1626,7 @@ dialog[open] { animation: fx-pop .18s ease-out; }
     for (const c of state.credits || []) { const st = creditStatus(state, c); if (!st.ok) continue; const pts = st.timeline.filter(p => p.date <= end); credits += pts.length ? pts[pts.length - 1].used : st.timeline[0].used; }
     return { zicht, spaar, loans, credits, total: Math.round((zicht + spaar - loans - credits) * 100) / 100 };
   }
-  function netWorthCard() {
+  function netWorthBody() {
     const t = todayS(), now = netWorthAt(t);
     const months = []; for (let i = 12; i >= 1; i--) months.push(endOfMonth(shiftMonth(t.slice(0, 7), -i)));
     const series = [...months.map(e => ({ date: e, v: netWorthAt(e).total })), { date: t, v: now.total }];
@@ -1542,10 +1640,10 @@ dialog[open] { animation: fx-pop .18s ease-out; }
     g += `<path d="${line}L${x(series.length - 1)},${y(Math.max(bot, Math.min(0, top)))}L${x(0)},${y(Math.max(bot, Math.min(0, top)))}Z" fill="${now.total >= 0 ? "rgba(var(--pos-rgb), .08)" : "rgba(var(--neg-rgb), .08)"}"/><path d="${line}" fill="none" stroke="${col}" stroke-width="2" style="filter:drop-shadow(0 0 5px ${col})"/>`;
     series.forEach((p, i) => g += `<rect x="${x(i) - iw / 26}" y="${T}" width="${iw / 13}" height="${ih}" fill="transparent" data-tip="${esc(`<b>${i === series.length - 1 ? "Vandaag" : monthName(p.date.slice(0, 7))}</b><br>Vermogen: ${eur(p.v)}`)}"/>`);
     g += `<text x="${L}" y="${H - 4}">${monthShort(months[0].slice(0, 7))}</text><text x="${W - R}" y="${H - 4}" text-anchor="end">nu</text>`;
-    return `<section class="card chart"><div class="card-head"><h2>Vermogen</h2><span class="hint">Rekening + spaar − leningen − kredieten</span></div>
-      <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap"><span class="gw-amt num" style="margin:0;color:${col};text-shadow:0 0 12px ${col}">${now.total < 0 ? "−" : ""}${eur0(Math.abs(now.total))}</span><span class="num ${delta >= 0 ? "pos" : "neg"}">${delta >= 0 ? "▲ +" : "▼ −"}${eur0(Math.abs(delta))}</span><span class="muted" style="font-size:12.5px">t.o.v. 12 maanden geleden</span></div>
+    return `<div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap"><span class="gw-amt num" style="margin:0;color:${col};text-shadow:0 0 12px ${col}">${now.total < 0 ? "−" : ""}${eur0(Math.abs(now.total))}</span><span class="num ${delta >= 0 ? "pos" : "neg"}">${delta >= 0 ? "▲ +" : "▼ −"}${eur0(Math.abs(delta))}</span><span class="muted" style="font-size:12.5px">t.o.v. 12 maanden geleden</span></div>
       <div class="pl-sum" style="margin:6px 0 4px"><span>Rekening <b class="${now.zicht < 0 ? "neg" : ""}">${eur0(now.zicht)}</b></span><span>Spaar <b class="gold">${eur0(now.spaar)}</b></span><span>Leningen <b class="neg">−${eur0(now.loans)}</b></span><span>Kredieten <b class="neg">−${eur0(now.credits)}</b></span></div>
-      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Vermogen over 12 maanden">${g}</svg></section>`;
+      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Vermogen over 12 maanden">${g}</svg>
+      <div class="legend"><span class="muted">Rekening + spaar − leningen − kredieten · laatste 12 maanden</span></div>`;
   }
 
   function goalsWide() {
@@ -3043,6 +3141,10 @@ dialog[open] { animation: fx-pop .18s ease-out; }
       case "card-add": cardAddDialog(); break;
       case "card-del": { const id = el.closest("tr").dataset.card, k = (state.cards || []).find(x => x.id === id);
         confirmDlg("Kredietkaart verwijderen?", `${k ? k.name : "De kaart"} wordt uit je lijst verwijderd. Je transacties en hun categorie blijven staan.`, "Verwijderen", () => { state.cards = state.cards.filter(x => x.id !== id); save(); render(); }); break; }
+      case "chart-view": setChartPref({ view: el.dataset.v }); render(); break;
+      case "chart-acc": { const h = new Set(chartPref().hide || ["*"]), k = el.dataset.acc; h.has(k) ? h.delete(k) : h.add(k); setChartPref({ hide: [...h] }); render(); break; }
+      case "chart-catmode": setChartPref({ catMode: el.dataset.v }); render(); break;
+      case "chart-cat-del": { const cur = chartCatsNow(); setChartPref({ cats: cur.filter(n => n !== el.dataset.cat) }); render(); break; }
       case "acc-pick": ui.acc = el.dataset.acc || ""; render(); break;
       case "sav-pick": ui.sav = el.dataset.sav || ""; render(); break;
       case "goto-profile": location.hash = "profiel"; break;
@@ -3149,6 +3251,7 @@ dialog[open] { animation: fx-pop .18s ease-out; }
 
   document.addEventListener("change", e => {
     const el = e.target, a = el.dataset.act;
+    if (a === "chart-cat-add" && el.value) { setChartPref({ cats: [...chartCatsNow(), el.value] }); render(); return; }
     if (el.id === "tx-cat") { ui.txCat = el.value; render(); return; }
     if (el.id === "tx-tag") { ui.txTag = el.value; if (el.value) ui.txAll = true; render(); return; }
     if (el.dataset.act === "sav-goal") {
