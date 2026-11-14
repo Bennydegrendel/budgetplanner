@@ -1008,4 +1008,45 @@ function monthClose(state, ym) {
     uncat: s.uncatCount, rate: s.income > 0 ? Math.round(s.net / s.income * 100) : null };
 }
 
-if (typeof module !== "undefined") module.exports = { monthClose, belfiusDesc, catByName, parentOf, groupOf, mainCats, subsOf, savKeys, activeSav, setSav, withSav, goalSav, savGoals, savAll, syncSavConfs, cardMatch, applyCards, transferFlows, OWN_CAT, ownTransfer, applyOwnTransfers, ownConflicts, MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
+/* ---------- abonnementen en vaste betalingen (stap 13b) ----------
+   Alle terugkerende uitgaven (ook die al in de planner staan), met ritme, huidig bedrag, kost per jaar,
+   prijsevolutie t.o.v. ±een jaar geleden en wat je de voorbije 12 maanden echt betaalde.
+   Wat de gebruiker erover zegt (nodig / twijfel / opzeggen / geen abonnement) staat in state.subs[key].review. */
+const PER_YEAR = { week: 52, month: 12, quarter: 4, year: 1 };
+function subscriptions(state, todayStr) {
+  const today = todayStr || ds(new Date()), groups = new Map(), r2 = x => Math.round(x * 100) / 100;
+  for (const t of budgetTx(state)) {
+    if (t.amount >= 0 || t.cat === "Opname krediet" || ["Sparen", "Overboeking"].includes(typeOf(state, t.cat))) continue;
+    if (savKeys(state).some(k => withSav(state, k, () => isSavMove(state, t)))) continue;   // stortingen naar de spaarrekening zijn geen kost
+    const mandate = ((t.search || "").match(/Mandaat:\s*(\d{6,})/i) || [])[1];
+    const k = mandate || merchantKey(t); if (!k) continue;
+    if (!groups.has(k)) groups.set(k, []); groups.get(k).push(t);
+  }
+  const subs = state.subs || {}, out = [];
+  for (const [key, list] of groups) {
+    // per dag maar één keer tellen (bv. twee kaartbetalingen dezelfde dag)
+    const byDate = [...list.reduce((m, t) => m.set(t.date, (m.get(t.date) || 0) + t.amount), new Map())].map(([date, amount]) => ({ date, amount: -amount })).sort((a, b) => a.date.localeCompare(b.date));
+    if (byDate.length < 3) continue;
+    const gaps = []; for (let i = 1; i < byDate.length; i++) gaps.push((pd(byDate[i].date) - pd(byDate[i - 1].date)) / 864e5);
+    const recent = gaps.slice(-6).sort((a, b) => a - b), med = recent[Math.floor(recent.length / 2)];
+    let repeat = null, tol = 4;
+    if (med >= 6 && med <= 8) repeat = "week", tol = 2; else if (med >= 26 && med <= 35) repeat = "month", tol = 5; else if (med >= 84 && med <= 98) repeat = "quarter", tol = 10; else if (med >= 350 && med <= 380) repeat = "year", tol = 20;
+    if (!repeat || recent.filter(g => Math.abs(g - med) <= tol).length / recent.length < 0.6) continue;
+    const last = byDate[byDate.length - 1], lastTx = list.filter(t => t.date === last.date).pop();
+    const active = (pd(today) - pd(last.date)) / 864e5 <= med * 2 + tol;
+    // bedrag ±een jaar geleden (de betaling die het dichtst bij "een jaar voor de laatste" ligt)
+    const yearAgo = ds(new Date(pd(last.date).getTime() - 365 * 864e5)), cands = byDate.filter(x => x.date <= addD0(yearAgo, 45));
+    const then = cands.length ? cands.reduce((b, x) => Math.abs(pd(x.date) - pd(yearAgo)) < Math.abs(pd(b.date) - pd(yearAgo)) ? x : b) : byDate[0];
+    const from12 = ds(new Date(pd(today).getTime() - 365 * 864e5));
+    out.push({ key, title: lastTx.desc.replace(/\s*\(.*$/, "").replace(/\s*·.*$/, "").replace(/^Domicili[eë]ring\s+/i, "").replace(/^Betaling\s+(Bancontact\s+|Maestro\s+|met debetkaart\s+)?/i, ""), cat: lastTx.cat, account: lastTx.account,
+      repeat, amount: r2(last.amount), perYear: r2(last.amount * PER_YEAR[repeat]), perMonth: r2(last.amount * PER_YEAR[repeat] / 12),
+      first: byDate[0].date, last: last.date, count: byDate.length, active,
+      was: then !== last ? r2(then.amount) : null, wasDate: then !== last ? then.date : null, pct: then !== last && then.amount > 0 ? Math.round((last.amount / then.amount - 1) * 100) : null,
+      paid12: r2(byDate.filter(x => x.date > from12).reduce((a, x) => a + x.amount, 0)),
+      review: (subs[key] && subs[key].review) || "" });
+  }
+  return out.sort((a, b) => b.perYear - a.perYear);
+}
+function addD0(d, n) { const x = pd(d); x.setDate(x.getDate() + n); return ds(x); }
+
+if (typeof module !== "undefined") module.exports = { subscriptions, PER_YEAR, monthClose, belfiusDesc, catByName, parentOf, groupOf, mainCats, subsOf, savKeys, activeSav, setSav, withSav, goalSav, savGoals, savAll, syncSavConfs, cardMatch, applyCards, transferFlows, OWN_CAT, ownTransfer, applyOwnTransfers, ownConflicts, MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
