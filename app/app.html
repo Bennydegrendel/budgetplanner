@@ -17,7 +17,7 @@
 <script>
   // Thema van dit toestel meteen zetten (anders flitst eerst het standaardthema)
   (function () { let t = {}; try { t = JSON.parse(localStorage.getItem("budgetplanner.v1.theme") || "{}"); } catch (e) {}
-    const ok = ["cyberpunk", "synthwave", "matrix", "oceaan"];
+    const ok = ["cyberpunk", "synthwave", "matrix", "oceaan", "prestige"];
     document.documentElement.dataset.theme = ok.includes(t.t) ? t.t : "cyberpunk";
     document.documentElement.dataset.mode = t.m === "light" ? "light" : "dark";
     // lettertypes van het gekozen thema (de andere worden pas geladen als je het themavenster opent)
@@ -25,7 +25,8 @@
       cyberpunk: "https://fonts.googleapis.com/css2?family=Zen+Dots&family=Orbitron:wght@500;600;700;800&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap",
       synthwave: "https://fonts.googleapis.com/css2?family=Audiowide&family=Exo+2:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap",
       matrix: "https://fonts.googleapis.com/css2?family=VT323&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap",
-      oceaan: "https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Nunito:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" };
+      oceaan: "https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Nunito:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap",
+      prestige: "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Montserrat:wght@500;600;700&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" };
     document.getElementById("theme-fonts").href = window.THEME_FONTS[document.documentElement.dataset.theme]; })();
   // Het manifest ("typeplaatje" voor installeren) alleen laden als de app via een webadres draait;
   // als los bestand (file://) geeft de browser er anders een foutmelding op.
@@ -171,6 +172,29 @@
   --head-top: rgba(255, 255, 255, .96); --head-bottom: rgba(242, 248, 252, .96); --grid-line: rgba(12, 143, 154, .05); --backdrop: rgba(10, 37, 64, .3); --menu-shadow: 0 8px 24px rgba(10, 37, 64, .15);
   color-scheme: light;
 }
+/* Prestige: zwart & wit met champagnegoud, positief = goud, zakelijk en chic, relief met schaduwen i.p.v. neon */
+[data-theme="prestige"][data-mode="dark"] {
+  --glow: .12;
+  --bg: #0a0a0b; --surface: #131315; --ink: #f2efe8; --muted: #8f8a80; --line: #2a2824;
+  --accent: #c9a45c; --magenta: #d6b56c; --pos: #c9a45c; --neg: #c2574a; --gold: #e8cf8e; --warn: #d9a54a;
+  --accent-rgb: 201, 164, 92; --magenta-rgb: 214, 181, 108; --pos-rgb: 201, 164, 92; --neg-rgb: 194, 87, 74;
+  --gold-rgb: 232, 207, 142; --warn-rgb: 217, 165, 74; --muted-rgb: 143, 138, 128; --ink-rgb: 242, 239, 232; --amber-rgb: 201, 164, 92; --shade-rgb: 0, 0, 0; --hi-rgb: 255, 255, 255;
+  --bar: #c9a45c; --bar-track: #1e1d1b; --s1: #c9a45c; --s2: #e9e4d8; --s3: #7d786e; --s4: #8a6a3d; --s5: #4f4b44;
+  --panel: #111112; --panel-rgb: 17, 17, 18; --scan: 0; --on-accent: #0a0a0b; --gold-dark: #8c6d33; --field: #0e0e0f;
+  --head-top: rgba(25, 25, 27, .97); --head-bottom: rgba(17, 17, 19, .97); --grid-line: transparent; --backdrop: rgba(0, 0, 0, .62); --menu-shadow: 0 14px 34px rgba(0, 0, 0, .6);
+  color-scheme: dark;
+}
+[data-theme="prestige"][data-mode="light"] {
+  --glow: 0;
+  --bg: #f6f4ef; --surface: #ffffff; --ink: #141414; --muted: #6e695f; --line: #e3ded2;
+  --accent: #9c7a35; --magenta: #1c1c1c; --pos: #9c7a35; --neg: #a8402f; --gold: #8a6a2a; --warn: #8f6a1a;
+  --accent-rgb: 156, 122, 53; --magenta-rgb: 28, 28, 28; --pos-rgb: 156, 122, 53; --neg-rgb: 168, 64, 47;
+  --gold-rgb: 138, 106, 42; --warn-rgb: 143, 106, 26; --muted-rgb: 110, 105, 95; --ink-rgb: 20, 20, 20; --amber-rgb: 156, 122, 53; --shade-rgb: 40, 32, 16; --hi-rgb: 255, 255, 255;
+  --bar: #9c7a35; --bar-track: #ece8de; --s1: #9c7a35; --s2: #1c1c1c; --s3: #a39e93; --s4: #c9a96e; --s5: #5c574d;
+  --panel: #ffffff; --panel-rgb: 255, 255, 255; --scan: 0; --on-accent: #ffffff; --gold-dark: #6e5420; --field: #ffffff;
+  --head-top: rgba(255, 255, 255, .98); --head-bottom: rgba(251, 250, 247, .98); --grid-line: transparent; --backdrop: rgba(20, 20, 20, .35); --menu-shadow: 0 14px 34px rgba(40, 32, 16, .14);
+  color-scheme: light;
+}
 .theme-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0 4px; }
 .theme-tile { all: unset; box-sizing: border-box; cursor: pointer; background: var(--bg); color: var(--ink); border: 1px solid var(--line); padding: 10px; clip-path: var(--notch-sm); display: grid; gap: 8px; }
 .theme-tile .tt-card { background: var(--surface); border: 1px solid var(--line); padding: 8px 10px; }
@@ -203,6 +227,21 @@
   --r-card: 18px; --r-btn: 12px; --r-field: 10px; --r-pill: 999px; --r-bar: 999px; --r-sm: 8px;
   --case-title: none; --case-ui: none; --title-spacing: 0; --corner: 0; --hero-size: 30px; --body-size: 15px; --body-weight: 400;
 }
+[data-theme="prestige"] {
+  --font-display: "Montserrat", "Segoe UI", system-ui, sans-serif; --font-body: "Inter", "Segoe UI", system-ui, sans-serif; --font-mono: "DM Mono", ui-monospace, monospace;
+  --font-hero: "Playfair Display", Georgia, serif; --font-figure: "Playfair Display", Georgia, serif; --notch: none; --notch-sm: none;
+  --r-card: 6px; --r-btn: 4px; --r-field: 4px; --r-pill: 999px; --r-bar: 999px; --r-sm: 3px;
+  --case-title: uppercase; --case-ui: uppercase; --title-spacing: .14em; --corner: 0; --hero-size: 34px; --body-size: 14.5px; --body-weight: 400;
+  /* relief: een fijne lichtrand bovenaan (alsof het licht van boven komt) + een zachte slagschaduw eronder */
+  --relief: inset 0 1px 0 rgba(var(--hi-rgb), .06), 0 1px 1px rgba(var(--shade-rgb), .55), 0 20px 40px -24px rgba(var(--shade-rgb), .95);
+  --relief-sm: inset 0 1px 0 rgba(var(--hi-rgb), .07), 0 1px 2px rgba(var(--shade-rgb), .55);
+  --sunken: inset 0 1px 3px rgba(var(--shade-rgb), .55);
+}
+[data-theme="prestige"][data-mode="light"] {
+  --relief: inset 0 1px 0 rgba(var(--hi-rgb), 1), 0 1px 2px rgba(var(--shade-rgb), .07), 0 20px 40px -26px rgba(var(--shade-rgb), .30);
+  --relief-sm: inset 0 1px 0 rgba(var(--hi-rgb), 1), 0 1px 2px rgba(var(--shade-rgb), .10);
+  --sunken: inset 0 1px 3px rgba(var(--shade-rgb), .10);
+}
 /* Synthwave: zonsondergang in de titel, zon aan de horizon, roze randjes */
 [data-theme="synthwave"] body { background:
     radial-gradient(900px 340px at 50% 104%, rgba(var(--accent-rgb), .22), transparent 70%),
@@ -232,6 +271,47 @@
 [data-theme="oceaan"] th { letter-spacing: .02em; font-size: 12px; }
 [data-theme="oceaan"] main { gap: 24px; } [data-theme="oceaan"] .card { padding: 24px; }
 [data-theme="oceaan"] .kpi::before { border-radius: 999px; }
+/* Prestige: strak, rustig, relief i.p.v. gloed. Titels in Playfair, labels in Montserrat met ruime letterafstand */
+[data-theme="prestige"] body { background: radial-gradient(1200px 520px at 50% -12%, rgba(var(--accent-rgb), .08), transparent 70%), var(--bg); background-attachment: fixed; letter-spacing: 0; }
+[data-theme="prestige"] .page-head h1 { text-transform: none; letter-spacing: .005em; font-weight: 600; text-shadow: none; }
+[data-theme="prestige"] .page-head h1::after { width: 56px; height: 1px; margin-top: 12px; background: linear-gradient(90deg, var(--accent), transparent); box-shadow: none; }
+[data-theme="prestige"] header { background: rgba(var(--panel-rgb), .94); border-bottom: 1px solid var(--line); box-shadow: 0 10px 30px -22px rgba(var(--shade-rgb), .9); }
+[data-theme="prestige"] .brand-mark, [data-theme="prestige"] .sp-logo { background: linear-gradient(150deg, var(--gold), var(--accent) 45%, var(--gold-dark)); color: var(--on-accent); box-shadow: inset 0 1px 0 rgba(var(--hi-rgb), .45), 0 2px 6px rgba(var(--shade-rgb), .5); }
+[data-theme="prestige"][data-mode="light"] .brand-mark, [data-theme="prestige"][data-mode="light"] .sp-logo { background: linear-gradient(150deg, var(--ink), var(--magenta)); color: var(--gold); }
+[data-theme="prestige"] nav a { font-weight: 500; letter-spacing: .14em; font-size: 11.5px; }
+[data-theme="prestige"] nav a[aria-current="page"] { text-shadow: none; }
+[data-theme="prestige"] .card, [data-theme="prestige"] .kpi, [data-theme="prestige"] .drop { border-color: var(--line); box-shadow: var(--relief); }
+[data-theme="prestige"] .card h2, [data-theme="prestige"] .kpi .label { font-weight: 600; font-size: 11px; letter-spacing: .18em; }
+[data-theme="prestige"] .card h2 { color: var(--ink); }
+[data-theme="prestige"] .card h2::before { content: ""; display: inline-block; width: 14px; height: 1px; margin-right: 10px; vertical-align: middle; background: var(--accent); }
+[data-theme="prestige"] .kpi::before { width: 2px; box-shadow: none; }
+[data-theme="prestige"] .kpi .value, [data-theme="prestige"] .loan-big, [data-theme="prestige"] .gw-amt { font-weight: 600; letter-spacing: 0; text-shadow: none !important; }
+[data-theme="prestige"] { font-variant-numeric: lining-nums; }   /* Playfair: cijfers even hoog (geen "oude" cijfers) */
+[data-theme="prestige"] .kpi .value { font-size: 29px; }
+[data-theme="prestige"] .chip { letter-spacing: .06em; font-size: 10px; font-weight: 600; }
+[data-theme="prestige"] .btn { background: linear-gradient(180deg, rgba(var(--hi-rgb), .045), rgba(var(--hi-rgb), 0)), var(--surface); border-color: var(--line); color: var(--ink); box-shadow: var(--relief-sm); letter-spacing: .12em; font-weight: 500; font-size: 11.5px; transition: box-shadow .15s ease, border-color .15s ease, transform .08s ease; }
+[data-theme="prestige"] .btn:hover { border-color: rgba(var(--accent-rgb), .7); color: var(--accent); box-shadow: var(--relief-sm), 0 6px 14px -8px rgba(var(--shade-rgb), .7); }
+[data-theme="prestige"] .btn:active { transform: translateY(1px); box-shadow: var(--sunken); }
+[data-theme="prestige"] .btn.primary { background: linear-gradient(180deg, var(--gold), var(--accent) 55%, var(--gold-dark)); border-color: var(--gold-dark); color: var(--on-accent); box-shadow: inset 0 1px 0 rgba(var(--hi-rgb), .35), 0 2px 6px rgba(var(--shade-rgb), .45), 0 10px 20px -12px rgba(var(--accent-rgb), .7); }
+[data-theme="prestige"][data-mode="light"] .btn.primary { background: linear-gradient(180deg, rgba(var(--hi-rgb), .14), rgba(var(--hi-rgb), 0) 60%), var(--magenta); border-color: var(--magenta); color: var(--on-accent); box-shadow: inset 0 1px 0 rgba(var(--hi-rgb), .18), 0 2px 6px rgba(var(--shade-rgb), .25); }
+[data-theme="prestige"] .btn.primary:hover { filter: brightness(1.06); color: var(--on-accent); }
+[data-theme="prestige"] .btn.ghost { background: transparent; border-color: transparent; box-shadow: none; }
+[data-theme="prestige"] :is(.input, select.cat, input.cell, .month, .seg) { box-shadow: var(--sunken); }
+[data-theme="prestige"] .input:focus, [data-theme="prestige"] select.cat:focus, [data-theme="prestige"] input.cell:focus { box-shadow: var(--sunken), 0 0 0 1px var(--accent); }
+[data-theme="prestige"] .seg button[aria-pressed="true"] { background: linear-gradient(180deg, rgba(var(--accent-rgb), .20), rgba(var(--accent-rgb), .08)); text-shadow: none; box-shadow: inset 0 1px 0 rgba(var(--hi-rgb), .06); }
+[data-theme="prestige"] th { font-weight: 600; letter-spacing: .16em; font-size: 10px; border-bottom-color: var(--line); }
+[data-theme="prestige"] :is(.track, .gauge, .debt-bar) { box-shadow: var(--sunken); }
+[data-theme="prestige"] :is(.fill, .gauge span, .debt-bar .owed, .debt-bar .free) { box-shadow: inset 0 1px 0 rgba(var(--hi-rgb), .25) !important; }
+[data-theme="prestige"] .chart path[stroke] { filter: none !important; }
+[data-theme="prestige"] .chart path[fill^="var"], [data-theme="prestige"] .chart rect[fill^="var"] { filter: drop-shadow(0 1px 1px rgba(var(--shade-rgb), .5)); }
+[data-theme="prestige"] :is(.tooltip, #tut-tip) { background: rgba(var(--panel-rgb), .98); border-color: rgba(var(--accent-rgb), .55); box-shadow: inset 0 1px 0 rgba(var(--hi-rgb), .06), 0 18px 40px -14px rgba(var(--shade-rgb), .8); }
+[data-theme="prestige"] #tut-tip .tt { font-family: var(--font-hero); text-transform: none; letter-spacing: .01em; font-size: 15px; }
+[data-theme="prestige"] dialog { border-color: rgba(var(--accent-rgb), .35); border-radius: var(--r-card); box-shadow: inset 0 1px 0 rgba(var(--hi-rgb), .06), 0 40px 90px -30px rgba(var(--shade-rgb), .9); }
+[data-theme="prestige"] dialog h3 { font-family: var(--font-hero); text-transform: none; letter-spacing: .01em; font-size: 22px; font-weight: 600; }
+[data-theme="prestige"] .notice { box-shadow: var(--relief-sm); }
+[data-theme="prestige"] .toast { box-shadow: 0 18px 40px -12px rgba(var(--shade-rgb), .8); }
+[data-theme="prestige"] #spot { border-width: 1px; box-shadow: 0 0 0 4px rgba(var(--accent-rgb), .15), 0 10px 30px -10px rgba(var(--shade-rgb), .8); }
+[data-theme="prestige"] ::selection { background: var(--accent); color: var(--on-accent); }
 /* afgeleide tokens opnieuw uitrekenen op elk element met een thema (ook de voorbeeldtegels in het themavenster) */
 [data-theme] { --accent-soft: rgba(var(--accent-rgb), .10); --pos-soft: rgba(var(--pos-rgb), .12); --neg-soft: rgba(var(--neg-rgb), .14); --warn-soft: rgba(var(--warn-rgb), .12);
   --shadow: 0 0 0 1px rgba(var(--accent-rgb), .04), 0 0 28px rgba(var(--accent-rgb), .05); }
@@ -814,6 +894,10 @@ dialog[open] { animation: fx-pop .18s ease-out; }
   60% { clip-path: inset(0 0 0 0); transform: translateX(2px); }
   100% { clip-path: inset(0 0 0 0); transform: none; } }
 [data-theme="cyberpunk"] #main.enter .page-head h1 { animation: fx-glitch .45s steps(2, end) .1s both; }
+@keyframes pr-title { from { opacity: 0; letter-spacing: .08em; } to { opacity: 1; } }
+@keyframes pr-line { from { width: 0; } to { width: 56px; } }
+[data-theme="prestige"] #main.enter .page-head h1 { animation: pr-title .7s ease-out both; }
+[data-theme="prestige"] #main.enter .page-head h1::after { animation: pr-line .9s cubic-bezier(.2, .8, .2, 1) .2s both; }
 
 /* Matrix: knipperende cursor (de titel typt zichzelf via het script) */
 @keyframes fx-blink { 50% { opacity: 0; } }
@@ -896,6 +980,20 @@ dialog[open] { animation: fx-pop .18s ease-out; }
 @keyframes sp-blink { 50% { opacity: 0; } }
 [data-theme="matrix"] .sp-logo { background: var(--bg); color: var(--accent); border: 2px solid var(--accent); }
 [data-theme="matrix"] .sp-glow { filter: drop-shadow(0 0 calc(18px * var(--glow) + 2px) rgba(var(--accent-rgb), .8)); }
+/* Prestige: twee gouden lijnen schuiven open, glansstreep over het logo, titel in Playfair */
+[data-theme="prestige"] #splash { background: radial-gradient(900px 500px at 50% 40%, rgba(var(--accent-rgb), .10), transparent 70%), var(--bg); }
+[data-theme="prestige"] #splash .sp-fx::before, [data-theme="prestige"] #splash .sp-fx::after { content: ""; position: absolute; left: 50%; height: 1px; width: min(70vw, 760px); transform: translateX(-50%) scaleX(0);
+  background: linear-gradient(90deg, transparent, var(--accent), transparent); animation: pr-open 1.4s cubic-bezier(.2, .8, .2, 1) .5s both; }
+[data-theme="prestige"] #splash .sp-fx::before { top: calc(50% - 150px); } [data-theme="prestige"] #splash .sp-fx::after { top: calc(50% + 140px); }
+@keyframes pr-open { to { transform: translateX(-50%) scaleX(1); } }
+[data-theme="prestige"] .sp-glow { filter: drop-shadow(0 14px 22px rgba(var(--shade-rgb), .6)); }
+[data-theme="prestige"] .sp-logo { position: relative; overflow: hidden; font-family: var(--font-hero); border-radius: 8px; }
+[data-theme="prestige"] .sp-logo::after { content: ""; position: absolute; inset: -20%; background: linear-gradient(105deg, transparent 40%, rgba(var(--hi-rgb), .55) 50%, transparent 60%); transform: translateX(-120%); animation: pr-shine 1.1s ease-in-out 1.3s both; }
+@keyframes pr-shine { to { transform: translateX(120%); } }
+[data-theme="prestige"] .sp-title { font-family: var(--font-hero); color: var(--ink); text-transform: none; letter-spacing: .02em; font-weight: 600; text-shadow: none; font-size: clamp(30px, 7vw, 46px); }
+[data-theme="prestige"] .sp-sub { color: var(--accent); font-family: var(--font-display); letter-spacing: .36em; font-size: 11.5px; }
+[data-theme="prestige"] .sp-bar { height: 1px; background: rgba(var(--accent-rgb), .18); }
+[data-theme="prestige"] .sp-bar i { box-shadow: none; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; } #fx { display: none !important; } }
 </style>
 </head>
@@ -1178,7 +1276,7 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
   }
   /* ---------- thema's ----------
      De keuze hoort bij dit toestel (localStorage), niet bij de back-up: zo kan je gsm licht en je pc donker zijn. */
-  const THEMES = [["cyberpunk", "Cyberpunk"], ["synthwave", "Synthwave"], ["matrix", "Matrix"], ["oceaan", "Oceaan"]];
+  const THEMES = [["cyberpunk", "Cyberpunk"], ["synthwave", "Synthwave"], ["matrix", "Matrix"], ["oceaan", "Oceaan"], ["prestige", "Prestige"]];
   function getTheme() { const r = document.documentElement; return { t: r.dataset.theme || "cyberpunk", m: r.dataset.mode || "dark" }; }
   function applyTheme(th) {
     const r = document.documentElement; r.dataset.theme = th.t; r.dataset.mode = th.m; $("#theme-fonts").href = window.THEME_FONTS[th.t];
@@ -1602,7 +1700,7 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
   }
   /* ---------- grafieken (stap 9a): één kaart met keuzeknoppen ---------- */
   const CHART_VIEWS = [["saldo", "Saldoverwachting"], ["vermogen", "Vermogen"], ["cat", "Per categorie"], ["inuit", "Inkomen & uitgaven"]];
-  const CAT_COLORS = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--pos)"], MAX_CHART_CATS = CAT_COLORS.length;
+  const CAT_COLORS = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--s5, var(--pos))"], MAX_CHART_CATS = CAT_COLORS.length;
   // keuze per toestel (zoals het thema), niet in de back-up
   function chartPref() { try { return JSON.parse(localStorage.getItem(KEY + ".chart") || "{}") || {}; } catch (e) { return {}; } }
   function setChartPref(p) { try { localStorage.setItem(KEY + ".chart", JSON.stringify({ ...chartPref(), ...p })); } catch (e) {} }
@@ -1817,7 +1915,7 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
     const total = rows.reduce((a, r) => a + r.carryIn, 0);
     const max = Math.max(1, ...rows.map(r => Math.abs(r.carryIn)));
     let h = `<section class="card"><div class="card-head"><h2>Overgedragen budget</h2><span class="num ${total >= 0 ? "pos" : "neg"}" style="font-weight:600">${signed(total)}</span></div>
-      <p class="muted" style="margin:-6px 0 12px;font-size:12.5px">Wat er sinds ${rolloverStart(state) ? esc(monthName(rolloverStart(state))) : "het begin"} over is (groen) of te veel uitgegeven werd (rood), en dus bij het budget van ${esc(monthName(ui.month))} komt.</p><div class="cats">`;
+      <p class="muted" style="margin:-6px 0 12px;font-size:12.5px">Wat er sinds ${rolloverStart(state) ? esc(monthName(rolloverStart(state))) : "het begin"} over is (+) of te veel uitgegeven werd (−), en dus bij het budget van ${esc(monthName(ui.month))} komt.</p><div class="cats">`;
 
     for (const r of rows) {
       const w = Math.abs(r.carryIn) / max * 50;
@@ -3228,7 +3326,7 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
     tutPaint();
   }
   /* ---------- profiel: rekeningen en instellingen (stap 8a) ---------- */
-  const ACC_COLORS = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--pos)"];
+  const ACC_COLORS = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--s5, var(--pos))"];
   function accColor(acc) { const a = state.accounts[acc]; const i = a && Number.isInteger(a.color) ? a.color : Math.max(0, zichtList(state).indexOf(acc)); return ACC_COLORS[i % ACC_COLORS.length]; }
   function oldestDay(acc) { const d = state.transactions.filter(t => t.account === acc).map(t => t.date).sort()[0]; if (!d) return ""; const x = new Date(d); x.setDate(x.getDate() - 1); return x.getFullYear() + "-" + String(x.getMonth() + 1).padStart(2, "0") + "-" + String(x.getDate()).padStart(2, "0"); }
   function viewProfile() {
