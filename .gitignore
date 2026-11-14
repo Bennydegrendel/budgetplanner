@@ -1,0 +1,5 @@
+# Nooit persoonlijke gegevens in deze repo
+*.csv
+*.json.gz
+*-backup*.json
+budgetplanner-mobiel.*
