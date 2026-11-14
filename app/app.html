@@ -858,6 +858,7 @@ dialog[open] { animation: fx-pop .18s ease-out; }
       <a href="#spaar">Spaar</a>
       <a href="#planner" id="nav-planner">Planner</a>
       <a href="#leningen" title="Leningen &amp; kredieten">L&amp;K</a>
+      <a href="#help" title="Uitleg en stappenplannen">Help</a>
     </nav>
     <div class="actions">
       <button class="btn primary" id="btn-import" type="button" title="CSV van je bank importeren">↑ <span class="label-long">CSV importeren</span><span class="label-short" hidden>CSV</span></button>
@@ -2998,15 +2999,15 @@ dialog[open] { animation: fx-pop .18s ease-out; }
   function viewHelp() {
     const tabName = t => (HELP_TABS.find(x => x[0] === t) || [])[1] || "";
     const plain = h => h.replace(/<[^>]+>/g, "").toLowerCase();
-    let h = `<div class="page-head"><div><h1>Help</h1><p>Uitleg en stappenplannen · open deze pagina altijd met <kbd>F1</kbd></p></div></div>
+    let h = `<div class="page-head"><div><h1>Help</h1><p>Uitleg en stappenplannen</p></div></div>
       <section class="card help-search"><input class="input" id="help-q" type="search" placeholder="Zoek in de help, bv. startsaldo, OneDrive, splitsen…" aria-label="Zoeken in de help" autocomplete="off"><p class="muted" id="help-none" hidden style="margin:10px 0 0">Niets gevonden. Probeer een ander woord.</p></section>`;
     h += `<section class="card"><div class="card-head"><h2>Stappenplannen</h2><span class="hint">Klik om open te klappen</span></div><div class="help-list">` + HELP_TOPICS.map(t =>
       `<details class="help-item" id="help-${t.id}" data-q="${esc(plain(t.title + " " + t.steps.join(" ")))}"><summary><span class="help-ic">${t.icon}</span>${esc(t.title)}</summary>
         <ol class="help-steps">${t.steps.map(x => `<li><span>${x}</span></li>`).join("")}</ol>${t.tab ? `<a class="hint" href="#${t.tab}">→ Naar ${esc(tabName(t.tab))}</a>` : ""}</details>`).join("") + `</div></section>`;
     h += `<section class="card"><div class="card-head"><h2>De tabbladen</h2></div><div class="help-tabs">` + HELP_TABS.map(([k, n, x]) =>
       `<div class="help-item help-tab" data-q="${esc(plain(n + " " + x))}"><a href="#${k}"><b>${esc(n)}</b></a><p>${x}</p></div>`).join("") + `</div></section>`;
-    h += `<section class="card help-item" data-q="sneltoetsen toetsen f1 ctrl z escape"><div class="card-head"><h2>Sneltoetsen (pc)</h2></div><div class="help-keys">
-      <span><kbd>F1</kbd> deze helppagina</span><span><kbd>Ctrl</kbd>+<kbd>Z</kbd> laatste wisactie ongedaan maken</span><span><kbd>Esc</kbd> venster of menu sluiten</span></div></section>`;
+    h += `<section class="card help-item" data-q="sneltoetsen toetsen ctrl z escape"><div class="card-head"><h2>Sneltoetsen (pc)</h2></div><div class="help-keys">
+      <span><kbd>Ctrl</kbd>+<kbd>Z</kbd> laatste wisactie ongedaan maken</span><span><kbd>Esc</kbd> venster of menu sluiten</span></div></section>`;
     return h;
   }
   function helpFilter(q) {
@@ -3084,7 +3085,7 @@ dialog[open] { animation: fx-pop .18s ease-out; }
     h += `</tbody></table></div><div style="margin-top:12px"><button class="btn" data-act="card-add" type="button">+ Kredietkaart toevoegen</button></div></section>`;
     const items = [["theme-open", "🎨", "Thema", "Cyberpunk, Synthwave, Matrix of Oceaan · donker of licht"], ["folder-open", "☁", "OneDrive-back-up", "Automatisch een kopie + gsm-samenvatting"],
       ["export-json", "↓", "Back-up exporteren", "Alles in één .json-bestand"], ["import-json", "↑", "Back-up terugzetten", "Een eerder geëxporteerd bestand laden"],
-      ["export-csv", "⊞", "Transacties naar Excel", ".csv met puntkomma, opent in Excel"], ["pin-open", "🔒", "Pincode", "De planner afschermen met een code"], ["help-open", "?", "Help", "Uitleg en stappenplannen · F1"],
+      ["export-csv", "⊞", "Transacties naar Excel", ".csv met puntkomma, opent in Excel"], ["pin-open", "🔒", "Pincode", "De planner afschermen met een code"], ["help-open", "?", "Help", "Uitleg en stappenplannen"],
       ...(isStandalone() ? [] : [["install", "⤓", "App installeren", "Als programma op je pc of gsm"]]), ["reset", "✕", "Alles wissen", "Verwijdert alle gegevens in deze browser", "danger"]];
     h += `<section class="card"><div class="card-head"><h2>Instellingen</h2></div><div class="pf-grid">${items.map(([act, ic, t, sub, cls]) => `<button type="button" class="pf-item${cls ? " " + cls : ""}" data-act="${act}"><b>${ic} ${t}</b><small>${sub}</small></button>`).join("")}</div></section>`;
     return h;
@@ -3521,8 +3522,6 @@ dialog[open] { animation: fx-pop .18s ease-out; }
     tip.style.left = x + "px"; tip.style.top = y + "px";
   });
   document.addEventListener("keydown", e => { if (e.key === "Escape") { hideTip(); navOpen(false); } });
-  // F1 = helppagina (de browser-help onderdrukken)
-  document.addEventListener("keydown", e => { if (e.key !== "F1") return; e.preventDefault(); if ($("#dlg").open) $("#dlg").close(); location.hash = "help"; window.scrollTo(0, 0); });
   document.addEventListener("input", e => { if (e.target.id === "help-q") helpFilter(e.target.value); });
   // Ctrl+Z (Cmd+Z op Mac) = laatste wisactie ongedaan maken, behalve tijdens het typen in een veld
   document.addEventListener("keydown", e => {
