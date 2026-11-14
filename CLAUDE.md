@@ -87,7 +87,7 @@ Werk ze in volgorde af. Na elke stap: commit, korte uitleg, en wacht op Benny vo
   - [x] 6a – Opkuis: alle losse kleuren naar tokens (pixelvergelijking vóór/na: 0 verschillen).
   - [x] 6b – Licht/donker + themakiezer, voor de volledige app en de gsm-weergave.
   - [x] 6c – Karakter per thema (lettertypes, hoeken, accenten) + animaties (kort en spaarzaam, respecteert "minder beweging").
-- [ ] **Stap 7 – Layout voor elk scherm.**
+- [x] **Stap 7 – Layout voor elk scherm.**
   - [x] 7a – Brede schermen (≥ 1600 px): inhoud tot 1760 px breed + vast zijpaneel `#side` (Binnenkort te betalen, Resterend budget, Spaardoelen), niet op het Overzicht (daar staat het al). `renderSide()` na elke render; onder 1600 px ongewijzigd.
   - [x] 7b – Volledige planner op de gsm (≤ 900 px): menuknop ☰ `#btn-nav` met naam van het huidige tabblad i.p.v. verborgen veegbalk; ≤ 700 px kaartjes 2 per rij en prijsstijgingen als inklapbare `details.fold` (`narrow()`).
   - [x] 7c – Gsm-weergave: bovenbalk weg (`body.lite header`), logo + titel + 👁/⟳ in één kopregel die bovenaan blijft staan (sticky); prijsstijgingen inklapbaar.
