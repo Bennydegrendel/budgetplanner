@@ -1073,4 +1073,93 @@ function filterTx(state, list, f) {
 }
 const filterActive = f => !!(f && (f.dir || parseAmt(f.min) !== null || parseAmt(f.max) !== null || f.from || f.to || (f.cats && f.cats.length) || f.noXfer));
 
-if (typeof module !== "undefined") module.exports = { filterTx, filterActive, parseAmt, subscriptions, PER_YEAR, monthClose, belfiusDesc, catByName, parentOf, groupOf, mainCats, subsOf, savKeys, activeSav, setSav, withSav, goalSav, savGoals, savAll, syncSavConfs, cardMatch, applyCards, transferFlows, OWN_CAT, ownTransfer, applyOwnTransfers, ownConflicts, MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
+/* ---------- demo-modus (stap 14) ----------
+   Een volledig verzonnen planner: Luna (27), QA-tester bij een gamestudio in Gent, streamt op Twitch, kat Pixel.
+   Altijd dezelfde gegevens (vast zaadgetal), 2 jaar tot vandaag, alle bedragen afgerond op hele euro's.
+   Rekeningnummers en firma's zijn verzonnen (testnummers 0000). Wordt nooit bewaard. */
+function demoState(todayStr) {
+  const today = todayStr || ds(new Date()), st = newState();
+  let seed = 20260117;
+  const rnd = () => { seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  const between = (a, b) => Math.round(a + rnd() * (b - a)), pick = l => l[Math.floor(rnd() * l.length)];
+  const ZICHT = "BE68 0000 0000 0420", SPAAR = "BE41 0000 0000 1337", HUISBAAS = "BE12 0000 0000 7777";
+  st.profile = { name: "Luna" };
+  st.accounts = { [ZICHT]: { type: "zicht", name: "Zichtrekening", color: 1 }, [SPAAR]: { type: "spaar", name: "Spaarrekening" } };
+  const C = (name, type, budget, extra) => Object.assign({ name, type, budget }, extra || {});
+  st.categories = [
+    C("Loon", "Inkomen", 2200), C("Twitch", "Inkomen", 80),
+    C("Huur", "Vaste kosten", 785), C("Energie", "Vaste kosten", 95), C("Internet & gsm", "Vaste kosten", 75), C("Verzekering", "Vaste kosten", 25), C("Abonnementen", "Vaste kosten", 60),
+    C("Boodschappen", "Variabele kosten", 290), C("Games", "Variabele kosten", 100), C("Eten & drinken", "Variabele kosten", 120), C("Kat Pixel", "Variabele kosten", 45),
+    C("Kleding & cosplay", "Variabele kosten", 70), C("Sport", "Vaste kosten", 30), C("Uitstapjes", "Variabele kosten", 60), C("Hardware", "Variabele kosten", null, { budgetYear: 600 }),
+    C("Gaming-pc", "Sparen", 165), C("Japan-reis", "Sparen", 250), C("Noodfonds", "Sparen", 215),
+  ];
+  st.rules = [["pixelforge", "Loon"], ["twitch", "Twitch"], ["immo de kat", "Huur"], ["luminus", "Energie"], ["proximus", "Internet & gsm"], ["mobile vikings", "Internet & gsm"],
+    ["ethias", "Verzekering"], ["netflix", "Abonnementen"], ["spotify", "Abonnementen"], ["game pass", "Abonnementen"], ["discord", "Abonnementen"],
+    ["colruyt", "Boodschappen"], ["delhaize", "Boodschappen"], ["steam", "Games"], ["playstation", "Games"], ["nintendo", "Games"],
+    ["deliveroo", "Eten & drinken"], ["takeaway", "Eten & drinken"], ["zooplus", "Kat Pixel"], ["dierenarts", "Kat Pixel"], ["zalando", "Kleding & cosplay"], ["cosplay", "Kleding & cosplay"], ["anime figures", "Kleding & cosplay"], ["basic-fit", "Sport"],
+    ["nmbs", "Uitstapjes"], ["kinepolis", "Uitstapjes"], ["facts", "Uitstapjes"], ["coolblue", "Hardware"], ["alternate", "Hardware"]].map(([keyword, cat]) => ({ keyword, cat }));
+  const end = today.slice(0, 7), start = addMonths(end, -23), first = start + "-01";
+  st.goals = [{ name: "Gaming-pc", target: 4500, start: 0, deadline: addMonths(end, 4) + "-01" }, { name: "Japan-reis", target: 9000, start: 0, deadline: addMonths(end, 14) + "-01" }, { name: "Noodfonds", target: 8000, start: 0, deadline: "" }];
+  ensureGoalRefs(st);
+  let n = 0;
+  const tx = (date, amount, desc, cp, extra) => { if (date > today) return; n++; st.transactions.push(Object.assign({ id: `${ZICHT}|${n}|${date}`, date, desc, cat: UNCAT, amount: Math.round(amount), account: ZICHT, omzet: String(n), counterparty: cp || "", raw: desc, search: desc + (cp ? " " + cp : "") }, extra || {})); };
+  for (let ym = start, i = 0; ym <= end; ym = addMonths(ym, 1), i++) {
+    const last = +endOfMonth(ym).slice(8), d = day => `${ym}-${String(Math.min(day, last)).padStart(2, "0")}`, y2 = i >= 12, m = ym.slice(5);
+    tx(d(25), y2 ? 2250 : 2150, "PIXELFORGE STUDIOS NV · loon");
+    tx(d(between(8, 12)), between(40, 120), "TWITCH INTERACTIVE · payout");
+    if (m === "05") tx(d(28), 1450, "PIXELFORGE STUDIOS NV · vakantiegeld");
+    if (m === "12") tx(d(20), 1100, "PIXELFORGE STUDIOS NV · eindejaarspremie");
+    tx(d(1), y2 ? -785 : -760, "Naar IMMO DE KAT · huur", HUISBAAS);
+    tx(d(5), -between(84, 104), "Domiciliëring LUMINUS energie");
+    tx(d(6), -60, "Domiciliëring PROXIMUS internet");
+    tx(d(7), -15, "Domiciliëring MOBILE VIKINGS");
+    tx(d(15), -25, "Domiciliëring ETHIAS verzekering");
+    tx(d(9), i >= 16 ? -18 : -15, "NETFLIX.COM");
+    tx(d(10), -12, "SPOTIFY");
+    tx(d(11), y2 ? -18 : -15, "XBOX GAME PASS ULTIMATE");
+    tx(d(14), -10, "DISCORD NITRO");
+    for (const day of [3, 10, 17, 24]) tx(d(day + between(0, 2)), -between(45, 95), pick(["Betaling Bancontact COLRUYT GENT", "Betaling Bancontact DELHAIZE GENT"]));
+    for (let k = between(2, 3); k > 0; k--) tx(d(between(2, 27)), -between(15, 60), pick(["STEAM PURCHASE", "PLAYSTATION STORE", "NINTENDO ESHOP"]));
+    for (let k = between(3, 5); k > 0; k--) tx(d(between(2, 28)), -between(17, 34), pick(["DELIVEROO", "TAKEAWAY.COM"]));
+    for (let k = between(2, 3); k > 0; k--) tx(d(between(2, 28)), -between(5, 8), "Betaling Bancontact BUBBLE TEA GENT");   // geen regel: te categoriseren
+    tx(d(between(4, 20)), -between(32, 46), "ZOOPLUS · kattenvoer Pixel");
+    tx(d(between(5, 25)), -between(25, 95), pick(["ZALANDO", "COSPLAY SHOP ANTWERPEN"]));
+    tx(d(2), -30, "Domiciliëring BASIC-FIT");
+    if (i % 2 === 1) tx(d(between(5, 25)), -between(35, 80), "ANIME FIGURES SHOP · figuurtje");
+    if (i % 3 === 1) tx(d(between(5, 25)), -between(12, 48), pick(["KINEPOLIS GENT", "FACTS GENT · tickets", "NMBS · treinticket"]));
+    if (i === 8) tx(d(18), -649, "COOLBLUE · grafische kaart");
+    if (i === 19) tx(d(12), -119, "ALTERNATE · gaming headset");
+    if (i === 14) tx(d(9), -85, "DIERENARTS DE POOT · Pixel");
+    // sparen: elke maand naar de spaarrekening, met de referentie van een doel
+    const g = st.goals[i % 3];
+    tx(d(26), -(g.name === "Noodfonds" ? 400 : 500), `Naar Spaarrekening ${g.ref}`, SPAAR, { goal: g.name, savChecked: true });
+    if (m === "12") tx(d(22), -1000, `Naar Spaarrekening ${st.goals[2].ref} · premie`, SPAAR, { goal: st.goals[2].name, savChecked: true });
+    if (m === "06") tx(d(2), -1000, `Naar Spaarrekening ${st.goals[1].ref} · vakantiegeld`, SPAAR, { goal: st.goals[1].name, savChecked: true });
+  }
+  st.transactions.sort((a, b) => b.date.localeCompare(a.date));
+  applyRules(st);
+  for (const t of st.transactions) if (t.goal) t.cat = t.goal;
+  // bubble tea van vóór deze maand al ingedeeld (zoals een gebruiker zou doen); die van deze maand blijven te categoriseren
+  for (const t of st.transactions) if (t.cat === UNCAT && t.date.slice(0, 7) < end) t.cat = "Eten & drinken";
+  // startsaldo: het saldo van vandaag (de app rekent zelf terug)
+  // zo gekozen dat het laagste saldo ooit ±€ 400 is (nooit in het rood)
+  let run = 0, low = 0; for (const t of [...st.transactions].reverse()) if (t.account === ZICHT) { run += t.amount; low = Math.min(low, run); }
+  st.balances = [{ account: ZICHT, date: today, amount: Math.round((400 - low + run) / 10) * 10 }];
+  st.savings = { iban: SPAAR, anchor: { date: addD0(first, -1), amount: 1500, included: [] }, entries: [], transfers: [], pending: [] };
+  st.plans = [
+    { id: "demo1", title: "FACTS Gent – tickets", amount: 45, kind: "uitgave", date: addD0(today, 12), repeat: "none", account: ZICHT, cat: "Uitstapjes", remind: 3 },
+    { id: "demo2", title: "Verjaardag Milan (cadeau)", amount: 40, kind: "uitgave", date: addD0(today, 6), repeat: "none", account: ZICHT, cat: "Uitstapjes", remind: 3 },
+    { id: "demo3", title: "Nieuwe controller", amount: 70, kind: "uitgave", date: addD0(today, 30), repeat: "none", account: ZICHT, cat: "Games", remind: 3 },
+  ];
+  st.rolloverFrom = addMonths(end, -5);
+  st.lastBackup = today + "T08:00:00.000Z";
+  // enkel echte prijsstijgingen tonen (huur, Netflix, Game Pass), niet de wisselende winkelbedragen
+  const real = /IMMO DE KAT|NETFLIX|GAME PASS/i;
+  st.ignoredPrice = priceChanges(st).filter(x => !real.test(x.title)).map(x => x.key);
+  // in het abonnementenoverzicht enkel echte vaste betalingen; winkels en webshops als "geen abonnement"
+  st.subs = {}; for (const x of subscriptions(st, today)) if (!/IMMO|LUMINUS|PROXIMUS|VIKINGS|ETHIAS|NETFLIX|SPOTIFY|GAME PASS|DISCORD|BASIC-FIT/i.test(x.title)) st.subs[x.key] = { review: "geen" };
+  st.demo = true;
+  return st;
+}
+
+if (typeof module !== "undefined") module.exports = { demoState, filterTx, filterActive, parseAmt, subscriptions, PER_YEAR, monthClose, belfiusDesc, catByName, parentOf, groupOf, mainCats, subsOf, savKeys, activeSav, setSav, withSav, goalSav, savGoals, savAll, syncSavConfs, cardMatch, applyCards, transferFlows, OWN_CAT, ownTransfer, applyOwnTransfers, ownConflicts, MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };

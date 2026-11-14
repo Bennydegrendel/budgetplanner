@@ -68,6 +68,7 @@
   --bar-track: #161616;
   --shadow: 0 0 0 1px rgba(var(--accent-rgb), .04), 0 0 28px rgba(var(--accent-rgb), .05);
   --s1: #00e5ff; --s2: #ff2bd6; --s3: #f5e83b; --s4: #9d7bff;
+  --demo: #ff3d00; --demo-rgb: 255, 61, 0; --on-demo: #ffffff;   /* label DEMO-MODE: knalt in elk thema */
   --font-display: "Zen Dots", "Orbitron", "Segoe UI", system-ui, sans-serif;   /* titels en subtitels */
   --font-figure: "Orbitron", "Segoe UI", system-ui, sans-serif;               /* grote bedragen (data) */
   --font-body: "Rajdhani", "Segoe UI", system-ui, sans-serif;
@@ -736,6 +737,12 @@ tr.sub-cancel .sub-name { text-decoration: line-through; text-decoration-color: 
 .fchips .chip, .fsaved .chip { cursor: pointer; font-size: 11.5px; padding: 3px 9px; }
 .fsave-chip { display: inline-flex; align-items: center; gap: 2px; }
 @media (max-width: 520px) { .flabel { width: 100%; } }
+/* demo-modus: knalgekleurd label, altijd zichtbaar */
+#demo-badge { position: fixed; left: 14px; bottom: 14px; transform: rotate(-2deg); z-index: 250; padding: 8px 16px; background: var(--demo); color: var(--on-demo);
+  font: 800 14px/1 var(--font-display); letter-spacing: .16em; text-transform: uppercase; border-radius: 6px; box-shadow: 0 6px 20px rgba(var(--demo-rgb), .45), 0 0 0 3px var(--on-demo); pointer-events: none; white-space: nowrap; }
+#demo-badge span { font: 600 10px var(--font-body); letter-spacing: .08em; opacity: .9; margin-left: 8px; text-transform: none; }
+.notice.demo-note { background: var(--demo); color: var(--on-demo); }
+body.demo main { padding-bottom: 70px; }
 .close-lead p { margin: 0; font-size: 15.5px; line-height: 1.55; }
 .close-row { display: grid; grid-template-columns: 1fr auto auto; gap: 14px; align-items: baseline; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
 .close-row:last-child { border-bottom: 0; }
@@ -1111,6 +1118,24 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
   }
   async function idbGet(k) { const db = await openDb(); return new Promise((res, rej) => { const rq = db.transaction("kv").objectStore("kv").get(k); rq.onsuccess = () => res(rq.result); rq.onerror = () => rej(rq.error); }); }
   async function idbPut(k, v) { const db = await openDb(); return new Promise((res, rej) => { const tx = db.transaction("kv", "readwrite"); tx.objectStore("kv").put(v, k); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); tx.onabort = () => rej(tx.error); }); }
+  /* ---------- demo-modus (stap 14) ----------
+     Een aparte demo-pincode opent verzonnen gegevens (demoState in core.js). In demo-modus wordt NIETS bewaard:
+     save() doet niets, geen OneDrive, geen gsm-samenvatting, en ook voorkeuren (thema, grafiek, tutorial…) blijven in het geheugen.
+     De demo-pincode zelf staat buiten de kluis (localStorage budgetplanner.v1.demo = {salt, hash}), anders kan het slotscherm ze niet herkennen. */
+  let DEMO = false;
+  const memPrefs = {};
+  function prefGet(k) { if (DEMO) return k in memPrefs ? memPrefs[k] : null; try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function prefSet(k, v) { if (DEMO) { memPrefs[k] = v; return; } try { localStorage.setItem(k, v); } catch (e) {} }
+  function demoPin() { try { return JSON.parse(localStorage.getItem(KEY + ".demo") || "null"); } catch (e) { return null; } }
+  function setDemoPin(v) { try { if (v) localStorage.setItem(KEY + ".demo", JSON.stringify(v)); else localStorage.removeItem(KEY + ".demo"); } catch (e) {} }
+  function enterDemo() {
+    DEMO = true; lockedEnv = null; disableCrypto(); undoStack.length = 0;
+    state = hydrate(demoState(todayS()));
+    const r = document.documentElement; r.dataset.theme = "oceaan"; r.dataset.mode = "light"; $("#theme-fonts").href = window.THEME_FONTS.oceaan; syncThemeColor();
+    document.body.classList.add("demo");
+    if (!$("#demo-badge")) document.body.insertAdjacentHTML("beforeend", `<div id="demo-badge" role="status">DEMO-MODE <span>niets wordt bewaard</span></div>`);
+  }
+
   /* ---------- versleuteling met de pincode (stap 13e) ----------
      Met een pincode staat de state versleuteld in de browser: AES-GCM 256 bit, sleutel afgeleid van de pincode met
      PBKDF2-SHA-256 (600.000 rondes, eigen willekeurig zout). De sleutel bestaat enkel in het geheugen zolang de app open is.
@@ -1170,6 +1195,7 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
   let writing = false, dirty = false;
   let unsynced = false;   // iets veranderd sinds de laatste OneDrive-back-up
   function save() {
+    if (DEMO) return;   // demo-modus: de kraan naar de opslag staat dicht
     unsynced = true;
     if (backend === "ls") {
       (async () => { try { localStorage.setItem(KEY, await storedText()); storageOk = true; storageFull = false; }
@@ -1335,7 +1361,7 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
   function getTheme() { const r = document.documentElement; return { t: r.dataset.theme || "cyberpunk", m: r.dataset.mode || "dark" }; }
   function applyTheme(th) {
     const r = document.documentElement; r.dataset.theme = th.t; r.dataset.mode = th.m; $("#theme-fonts").href = window.THEME_FONTS[th.t];
-    try { localStorage.setItem(KEY + ".theme", JSON.stringify(th)); } catch (e) {}
+    if (!DEMO) try { localStorage.setItem(KEY + ".theme", JSON.stringify(th)); } catch (e) {}
     syncThemeColor();
   }
   // statusbalk/titelbalk in de kleur van de achtergrond van het thema
@@ -1470,6 +1496,7 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
   }
   async function writeFile(dir, name, data) { const fh = await dir.getFileHandle(name, { create: true }); const w = await fh.createWritable(); await w.write(data); await w.close(); }
   async function folderBackup(manual) {
+    if (DEMO) return false;
     if (folderBusy) return false; folderBusy = true;
     try {
       const h = await loadDirHandle();
@@ -1493,6 +1520,7 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
   }
   // automatisch: bij openen (max. 1× per dag), na een import, en bij wegklikken als er iets veranderde
   async function folderAuto(reason) {
+    if (DEMO) return;
     const f = state.folder; if (!f || !f.enabled || !canFolder()) return;
     if (reason === "open" && f.last && Date.now() - new Date(f.last) < 864e5) {
       const h = await loadDirHandle(); if (h && !(await folderAllowed(h, false))) { ui.folderAsk = true; render(); }
@@ -1557,10 +1585,10 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
     let pref = ""; try { pref = sessionStorage.getItem(KEY + ".full") || ""; } catch (e) {}
     return window.matchMedia && matchMedia("(max-width: 700px)").matches && pref !== "1";
   }
-  function liteLoadCache() { try { const r = localStorage.getItem(LITE_KEY); if (r) lite.data = JSON.parse(r); } catch (e) {} }
+  function liteLoadCache() { if (DEMO) { lite.data = null; return; } try { const r = localStorage.getItem(LITE_KEY); if (r) lite.data = JSON.parse(r); } catch (e) {} }   // demo: nooit de echte samenvatting tonen
   // De gsm-weergave toont de samenvatting die de pc in OneDrive zet (budgetplanner-mobiel.txt),
   // gekozen via ⟳. Zolang er nog geen gekozen is, een samenvatting van de gegevens op dit toestel.
-  function liteStore(p, src) { lite.data = Object.assign(p, { src }); try { localStorage.setItem(LITE_KEY, JSON.stringify(lite.data)); } catch (e) {} }
+  function liteStore(p, src) { lite.data = Object.assign(p, { src }); if (!DEMO) try { localStorage.setItem(LITE_KEY, JSON.stringify(lite.data)); } catch (e) {} }
   function liteFromLocal(force) {
     if (!force && lite.data && lite.data.src === "bestand") { render(); return; }   // samenvatting uit OneDrive blijft staan
     lite.status = "";
@@ -1587,12 +1615,13 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
     finally { lite.busy = false; render(); }
   }
   function liteRefresh(manual) {
+    if (DEMO) { toast("Niet beschikbaar in demo-modus"); return; }
     if (manual) { const inp = $("#file-lite"); inp.value = ""; inp.click(); return; }
     liteFromLocal();
   }
   const EYE_ON = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>`;
   const EYE_OFF = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3 3.9M6.6 6.6C3.7 8.4 2 12 2 12s3.6 7 10 7c1.9 0 3.6-.6 5-1.5"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><path d="M3 3l18 18"/></svg>`;
-  function liteHidden() { try { return localStorage.getItem(KEY + ".eye") === "0"; } catch (e) { return false; } }
+  function liteHidden() { return prefGet(KEY + ".eye") === "0"; }
   function viewLite() {
     const d = lite.data, ago = at => { const m = Math.round((Date.now() - new Date(at)) / 60000); return m < 60 ? `${m} min geleden` : m < 1440 ? `${Math.round(m / 60)} u geleden` : new Date(at).toLocaleDateString("nl-BE", { day: "numeric", month: "short" }) + " " + new Date(at).toLocaleTimeString("nl-BE", { hour: "2-digit", minute: "2-digit" }); };
     let h = `<div class="lite-head"><div class="lite-title"><span class="brand-mark" aria-hidden="true">€</span><div><h1>Overzicht</h1><p class="muted">${d ? `Bijgewerkt ${esc(ago(d.at))}` : "Nog geen gegevens"}</p></div></div><div class="lite-btns"><button class="btn lite-eye" data-act="lite-eye" type="button" aria-pressed="${liteHidden() ? "false" : "true"}" aria-label="${liteHidden() ? "Bedragen tonen" : "Bedragen verbergen"}">${liteHidden() ? EYE_OFF : EYE_ON}</button><button class="btn${lite.busy ? "" : " primary"}" data-act="lite-refresh" type="button" ${lite.busy ? "disabled" : ""}>${lite.busy ? "…" : "⟳"}</button></div></div>`;
@@ -1619,7 +1648,7 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
   /* ---------- pincode ---------- */
   async function sha(t) { const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join(""); }
   function isUnlocked() { try { return sessionStorage.getItem(KEY + ".unlocked") === "1"; } catch (e) { return false; } }
-  function setUnlocked() { try { sessionStorage.setItem(KEY + ".unlocked", "1"); } catch (e) {} }
+  function setUnlocked() { if (DEMO) return; try { sessionStorage.setItem(KEY + ".unlocked", "1"); } catch (e) {} }
   function showLock(after, env) {
     const ov = document.createElement("div"); ov.id = "lock";
     ov.innerHTML = `<div class="lock-box"><div class="brand-mark" style="width:42px;height:42px;font-size:22px;margin:0 auto 14px">€</div><h2>Budgetplanner</h2><p class="muted">Geef je pincode in</p><input class="input num" id="lock-pin" type="password" inputmode="numeric" autocomplete="off" aria-label="Pincode"><p id="lock-err" class="neg" style="min-height:18px;margin:8px 0 0;font-size:13px"></p><button class="btn primary" id="lock-ok" type="button" style="margin-top:6px">Ontgrendelen</button></div>`;
@@ -1630,6 +1659,8 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
     const go = async () => {
       if (busy || !inp.value) return; busy = true; btn.disabled = true; err.textContent = "Even geduld…";
       try {
+        const dp = demoPin();
+        if (dp && await sha(dp.salt + inp.value) === dp.hash) { enterDemo(); ov.remove(); after(); return; }
         if (env) { try { state = hydrate(await decryptEnvelope(env, inp.value)); lockedEnv = null; } catch (e) { wrong(); return; } }
         else if (await sha(state.pin.salt + inp.value) === state.pin.hash) { await enableCrypto(inp.value); save(); }   // oude pincode: vanaf nu versleuteld
         else { wrong(); return; }
@@ -1639,20 +1670,38 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
     ov.querySelector("#lock-ok").addEventListener("click", go); inp.addEventListener("keydown", e => { if (e.key === "Enter") go(); });
   }
   function pinDialog() {
-    const has = !!(state.pin && state.pin.hash);
+    const has = !!(state.pin && state.pin.hash), dp = demoPin();
     dialog(`<h3>Pincode</h3><p>Met een pincode vraagt de planner telkens je code als je hem opent, en staan je gegevens <b>versleuteld</b> in deze browser: zonder de code zijn ze onleesbaar.</p>
       <div class="notice warn" style="margin:0 0 12px"><span><b>Pincode vergeten = gegevens kwijt.</b> Niemand kan ze terughalen. Je back-ups (exporteren en OneDrive) blijven wel zonder code: dat is je vangnet.</span></div>
-      ${has ? `<label for="pin-old">Huidige pincode</label><input class="input" id="pin-old" type="password" inputmode="numeric">` : ""}
-      <label for="pin-new">${has ? "Nieuwe pincode (leeg = uitschakelen)" : "Nieuwe pincode (min. 4 cijfers)"}</label><input class="input" id="pin-new" type="password" inputmode="numeric">
+      ${has ? `<label for="pin-old">Huidige pincode</label><input class="input" id="pin-old" type="password" inputmode="numeric" autocomplete="off">` : ""}
+      <label for="pin-new">${has ? "Nieuwe pincode (leeg = niet wijzigen)" : "Pincode (4 tot 8 cijfers)"}</label><input class="input" id="pin-new" type="password" inputmode="numeric" autocomplete="off">
+      <label for="pin-demo">Demo-pincode ${dp ? "(ingesteld · leeg = niet wijzigen)" : "(optioneel)"}</label><input class="input" id="pin-demo" type="password" inputmode="numeric" autocomplete="off">
+      <p class="muted" style="font-size:12.5px;margin:6px 0 0">Met de demo-pincode opent de app <b>verzonnen gegevens</b> (DEMO-MODE). Wat je dan doet, wordt nergens bewaard. Moet verschillen van je echte pincode.</p>
       <p id="pin-err" class="neg" style="margin:8px 0 0;font-size:12.5px"></p>
-      <div class="row"><button class="btn" data-close type="button">Annuleren</button><button class="btn primary" id="pin-ok" type="button">Opslaan</button></div>`, d => {
-      d.querySelector("#pin-ok").addEventListener("click", async () => {
-        const nw = d.querySelector("#pin-new").value.trim(), err = d.querySelector("#pin-err");
-        if (has && await sha(state.pin.salt + d.querySelector("#pin-old").value) !== state.pin.hash) { err.textContent = "Huidige pincode klopt niet."; return; }
-        if (!nw && has) { state.pin = null; disableCrypto(); save(); d.close(); toast("Pincode uitgeschakeld · gegevens niet meer versleuteld"); return; }
-        if (!/^\d{4,8}$/.test(nw)) { err.textContent = "Gebruik 4 tot 8 cijfers."; return; }
-        err.textContent = ""; const ok = d.querySelector("#pin-ok"); ok.disabled = true; ok.textContent = "Versleutelen…";
-        const salt = Math.random().toString(36).slice(2); state.pin = { salt, hash: await sha(salt + nw) }; await enableCrypto(nw); setUnlocked(); save(); d.close(); toast("Pincode ingesteld · je gegevens zijn versleuteld");
+      <div class="row">${has ? `<button class="btn danger" id="pin-off" type="button">Pincode uitschakelen</button>` : ""}${dp ? `<button class="btn" id="pin-demo-off" type="button">Demo-pincode wissen</button>` : ""}<button class="btn" data-close type="button">Annuleren</button><button class="btn primary" id="pin-ok" type="button">Opslaan</button></div>`, d => {
+      const g = q => d.querySelector(q), err = g("#pin-err");
+      const oldOk = async () => !has || await sha(state.pin.salt + g("#pin-old").value) === state.pin.hash;
+      const demoHash = async v => { const salt = crypto.getRandomValues(new Uint8Array(8)).reduce((a, x) => a + x.toString(16).padStart(2, "0"), ""); return { salt, hash: await sha(salt + v) }; };
+      const off = g("#pin-off"); if (off) off.addEventListener("click", async () => {
+        if (!await oldOk()) { err.textContent = "Huidige pincode klopt niet."; return; }
+        state.pin = null; disableCrypto(); setDemoPin(null); save(); d.close(); toast("Pincode uitgeschakeld · gegevens niet meer versleuteld"); });
+      const doff = g("#pin-demo-off"); if (doff) doff.addEventListener("click", async () => {
+        if (!await oldOk()) { err.textContent = "Huidige pincode klopt niet."; return; }
+        setDemoPin(null); d.close(); toast("Demo-pincode gewist"); });
+      g("#pin-ok").addEventListener("click", async () => {
+        const nw = g("#pin-new").value.trim(), dm = g("#pin-demo").value.trim();
+        if (!await oldOk()) { err.textContent = "Huidige pincode klopt niet."; return; }
+        if (!has && !nw) { err.textContent = "Vul een pincode in."; return; }
+        if (nw && !/^\d{4,8}$/.test(nw)) { err.textContent = "Gebruik 4 tot 8 cijfers."; return; }
+        if (dm && !/^\d{4,8}$/.test(dm)) { err.textContent = "Demo-pincode: gebruik 4 tot 8 cijfers."; return; }
+        const real = nw || (has ? g("#pin-old").value : "");
+        if (dm && dm === real) { err.textContent = "De demo-pincode moet verschillen van je echte pincode."; return; }
+        if (nw && !dm && dp && await sha(dp.salt + nw) === dp.hash) { err.textContent = "Je nieuwe pincode is gelijk aan de demo-pincode."; return; }
+        if (!nw && !dm) { d.close(); return; }
+        const ok = g("#pin-ok"); ok.disabled = true; ok.textContent = "Bezig…";
+        if (nw) { const salt = Math.random().toString(36).slice(2); state.pin = { salt, hash: await sha(salt + nw) }; await enableCrypto(nw); setUnlocked(); save(); }
+        if (dm) setDemoPin(await demoHash(dm));
+        d.close(); toast(nw ? "Pincode ingesteld · je gegevens zijn versleuteld" + (dm ? " · demo-pincode ingesteld" : "") : "Demo-pincode ingesteld");
       });
     });
   }
@@ -1830,8 +1879,8 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
   const CHART_VIEWS = [["saldo", "Saldoverwachting"], ["vermogen", "Vermogen"], ["cat", "Per categorie"], ["inuit", "Inkomen & uitgaven"]];
   const CAT_COLORS = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--s5, var(--pos))"], MAX_CHART_CATS = CAT_COLORS.length;
   // keuze per toestel (zoals het thema), niet in de back-up
-  function chartPref() { try { return JSON.parse(localStorage.getItem(KEY + ".chart") || "{}") || {}; } catch (e) { return {}; } }
-  function setChartPref(p) { try { localStorage.setItem(KEY + ".chart", JSON.stringify({ ...chartPref(), ...p })); } catch (e) {} }
+  function chartPref() { try { return JSON.parse(prefGet(KEY + ".chart") || "{}") || {}; } catch (e) { return {}; } }
+  function setChartPref(p) { prefSet(KEY + ".chart", JSON.stringify({ ...chartPref(), ...p })); }
   const axisK = v => Math.abs(v) >= 1000 ? (v / 1000).toLocaleString("nl-BE") + "k" : String(Math.round(v * 100) / 100);
   // gemeenschappelijk kader: breedte, schaal en rasterlijnen
   function chartBox(vals, H0) {
@@ -3333,7 +3382,8 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
       "Ga naar <b>Profiel</b> → <b>Pincode</b> en kies een code van 4 tot 8 cijfers.",
       "Vanaf dan staan je gegevens <b>versleuteld</b> in de browser. Bij elk openen vraagt de app je code.",
       "<b>Pincode vergeten = gegevens kwijt</b>: niemand kan ze terughalen. Maak daarom regelmatig een back-up (of zet de OneDrive-back-up aan); die blijft zonder code.",
-      "Pincode uitschakelen: laat het veld <b>Nieuwe pincode</b> leeg. Je gegevens staan dan weer gewoon (onversleuteld) in de browser." ] },
+      "Pincode uitschakelen: knop <b>Pincode uitschakelen</b> in hetzelfde venster. Je gegevens staan dan weer gewoon (onversleuteld) in de browser.",
+      "Optioneel: een <b>demo-pincode</b>. Daarmee opent de app verzonnen gegevens (DEMO-MODE, in Oceaan licht); niets wat je dan doet wordt bewaard. Handig om de app aan iemand te tonen." ] },
     { id: "thema", show: [["profiel", '[data-act="theme-open"]'], null], icon: "🎨", title: "Thema kiezen", tab: "profiel", steps: [
       "Ga naar <b>Profiel</b> → <b>Thema</b>: Cyberpunk, Synthwave, Matrix of Oceaan, telkens donker of licht.",
       "De keuze geldt per toestel: je gsm mag een ander thema hebben dan je pc." ] },
@@ -3454,7 +3504,7 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
     { sel: '[data-act="export-json"]', t: "Back-up exporteren", x: "Al je gegevens in één .json-bestand. Bewaar het goed.", topic: "backup" },
     { sel: '[data-act="import-json"]', t: "Back-up terugzetten", x: "Laad een eerder geëxporteerd bestand. Je ziet eerst een samenvatting voor er iets vervangen wordt." },
     { sel: '[data-act="export-csv"]', t: "Naar Excel", x: "Al je transacties als .csv met puntkomma's, opent rechtstreeks in Excel." },
-    { sel: '[data-act="pin-open"]', t: "Pincode", x: "Versleutelt je gegevens in deze browser: zonder de code zijn ze onleesbaar. Pincode vergeten = gegevens kwijt; je back-ups blijven zonder code.", topic: "pin" },
+    { sel: '[data-act="pin-open"]', t: "Pincode", x: "Versleutelt je gegevens in deze browser: zonder de code zijn ze onleesbaar. Pincode vergeten = gegevens kwijt; je back-ups blijven zonder code. Optioneel een demo-pincode die verzonnen gegevens toont.", topic: "pin" },
     { sel: '[data-act="tut-toggle"]', t: "Tutorial", x: "Zet deze uitleg-ballonnen aan of uit." },
     { sel: '[data-act="reset"]', t: "Alles wissen", x: "Verwijdert alle gegevens in deze browser. Je moet eerst WISSEN intypen; maak vooraf een back-up." },
   ];
@@ -3462,8 +3512,8 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
   HELP_TABS.forEach(([k, n, x]) => TUT.push({ sel: `#nav a[href="#${k}"]`, t: n, x }));
   TUT.push({ sel: '#nav a[href="#help"]', t: "Help", x: "Alle uitleg en stappenplannen op één pagina, met een zoekveld." });
 
-  function tutOn() { try { return localStorage.getItem(KEY + ".tut") === "1"; } catch (e) { return false; } }
-  function setTut(on) { try { localStorage.setItem(KEY + ".tut", on ? "1" : "0"); } catch (e) {} }
+  function tutOn() { return prefGet(KEY + ".tut") === "1"; }
+  function setTut(on) { prefSet(KEY + ".tut", on ? "1" : "0"); }
   // enkel op een toestel met muis (op de gsm toont de app vooral gegevens)
   const tutActive = () => tutOn() && !document.body.classList.contains("lite") && matchMedia("(hover: hover) and (pointer: fine)").matches;
   function tutBanner() {
@@ -3536,6 +3586,12 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
   function accColor(acc) { const a = state.accounts[acc]; const i = a && Number.isInteger(a.color) ? a.color : Math.max(0, zichtList(state).indexOf(acc)); return ACC_COLORS[i % ACC_COLORS.length]; }
   function oldestDay(acc) { const d = state.transactions.filter(t => t.account === acc).map(t => t.date).sort()[0]; if (!d) return ""; const x = new Date(d); x.setDate(x.getDate() - 1); return x.getFullYear() + "-" + String(x.getMonth() + 1).padStart(2, "0") + "-" + String(x.getDate()).padStart(2, "0"); }
   function viewProfile() {
+    const h = viewProfileReal(); if (!DEMO) return h;
+    // demo: duidelijke melding net onder de titel
+    const i = h.indexOf("</div></div>") + "</div></div>".length;
+    return h.slice(0, i) + `<div class="notice demo-note"><span><b>DEMO-MODE</b> · Je bekijkt verzonnen gegevens. Wijzigingen worden niet bewaard; sluit de app om terug te keren.</span></div>` + h.slice(i);
+  }
+  function viewProfileReal() {
     const pr = state.profile || {}, z = zichtList(state), sp = spaarList(state), bal = balanceAt(state, todayYm());
     const txOf = acc => state.transactions.filter(t => normIban(t.account) === normIban(acc));
     let h = `<div class="page-head"><div><h1>Profiel</h1><p>Je rekeningen en instellingen</p></div></div>`;
@@ -3753,11 +3809,11 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
       case "export-json": exportJson(); break;
       case "import-json": $("#file-json").click(); break;
       case "lite-refresh": liteRefresh(true); break;
-      case "lite-eye": try { localStorage.setItem(KEY + ".eye", liteHidden() ? "1" : "0"); } catch (x) {} render(); break;
+      case "lite-eye": prefSet(KEY + ".eye", liteHidden() ? "1" : "0"); render(); break;
       case "lite-news-ok": lite.news = null; render(); break;
       case "lite-full": try { sessionStorage.setItem(KEY + ".full", "1"); } catch (x) {} if (location.hash === "#mobiel") location.hash = "overzicht"; else render(); break;
       case "price-ok": state.ignoredPrice = state.ignoredPrice || []; state.ignoredPrice.push(el.dataset.key); save(); render(); break;
-      case "pin-open": pinDialog(); break;
+      case "pin-open": if (DEMO) { toast("Niet beschikbaar in demo-modus"); break; } pinDialog(); break;
       case "install": installApp(); break;
       case "theme-open": themeDialog(); break;
       case "close-open": if (el.dataset.ym) ui.month = el.dataset.ym; else if (ui.month >= todayYm()) ui.month = prevYm(); ui.period = "maand"; location.hash = "afsluiting"; break;
@@ -3790,7 +3846,7 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
       case "acc-color": { const acc = el.closest("tr").dataset.acc, a = state.accounts[acc]; const cur = Number.isInteger(a.color) ? a.color : Math.max(0, zichtList(state).indexOf(acc)); a.color = (cur + 1) % ACC_COLORS.length; save(); render(); break; }
       case "acc-del": { const acc = el.closest("tr").dataset.acc; if (state.transactions.some(t => normIban(t.account) === normIban(acc))) break;
         confirmDel("Rekening verwijderen?", `${accName(state, acc)} wordt uit je lijst verwijderd.`, "Verwijderen", "Rekening verwijderd", () => { delete state.accounts[acc]; state.balances = state.balances.filter(b => b.account !== acc); save(); render(); }); break; }
-      case "folder-open": folderDialog(); break;
+      case "folder-open": if (DEMO) { toast("Niet beschikbaar in demo-modus"); break; } folderDialog(); break;
       case "folder-resume": folderBackup(true); break;
       case "export-csv": offerFile(`transacties-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(state), "text/csv"); break;
       case "reset": resetDialog(); break;
