@@ -663,6 +663,29 @@ a.hint, .legend a { color: var(--accent); }
   #side .card { padding: 16px 18px; }
   #side .cat-row { grid-template-columns: 112px 1fr 82px; }
 }
+/* ================= SMALLE SCHERMEN (stap 7b) =================
+   Tot 900 px: menuknop ☰ met alle tabbladen i.p.v. een veegbalk die buiten beeld loopt.
+   Tot 700 px: kaartjes 2 per rij, meldingen inklapbaar. */
+.nav-toggle { display: none; }
+.fold { display: block; } .fold > summary { cursor: pointer; list-style: none; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary::after { content: "▸"; margin-left: auto; transition: transform .2s ease; } .fold[open] > summary::after { transform: rotate(90deg); }
+.fold[open] > summary { margin-bottom: 8px; } .fold > div + div { margin-top: 6px; }
+.fold-hint { font-weight: 400; opacity: .7; font-size: .9em; } .fold[open] .fold-hint { display: none; }
+@media (max-width: 900px) {
+  .nav-toggle { display: inline-flex; margin-right: auto; }
+  header nav { display: none; }
+  header.nav-open nav { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; position: absolute; left: 0; right: 0; top: 100%; padding: 10px 16px 14px; background: var(--panel); border-bottom: 1px solid rgba(var(--accent-rgb), .35); box-shadow: 0 14px 28px rgba(var(--shade-rgb), .35); overflow: visible; animation: fx-drop .16s ease-out; }
+  header.nav-open nav a { padding: 11px 12px; border: 1px solid var(--line); border-radius: var(--r-btn); clip-path: var(--notch-sm); }
+  header.nav-open nav a[aria-current="page"] { border-color: var(--accent); background: rgba(var(--accent-rgb), .08); }
+}
+@media (max-width: 700px) {
+  .kpis { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .kpis > .kpi:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .kpi { padding: 12px 14px; } .kpi .value { font-size: 20px; }
+  .kpi .chip { white-space: normal; font-size: 10.5px; letter-spacing: .02em; line-height: 1.35; max-width: 100%; }
+}
+body.lite .nav-toggle { display: none !important; }
 /* ================= ANIMATIES (stap 6c) =================
    Kort en spaarzaam. Alles valt weg bij "minder beweging" (zie onderaan).
    #main.enter wordt kort gezet als je van tabblad wisselt of de app opent. */
@@ -719,6 +742,7 @@ dialog[open] { animation: fx-pop .18s ease-out; }
 <header>
   <div class="bar">
     <div class="brand" title="Budgetplanner"><span class="brand-mark" aria-hidden="true">€</span><span class="brand-text">Budgetplanner</span></div>
+    <button class="btn nav-toggle" id="btn-nav" type="button" aria-expanded="false" aria-controls="nav">☰ <span id="nav-cur">Overzicht</span></button>
     <nav id="nav" aria-label="Onderdelen">
       <a href="#overzicht">Overzicht</a>
       <a href="#transacties">Transacties</a>
@@ -2145,6 +2169,9 @@ if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, 
   /* ---------- prijsstijgingen ---------- */
   function priceNotice() {
     const list = priceChanges(state); if (!list.length) return "";
+    const rows = list.slice(0, 5).map(p => `<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><span>${esc(p.title)}: <span class="num">${eur(p.old)}</span> → <b class="num neg">${eur(p.now)}</b> (+${p.pct}%) sinds ${fmtDate(p.date)}</span><button class="btn small ghost" data-act="price-ok" data-key="${esc(p.key)}" type="button">Gezien</button></div>`).join("");
+    // op een smal scherm ingeklapt tot één regel (tik om te openen)
+    if (narrow()) return `<details class="notice warn fold"><summary>⚠ ${list.length} prijsstijging${list.length === 1 ? "" : "en"} <span class="fold-hint">tik om te zien</span></summary>${rows}</details>`;
     return `<div class="notice warn" style="flex-direction:column;align-items:stretch;gap:6px"><b style="font-family:var(--font-display);letter-spacing:.08em;text-transform:var(--case-ui);font-size:12px">⚠ Duurder geworden</b>${list.slice(0, 5).map(p => `<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><span>${esc(p.title)}: <span class="num">${eur(p.old)}</span> → <b class="num neg">${eur(p.now)}</b> (+${p.pct}%) sinds ${fmtDate(p.date)}</span><button class="btn small ghost" data-act="price-ok" data-key="${esc(p.key)}" type="button">Gezien</button></div>`).join("")}</div>`;
   }
 
@@ -3409,8 +3436,14 @@ if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, 
     document.querySelectorAll("#nav a").forEach(a => { if (a.getAttribute("href") === "#" + r) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
     if (focusId) { const el = document.getElementById(focusId); if (el) { el.focus(); try { el.setSelectionRange(selStart, selStart); } catch (e) {} } }
     renderSide(r);
+    const cur = document.querySelector(`#nav a[href="#${r}"]`); $("#nav-cur").textContent = cur ? cur.firstChild.textContent.trim() : ""; navOpen(false);
     afterRender(r + (r === "overzicht" ? ui.period : ""));
   }
+  /* ---------- smalle schermen (stap 7b) ---------- */
+  const narrow = () => window.matchMedia && matchMedia("(max-width: 700px)").matches;
+  function navOpen(open) { const h = $("header"); h.classList.toggle("nav-open", open); $("#btn-nav").setAttribute("aria-expanded", String(open)); }
+  $("#btn-nav").addEventListener("click", e => { e.stopPropagation(); navOpen(!$("header").classList.contains("nav-open")); });
+  document.addEventListener("click", e => { if (!e.target.closest("header")) navOpen(false); });
   /* ---------- zijpaneel op brede schermen (stap 7a) ---------- */
   const wide = () => window.matchMedia && matchMedia("(min-width: 1600px)").matches;
   function renderSide(r) {
