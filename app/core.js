@@ -397,7 +397,7 @@ function expandTx(list) { const out = []; for (const t of list) { if (t.splits &
 /* Samenvatting voor één maand ("YYYY-MM"). Uitgaven en sparen positief uitgedrukt. */
 function monthSummary(state, ym) {
   const tx = expandTx(budgetTx(state).filter(t => monthKey(t.date) === ym));
-  const s = { transfer: 0, income: 0, fixed: 0, variable: 0, saved: 0, uncat: 0, uncatCount: 0, net: 0, byCat: {}, count: tx.length };
+  const s = { transfer: 0, income: 0, fixed: 0, variable: 0, saved: 0, uncat: 0, uncatCount: 0, net: 0, byCat: {}, byCatRaw: {}, count: tx.length };
   for (const t of tx) {
     const ty = typeOf(state, t.cat);
     s.net += t.amount;
@@ -407,7 +407,9 @@ function monthSummary(state, ym) {
     else if (ty === "Sparen") s.saved -= t.amount;
     else if (ty === "Overboeking") { s.transfer = (s.transfer || 0) + t.amount; }
     else { s.uncat += t.amount; s.uncatCount++; }
-    s.byCat[t.cat] = (s.byCat[t.cat] || 0) + t.amount;
+    const gk = groupOf(state, t.cat);
+    s.byCat[gk] = (s.byCat[gk] || 0) + t.amount;
+    s.byCatRaw[t.cat] = (s.byCatRaw[t.cat] || 0) + t.amount;
   }
   for (const k of ["income", "fixed", "variable", "saved", "uncat", "net"]) s[k] = Math.round(s[k] * 100) / 100;
   s.expenses = Math.round((s.fixed + s.variable) * 100) / 100;
@@ -446,6 +448,15 @@ function accounts(state) { return [...new Set(state.transactions.map(t => t.acco
 /* ---------- budget meenemen (enveloppen) ---------- */
 function rolls(c) { return c.rollover === undefined ? (c.type === "Variabele kosten" || +c.budgetYear > 0) : !!c.rollover; }
 /* Maandbudget = budget per maand + budget per jaar / 12. Jaarbudget = budget per maand × 12 + budget per jaar. */
+/* ---------- deelbudgetten (stap 8e) ----------
+   Een categorie met group: true is een deelbudget (zoals een subsamenstelling): in het hoofdbudget één regel.
+   Subcategorieën hebben parent: "<naam deelbudget>" en hetzelfde type. Hun uitgaven "rollen op" naar het deelbudget,
+   hun eigen budget telt NIET apart mee in het hoofdbudget (anders dubbel). */
+function catByName(state, name) { return state.categories.find(c => c.name === name) || null; }
+function parentOf(state, name) { const c = catByName(state, name); return c && c.parent && catByName(state, c.parent) ? c.parent : null; }
+function groupOf(state, name) { return parentOf(state, name) || name; }
+function mainCats(state) { return state.categories.filter(c => !(c.parent && catByName(state, c.parent))); }
+function subsOf(state, name) { return state.categories.filter(c => c.parent === name); }
 function monthlyBudget(c) { return (+c.budget || 0) + (+c.budgetYear || 0) / 12; }
 function yearlyBudget(c) { return (+c.budget || 0) * 12 + (+c.budgetYear || 0); }
 function firstMonth(state) {
@@ -461,7 +472,10 @@ function rolloverStart(state) {
 function nextYm(ym) { let [y, m] = ym.split("-").map(Number); m++; if (m > 12) { m = 1; y++; } return y + "-" + String(m).padStart(2, "0"); }
 function spentMap(state) {
   const m = new Map();
-  for (const t of expandTx(budgetTx(state))) { const k = t.cat + "|" + t.date.slice(0, 7); m.set(k, (m.get(k) || 0) - t.amount); }
+  for (const t of expandTx(budgetTx(state))) {
+    const ym = t.date.slice(0, 7), k = groupOf(state, t.cat) + "|" + ym, r = "raw:" + t.cat + "|" + ym;
+    m.set(k, (m.get(k) || 0) - t.amount); m.set(r, (m.get(r) || 0) - t.amount);
+  }
   return m;
 }
 /* Per uitgavencategorie voor maand ym: budget, overgedragen (carryIn), beschikbaar, uitgegeven, over (carryOut). */
@@ -469,11 +483,12 @@ function envelopes(state, ym, _spent) {
   const spent = _spent || spentMap(state), start = rolloverStart(state), out = {};
   for (const c of state.categories) {
     if (c.type !== "Vaste kosten" && c.type !== "Variabele kosten") continue;
+    const sk = c.parent && catByName(state, c.parent) ? "raw:" : "";
     const budget = Math.round(monthlyBudget(c) * 100) / 100, roll = rolls(c) && budget > 0;
     let carry = 0;
-    if (roll && start && start < ym) for (let m = start; m < ym; m = nextYm(m)) carry = carry + budget - (spent.get(c.name + "|" + m) || 0);
+    if (roll && start && start < ym) for (let m = start; m < ym; m = nextYm(m)) carry = carry + budget - (spent.get(sk + c.name + "|" + m) || 0);
     carry = Math.round(carry * 100) / 100;
-    const s = Math.round((spent.get(c.name + "|" + ym) || 0) * 100) / 100;
+    const s = Math.round((spent.get(sk + c.name + "|" + ym) || 0) * 100) / 100;
     const available = Math.round((budget + carry) * 100) / 100;
     out[c.name] = { budget, roll, carryIn: carry, available, spent: s, carryOut: roll ? Math.round((available - s) * 100) / 100 : 0 };
   }
@@ -917,4 +932,4 @@ function toCsv(state) {
   return "﻿" + lines.join("\r\n");
 }
 
-if (typeof module !== "undefined") module.exports = { savKeys, activeSav, setSav, withSav, goalSav, savGoals, savAll, syncSavConfs, cardMatch, applyCards, transferFlows, OWN_CAT, ownTransfer, applyOwnTransfers, ownConflicts, MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
+if (typeof module !== "undefined") module.exports = { catByName, parentOf, groupOf, mainCats, subsOf, savKeys, activeSav, setSav, withSav, goalSav, savGoals, savAll, syncSavConfs, cardMatch, applyCards, transferFlows, OWN_CAT, ownTransfer, applyOwnTransfers, ownConflicts, MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };

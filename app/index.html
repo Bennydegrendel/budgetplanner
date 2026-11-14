@@ -1253,7 +1253,7 @@ function expandTx(list) { const out = []; for (const t of list) { if (t.splits &
 /* Samenvatting voor één maand ("YYYY-MM"). Uitgaven en sparen positief uitgedrukt. */
 function monthSummary(state, ym) {
   const tx = expandTx(budgetTx(state).filter(t => monthKey(t.date) === ym));
-  const s = { transfer: 0, income: 0, fixed: 0, variable: 0, saved: 0, uncat: 0, uncatCount: 0, net: 0, byCat: {}, count: tx.length };
+  const s = { transfer: 0, income: 0, fixed: 0, variable: 0, saved: 0, uncat: 0, uncatCount: 0, net: 0, byCat: {}, byCatRaw: {}, count: tx.length };
   for (const t of tx) {
     const ty = typeOf(state, t.cat);
     s.net += t.amount;
@@ -1263,7 +1263,9 @@ function monthSummary(state, ym) {
     else if (ty === "Sparen") s.saved -= t.amount;
     else if (ty === "Overboeking") { s.transfer = (s.transfer || 0) + t.amount; }
     else { s.uncat += t.amount; s.uncatCount++; }
-    s.byCat[t.cat] = (s.byCat[t.cat] || 0) + t.amount;
+    const gk = groupOf(state, t.cat);
+    s.byCat[gk] = (s.byCat[gk] || 0) + t.amount;
+    s.byCatRaw[t.cat] = (s.byCatRaw[t.cat] || 0) + t.amount;
   }
   for (const k of ["income", "fixed", "variable", "saved", "uncat", "net"]) s[k] = Math.round(s[k] * 100) / 100;
   s.expenses = Math.round((s.fixed + s.variable) * 100) / 100;
@@ -1302,6 +1304,15 @@ function accounts(state) { return [...new Set(state.transactions.map(t => t.acco
 /* ---------- budget meenemen (enveloppen) ---------- */
 function rolls(c) { return c.rollover === undefined ? (c.type === "Variabele kosten" || +c.budgetYear > 0) : !!c.rollover; }
 /* Maandbudget = budget per maand + budget per jaar / 12. Jaarbudget = budget per maand × 12 + budget per jaar. */
+/* ---------- deelbudgetten (stap 8e) ----------
+   Een categorie met group: true is een deelbudget (zoals een subsamenstelling): in het hoofdbudget één regel.
+   Subcategorieën hebben parent: "<naam deelbudget>" en hetzelfde type. Hun uitgaven "rollen op" naar het deelbudget,
+   hun eigen budget telt NIET apart mee in het hoofdbudget (anders dubbel). */
+function catByName(state, name) { return state.categories.find(c => c.name === name) || null; }
+function parentOf(state, name) { const c = catByName(state, name); return c && c.parent && catByName(state, c.parent) ? c.parent : null; }
+function groupOf(state, name) { return parentOf(state, name) || name; }
+function mainCats(state) { return state.categories.filter(c => !(c.parent && catByName(state, c.parent))); }
+function subsOf(state, name) { return state.categories.filter(c => c.parent === name); }
 function monthlyBudget(c) { return (+c.budget || 0) + (+c.budgetYear || 0) / 12; }
 function yearlyBudget(c) { return (+c.budget || 0) * 12 + (+c.budgetYear || 0); }
 function firstMonth(state) {
@@ -1317,7 +1328,10 @@ function rolloverStart(state) {
 function nextYm(ym) { let [y, m] = ym.split("-").map(Number); m++; if (m > 12) { m = 1; y++; } return y + "-" + String(m).padStart(2, "0"); }
 function spentMap(state) {
   const m = new Map();
-  for (const t of expandTx(budgetTx(state))) { const k = t.cat + "|" + t.date.slice(0, 7); m.set(k, (m.get(k) || 0) - t.amount); }
+  for (const t of expandTx(budgetTx(state))) {
+    const ym = t.date.slice(0, 7), k = groupOf(state, t.cat) + "|" + ym, r = "raw:" + t.cat + "|" + ym;
+    m.set(k, (m.get(k) || 0) - t.amount); m.set(r, (m.get(r) || 0) - t.amount);
+  }
   return m;
 }
 /* Per uitgavencategorie voor maand ym: budget, overgedragen (carryIn), beschikbaar, uitgegeven, over (carryOut). */
@@ -1325,11 +1339,12 @@ function envelopes(state, ym, _spent) {
   const spent = _spent || spentMap(state), start = rolloverStart(state), out = {};
   for (const c of state.categories) {
     if (c.type !== "Vaste kosten" && c.type !== "Variabele kosten") continue;
+    const sk = c.parent && catByName(state, c.parent) ? "raw:" : "";
     const budget = Math.round(monthlyBudget(c) * 100) / 100, roll = rolls(c) && budget > 0;
     let carry = 0;
-    if (roll && start && start < ym) for (let m = start; m < ym; m = nextYm(m)) carry = carry + budget - (spent.get(c.name + "|" + m) || 0);
+    if (roll && start && start < ym) for (let m = start; m < ym; m = nextYm(m)) carry = carry + budget - (spent.get(sk + c.name + "|" + m) || 0);
     carry = Math.round(carry * 100) / 100;
-    const s = Math.round((spent.get(c.name + "|" + ym) || 0) * 100) / 100;
+    const s = Math.round((spent.get(sk + c.name + "|" + ym) || 0) * 100) / 100;
     const available = Math.round((budget + carry) * 100) / 100;
     out[c.name] = { budget, roll, carryIn: carry, available, spent: s, carryOut: roll ? Math.round((available - s) * 100) / 100 : 0 };
   }
@@ -1773,7 +1788,7 @@ function toCsv(state) {
   return "﻿" + lines.join("\r\n");
 }
 
-if (typeof module !== "undefined") module.exports = { savKeys, activeSav, setSav, withSav, goalSav, savGoals, savAll, syncSavConfs, cardMatch, applyCards, transferFlows, OWN_CAT, ownTransfer, applyOwnTransfers, ownConflicts, MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
+if (typeof module !== "undefined") module.exports = { catByName, parentOf, groupOf, mainCats, subsOf, savKeys, activeSav, setSav, withSav, goalSav, savGoals, savAll, syncSavConfs, cardMatch, applyCards, transferFlows, OWN_CAT, ownTransfer, applyOwnTransfers, ownConflicts, MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
 
 </script>
 <script>
@@ -1877,9 +1892,10 @@ if (typeof module !== "undefined") module.exports = { savKeys, activeSav, setSav
   const catNames = () => state.categories.map(c => c.name);
   function catOptions(sel) {
     const groups = {};
-    for (const c of state.categories) (groups[c.type] = groups[c.type] || []).push(c.name);
+    for (const c of mainCats(state)) (groups[c.type] = groups[c.type] || []).push(c.name);
+    const opt = (n, lbl) => `<option value="${esc(n)}"${n === sel ? " selected" : ""}>${lbl}</option>`;
     let h = `<option value="${UNCAT}"${sel === UNCAT ? " selected" : ""}>${UNCAT}</option>`;
-    for (const t of TYPES) if (groups[t]) h += `<optgroup label="${t}">` + groups[t].map(n => `<option${n === sel ? " selected" : ""}>${esc(n)}</option>`).join("") + "</optgroup>";
+    for (const t of TYPES) if (groups[t]) h += `<optgroup label="${t}">` + groups[t].map(n => opt(n, esc(n)) + subsOf(state, n).map(x => opt(x.name, "&nbsp;&nbsp;↳ " + esc(x.name))).join("")).join("") + "</optgroup>";
     if (sel && sel !== UNCAT && !catNames().includes(sel)) h += `<option selected>${esc(sel)}</option>`;
     return h;
   }
@@ -2189,7 +2205,7 @@ if (typeof module !== "undefined") module.exports = { savKeys, activeSav, setSav
     const sm = savAll(state), savedM = hasSavings(state) ? sm.moves.filter(x => x.date.startsWith(ym) && x.src !== "transfer").reduce((a, x) => a + x.effect, 0) : s.saved;
     const f = forecast(45), nw = netWorthAt(t);
     const env = envelopes(state, ym);
-    const cats = state.categories.filter(c => c.type === "Vaste kosten" || c.type === "Variabele kosten").map(c => ({ n: c.name, s: Math.round(Math.max(0, -(s.byCat[c.name] || 0)) * 100) / 100, b: env[c.name] ? Math.round(Math.max(0, env[c.name].available) * 100) / 100 : 0 })).filter(c => c.s || c.b);
+    const cats = mainCats(state).filter(c => c.type === "Vaste kosten" || c.type === "Variabele kosten").map(c => ({ n: c.name, s: Math.round(Math.max(0, -(s.byCat[c.name] || 0)) * 100) / 100, b: env[c.name] ? Math.round(Math.max(0, env[c.name].available) * 100) / 100 : 0 })).filter(c => c.s || c.b);
     const soon = agenda(state, addD(t, -30), addD(t, 14), true).filter(it => !it.paid && (it.plan.auto ? it.date >= t && it.date <= addD(t, 7) : true)).slice(0, 12).map(it => ({ d: it.date, t: it.plan.title, a: +it.plan.amount || 0, k: it.plan.kind === "inkomst" ? 1 : -1, auto: !!it.plan.auto }));
     return {
       v: 1, at: new Date().toISOString(), ym,
@@ -2333,7 +2349,7 @@ if (typeof module !== "undefined") module.exports = { savKeys, activeSav, setSav
     if (state.transactions.length && ui.period === "jaar") return viewYear();
     if (!state.transactions.length) return `<div class="page-head"><div><h1>Overzicht</h1><p>Inkomsten, uitgaven en spaardoelen per maand</p></div></div>${notices()}${emptyState()}`;
     const s = monthSummary(state, ui.month);
-    const budget = t => state.categories.filter(c => c.type === t).reduce((a, c) => a + monthlyBudget(c), 0);
+    const budget = t => mainCats(state).filter(c => c.type === t).reduce((a, c) => a + monthlyBudget(c), 0);
     const bExp = budget("Vaste kosten") + budget("Variabele kosten");
     const rate = s.income > 0 ? Math.round(s.saved / s.income * 100) : null;
     const kpi = (label, value, color, sub) => `<div class="kpi" style="--k:${color}"><div class="label">${label}</div><div class="value num">${value}</div><div class="sub">${sub}</div></div>`;
@@ -2360,7 +2376,7 @@ if (typeof module !== "undefined") module.exports = { savKeys, activeSav, setSav
     h += goalsWide();
     const fcAccs = zichtList(state).length ? (multiAcc() ? zichtList(state) : [zichtList(state)[0]]) : [""];
     h += `<div class="stack">${netWorthCard()}${fcAccs.map(a => forecastCard(a)).join("")}${transferCard()}</div>`;
-    h += `<div class="grid-2"><div class="stack"><section class="card">${catChart(s)}</section>${debtCard()}${uncatHtml}</div><div class="stack">${(state.plans.length || detectRecurring(state).length) ? soonCard(14, true) : ""}<section class="card trend">${trendChart()}</section>${carryCard()}</div></div>`;
+    h += `<div class="grid-2"><div class="stack"><section class="card">${catChart(s)}</section>${groupCards(s)}${debtCard()}${uncatHtml}</div><div class="stack">${(state.plans.length || detectRecurring(state).length) ? soonCard(14, true) : ""}<section class="card trend">${trendChart()}</section>${carryCard()}</div></div>`;
     return h;
   }
 
@@ -2530,7 +2546,7 @@ if (typeof module !== "undefined") module.exports = { savKeys, activeSav, setSav
   }
   function carryCard() {
     const env = envelopes(state, ui.month);
-    const rows = Object.entries(env).filter(([, e]) => e.roll).map(([name, e]) => ({ name, ...e }));
+    const rows = Object.entries(env).filter(([name, e]) => e.roll && !parentOf(state, name)).map(([name, e]) => ({ name, ...e }));
     if (!rows.length) return "";
     const total = rows.reduce((a, r) => a + r.carryIn, 0);
     const max = Math.max(1, ...rows.map(r => Math.abs(r.carryIn)));
@@ -2585,7 +2601,7 @@ if (typeof module !== "undefined") module.exports = { savKeys, activeSav, setSav
       <div class="month" role="group" aria-label="Jaar kiezen"><button type="button" data-act="prev-year" aria-label="Vorig jaar">‹</button><span style="min-width:70px">${ui.year}</span><button type="button" data-act="next-year" aria-label="Volgend jaar">›</button></div></div></div>${notices()}`;
     h += `<section class="kpis">
       ${kpi("Inkomsten", `<span class="pos">${eur0(t.income)}</span>`, "var(--pos)", `gem. ${eur0(t.income / act)} per maand`)}
-      ${(() => { const yb = state.categories.filter(c => c.type === "Vaste kosten" || c.type === "Variabele kosten").reduce((a, c) => a + yearlyBudget(c), 0);
+      ${(() => { const yb = mainCats(state).filter(c => c.type === "Vaste kosten" || c.type === "Variabele kosten").reduce((a, c) => a + yearlyBudget(c), 0);
         return kpi("Uitgaven", `<span class="neg">${eur0(t.expenses)}</span>`, "var(--neg)", yb ? `${Math.round(t.expenses / yb * 100)}% van jaarbudget ${eur0(yb)}` : `gem. ${eur0(t.expenses / act)} per maand`); })()}
       ${kpi("Gespaard", `<span class="gold">${eur0(t.saved)}</span>`, "var(--gold)", t.income ? `${Math.round(t.saved / t.income * 100)}% van je inkomen` : "&nbsp;")}
       ${kpi("Netto dit jaar", `<span class="${t.net >= 0 ? "pos" : "neg"}">${t.net >= 0 ? "+" : "−"}${eur0(Math.abs(t.net))}</span>`, t.net >= 0 ? "var(--pos)" : "var(--neg)", t.uncat ? `<span class="chip warn">${t.uncat} te categoriseren</span>` : "&nbsp;")}
@@ -2611,7 +2627,7 @@ if (typeof module !== "undefined") module.exports = { savKeys, activeSav, setSav
 
   function heatTable(Y, curIdx, act) {
     // alle eigen categorieën, in dezelfde volgorde als het tabblad Budget (inkomen niet; overboekingen enkel als er iets is)
-    const rows = state.categories.filter(c => c.type !== "Inkomen").map(c => ({ c, vals: Y.months.map(m => Math.max(0, -(m.s.byCat[c.name] || 0))) }));
+    const rows = mainCats(state).filter(c => c.type !== "Inkomen").map(c => ({ c, vals: Y.months.map(m => Math.max(0, -(m.s.byCat[c.name] || 0))) }));
     rows.push({ c: { name: UNCAT, type: "Onbekend", budget: 0 }, vals: Y.months.map(m => Math.max(0, -(m.s.byCat[UNCAT] || 0))) });
     const shown = rows.filter(r => (r.c.type !== "Overboeking" && r.c.type !== "Onbekend") || r.vals.some(v => v > 0));
     let h = `<section class="card"><div class="card-head"><h2>Per categorie en maand</h2><span class="hint">Hoe donkerder, hoe meer van het budget gebruikt. Rood = boven budget. Bij een jaarbudget telt het jaartotaal.</span></div><div class="table-wrap"><table class="heat"><thead><tr><th>Categorie</th>${Y.months.map((m, i) => `<th class="r${i === curIdx ? " cur" : ""}">${monthShort(m.ym)}</th>`).join("")}<th class="r">Totaal</th><th class="r">Gem./mnd</th><th class="r">Budget/jaar</th><th class="r">Gebruikt</th></tr></thead><tbody>`;
@@ -2633,7 +2649,7 @@ if (typeof module !== "undefined") module.exports = { savKeys, activeSav, setSav
 
   function catChart(s) {
     const env = envelopes(state, ui.month);
-    const rows = state.categories.filter(c => c.type === "Vaste kosten" || c.type === "Variabele kosten")
+    const rows = mainCats(state).filter(c => c.type === "Vaste kosten" || c.type === "Variabele kosten")
       .map(c => { const e = env[c.name]; return { name: c.name, type: c.type, actual: Math.max(0, -(s.byCat[c.name] || 0)), budget: e ? Math.max(0, e.available) : 0, base: monthlyBudget(c), yearB: +c.budgetYear || 0, carry: e ? e.carryIn : 0, roll: e && e.roll }; })
       .filter(r => r.actual > 0 || r.budget > 0)
       ;
@@ -2774,7 +2790,7 @@ if (typeof module !== "undefined") module.exports = { savKeys, activeSav, setSav
 
   function viewBudget() {
     const s = monthSummary(state, ui.month);
-    const sum = t => state.categories.filter(c => c.type === t).reduce((a, c) => a + monthlyBudget(c), 0);
+    const sum = t => mainCats(state).filter(c => c.type === t).reduce((a, c) => a + monthlyBudget(c), 0);
     const left = sum("Inkomen") - sum("Vaste kosten") - sum("Variabele kosten") - sum("Sparen");
     let h = `<div class="page-head"><div><h1>Budget</h1><p>Budget per maand of per jaar (of allebei, ze worden opgeteld). Een jaarbudget telt voor 1/12 per maand. Met “Meenemen” gaat wat overblijft (of te veel is) mee naar de volgende maand. Cijfers voor ${esc(monthName(ui.month))}.</p></div>${monthSwitch()}</div>`;
     h += `<section class="kpis">${BUDGET_TYPES.map(t => `<div class="kpi" style="--k:${t === "Inkomen" ? "var(--pos)" : t === "Sparen" ? "var(--accent)" : "var(--neg)"}"><div class="label">${t}</div><div class="value num">${eur0(sum(t))}</div><div class="sub">per maand · ${eur0(sum(t) * 12)} per jaar</div></div>`).join("")}</section>`;
@@ -2786,12 +2802,13 @@ if (typeof module !== "undefined") module.exports = { savKeys, activeSav, setSav
     h += `<section class="card"><div class="table-wrap"><table id="cat-table" class="budget-table"><thead><tr><th style="width:62px" title="Sleep of gebruik de pijltjes om de volgorde te wijzigen">Volg&shy;orde</th><th>Categorie</th><th>Type</th><th class="r">Budget / maand</th><th class="r">Budget / jaar</th><th title="Wat overblijft (of te veel is) gaat mee naar de volgende maand" style="text-align:center">Mee&shy;nemen</th><th class="r">Over&shy;gedragen</th><th class="r">Beschik&shy;baar</th><th class="r">Werke&shy;lijk</th><th class="r">Ver&shy;schil</th><th></th></tr></thead><tbody>`;
     const env = envelopes(state, ui.month);
     state.categories.forEach((c, i) => {
+      if (parentOf(state, c.name)) return;   // subcategorie: staat op het blad van haar deelbudget
       const raw = s.byCat[c.name] || 0, actual = c.type === "Inkomen" || c.type === "Overboeking" ? raw : -raw;
       const e = env[c.name], isExp = !!e;
       const mb = monthlyBudget(c);
       const b = isExp ? e.available : mb, diff = mb ? (c.type === "Inkomen" || c.type === "Sparen" ? actual - b : b - actual) : null;
       h += `<tr data-i="${i}" class="cat-drag-row"><td class="ord"><span class="drag-handle" draggable="true" title="Sleep om te verplaatsen" aria-hidden="true">⋮⋮</span><span class="ord-btns"><button class="btn small ghost" data-act="cat-up" type="button" aria-label="Omhoog" ${i ? "" : "disabled"}>▲</button><button class="btn small ghost" data-act="cat-down" type="button" aria-label="Omlaag" ${i < state.categories.length - 1 ? "" : "disabled"}>▼</button></span></td><td><input class="cell wide" data-act="cat-name" value="${esc(c.name)}" aria-label="Naam"></td>
-        <td><select class="cat" data-act="cat-type" aria-label="Type">${TYPES.map(t => `<option${t === c.type ? " selected" : ""}>${t}</option>`).join("")}</select></td>
+        <td><select class="cat" data-act="cat-type" aria-label="Type">${TYPES.map(t => `<option${t === c.type ? " selected" : ""}>${t}</option>`).join("")}</select>${c.group ? `<div style="margin-top:3px"><a class="chip" href="#grp-${esc(c.name.replace(/\W+/g, "-"))}" title="Naar het blad van dit deelbudget">⑃ deelbudget</a></div>` : ""}</td>
         <td class="r"><input class="cell r num" data-act="cat-budget" inputmode="decimal" placeholder="${+c.budgetYear > 0 && !(+c.budget > 0) ? "≈" + Math.round(c.budgetYear / 12) : "—"}" value="${c.budget ?? ""}" aria-label="Budget per maand" title="${+c.budgetYear > 0 ? `Totaal per maand: ${eur(mb)} (incl. jaarbudget ÷ 12)` : ""}"></td>
         <td class="r"><input class="cell r num" data-act="cat-budget-year" inputmode="decimal" placeholder="—" value="${c.budgetYear ?? ""}" aria-label="Budget per jaar"></td>
         <td style="text-align:center">${isExp ? `<input type="checkbox" data-act="cat-roll" ${rolls(c) ? "checked" : ""} aria-label="Overschot meenemen voor ${esc(c.name)}">` : ""}</td>
@@ -2801,9 +2818,67 @@ if (typeof module !== "undefined") module.exports = { savKeys, activeSav, setSav
         <td class="r num ${diff === null ? "muted" : diff >= 0 ? "pos" : "neg"}">${diff === null ? "—" : signed(diff)}</td>
         <td class="r"><button class="btn small ghost" data-act="del-cat" type="button" aria-label="Verwijderen" title="Verwijderen">✕</button></td></tr>`;
     });
-    h += `</tbody></table></div><div style="margin-top:12px"><button class="btn" data-act="add-cat" type="button">+ Categorie toevoegen</button></div></section>`;
+    h += `</tbody></table></div><div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn" data-act="add-cat" type="button">+ Categorie toevoegen</button><button class="btn" data-act="grp-add" type="button" title="Een bedrag dat je zelf verder verdeelt, bv. een gezamenlijk budget">⑃ + Deelbudget</button></div></section>`;
+    h += state.categories.filter(c => c.group && !parentOf(state, c.name)).map(g => groupCard(g, s, env, true)).join("");
     return h;
   }
+
+  function groupCard(g, s, env, edit) {
+    const subs = subsOf(state, g.name), gb = monthlyBudget(g), dist = Math.round(subs.reduce((a, c) => a + monthlyBudget(c), 0) * 100) / 100, rest = Math.round((gb - dist) * 100) / 100;
+    const spent = n => Math.max(0, -(s.byCatRaw[n] || 0)), direct = spent(g.name), ge = env[g.name], tot = ge ? ge.spent : spent(g.name) + subs.reduce((a, c) => a + spent(c.name), 0);
+    const row = c => { const i = state.categories.indexOf(c), e = env[c.name], av = e ? e.available : monthlyBudget(c), sp = spent(c.name), left = Math.round((av - sp) * 100) / 100, pct = av > 0 ? Math.min(1, sp / av) : (sp > 0 ? 1 : 0);
+      return edit ? `<tr data-i="${i}"><td><input class="cell wide" data-act="cat-name" value="${esc(c.name)}" aria-label="Naam subcategorie"></td>
+          <td class="r"><input class="cell r num" data-act="cat-budget" inputmode="decimal" placeholder="—" value="${c.budget ?? ""}" aria-label="Budget per maand"></td>
+          <td style="min-width:120px"><span class="track" style="display:block"><span class="fill${left < 0 ? " over" : ""}" style="width:${(pct * 100).toFixed(1)}%"></span></span></td>
+          <td class="r num">${eur(sp)}</td><td class="r num ${left < 0 ? "neg" : "pos"}">${av ? signed(left) : "—"}</td>
+          <td class="r"><button class="btn small ghost" data-act="del-cat" type="button" aria-label="Verwijderen" title="Verwijderen">✕</button></td></tr>`
+        : `<div class="cat-row"><span class="name">${esc(c.name)}</span><span class="track"><span class="fill${left < 0 ? " over" : ""}" style="width:${(pct * 100).toFixed(1)}%"></span></span><span class="amt num">${eur0(sp)}${av ? `<span class="muted"> / ${eur0(av)}</span>` : ""}</span></div>`; };
+    const foot = `<div class="pl-sum" style="margin-top:10px"><span>Verdeeld <b class="num">${eur(dist)}</b> van <b class="num">${eur(gb)}</b></span>${rest >= 0 ? `<span>Nog te verdelen <b class="num gold">${eur(rest)}</b></span>` : `<span class="neg">⚠ <b class="num">${eur(-rest)}</b> te veel verdeeld</span>`}<span>Uitgegeven <b class="num ${ge && tot > ge.available ? "neg" : ""}">${eur(tot)}</b>${ge ? ` van ${eur(ge.available)}` : ""}</span></div>`;
+    const id = "grp-" + g.name.replace(/\W+/g, "-");
+    if (!edit) return `<section class="card" id="${esc(id)}"><div class="card-head"><h2>⑃ ${esc(g.name)}</h2><a class="hint" href="#budget">Deelbudget</a></div>${subs.length ? `<div class="cats">${subs.map(row).join("")}${direct ? `<div class="cat-row"><span class="name muted">rechtstreeks</span><span class="track"></span><span class="amt num">${eur0(direct)}</span></div>` : ""}</div>` : `<p class="muted" style="margin:0">Nog geen subcategorieën.</p>`}${foot}</section>`;
+    return `<section class="card" id="${esc(id)}"><div class="card-head"><h2>⑃ Deelbudget ${esc(g.name)}</h2><span class="hint">Verdeel ${eur(gb)} per maand over eigen subcategorieën. Uitgaven op een subcategorie tellen hier én in de regel “${esc(g.name)}” van je hoofdbudget.</span></div>
+      <div class="table-wrap"><table><thead><tr><th>Subcategorie</th><th class="r">Budget/maand</th><th></th><th class="r">Uitgegeven</th><th class="r">Resterend</th><th></th></tr></thead><tbody>
+      ${subs.map(row).join("")}${direct ? `<tr><td class="muted">Rechtstreeks op “${esc(g.name)}”</td><td></td><td></td><td class="r num">${eur(direct)}</td><td></td><td></td></tr>` : ""}
+      ${subs.length ? "" : `<tr class="empty-row"><td colspan="6">Nog geen subcategorieën. Voeg er een toe.</td></tr>`}</tbody></table></div>
+      ${foot}<div style="margin-top:12px"><button class="btn" data-act="sub-add" data-parent="${esc(g.name)}" type="button">+ Subcategorie</button></div></section>`;
+  }
+  function groupAddDialog() {
+    const conv = state.categories.filter(c => (c.type === "Vaste kosten" || c.type === "Variabele kosten") && !c.group && !parentOf(state, c.name));
+    dialog(`<h3>Deelbudget toevoegen</h3><p class="muted" style="margin:4px 0 10px">Een bedrag dat in je hoofdbudget één regel is, en dat je zelf verder verdeelt over eigen subcategorieën (bv. een gezamenlijk budget).</p>
+      <label for="ga-from">Van</label><select class="input" id="ga-from"><option value="">Nieuwe categorie</option>${conv.map(c => `<option>${esc(c.name)}</option>`).join("")}</select>
+      <div id="ga-new"><label for="ga-name">Naam</label><input class="input" id="ga-name" placeholder="bv. Gezamenlijk huishouden" autocomplete="off">
+      <label for="ga-type">Soort</label><select class="input" id="ga-type"><option>Variabele kosten</option><option>Vaste kosten</option></select></div>
+      <label for="ga-amt">Bedrag per maand</label><input class="input num" id="ga-amt" inputmode="decimal" placeholder="bv. 900">
+      <p id="ga-err" class="neg" style="margin:8px 0 0;font-size:12.5px"></p>
+      <div class="row"><button class="btn" data-close type="button">Annuleren</button><button class="btn primary" id="ga-ok" type="button">Aanmaken</button></div>`, d => {
+      const g = q => d.querySelector(q); g("#ga-from").addEventListener("change", () => { g("#ga-new").hidden = !!g("#ga-from").value; }); g("#ga-name").focus();
+      g("#ga-ok").addEventListener("click", () => {
+        const from = g("#ga-from").value, amt = num(g("#ga-amt").value); let c;
+        if (from) { c = state.categories.find(x => x.name === from); }
+        else { const name = g("#ga-name").value.trim(); if (!name) { g("#ga-err").textContent = "Geef het deelbudget een naam."; return; }
+          if (catNames().some(n => n.toLowerCase() === name.toLowerCase())) { g("#ga-err").textContent = "Er bestaat al een categorie met die naam. Kies ze bovenaan bij “Van”."; return; }
+          c = { name, type: g("#ga-type").value, budget: null }; state.categories.push(c); }
+        c.group = true; if (amt !== null) c.budget = amt; save(); d.close(); render(); toast(`Deelbudget ${c.name} aangemaakt. Voeg nu subcategorieën toe.`);
+        setTimeout(() => { const el = document.getElementById("grp-" + c.name.replace(/\W+/g, "-")); if (el) el.scrollIntoView({ block: "start", behavior: "smooth" }); }, 50);
+      });
+    });
+  }
+  function subAddDialog(parent) {
+    const pc = state.categories.find(c => c.name === parent); if (!pc) return;
+    dialog(`<h3>Subcategorie in ${esc(parent)}</h3>
+      <label for="sa-name">Naam</label><input class="input" id="sa-name" placeholder="bv. Boodschappen samen" autocomplete="off">
+      <label for="sa-amt">Budget per maand (optioneel)</label><input class="input num" id="sa-amt" inputmode="decimal" placeholder="bv. 450">
+      <p id="sa-err" class="neg" style="margin:8px 0 0;font-size:12.5px"></p>
+      <div class="row"><button class="btn" data-close type="button">Annuleren</button><button class="btn primary" id="sa-ok" type="button">Toevoegen</button></div>`, d => {
+      const g = q => d.querySelector(q); g("#sa-name").focus();
+      g("#sa-ok").addEventListener("click", () => {
+        const name = g("#sa-name").value.trim(); if (!name) { g("#sa-err").textContent = "Geef de subcategorie een naam."; return; }
+        if (catNames().some(n => n.toLowerCase() === name.toLowerCase())) { g("#sa-err").textContent = "Er bestaat al een categorie met die naam."; return; }
+        state.categories.push({ name, type: pc.type, budget: num(g("#sa-amt").value), parent, rollover: rolls(pc) }); save(); d.close(); render(); toast(`${name} toegevoegd aan ${parent}`);
+      });
+    });
+  }
+  function groupCards(s) { const env = envelopes(state, ui.month); return mainCats(state).filter(c => c.group).map(g => groupCard(g, s, env, false)).join(""); }
 
   function balanceCard() {
     const accs = accounts(state);
@@ -3827,7 +3902,7 @@ if (typeof module !== "undefined") module.exports = { savKeys, activeSav, setSav
   }
   function budgetSide() {
     const ym = todayYm(), env = envelopes(state, ym);
-    const rows = state.categories.map(c => ({ c, e: env[c.name] })).filter(x => x.e && x.e.available > 0)
+    const rows = mainCats(state).map(c => ({ c, e: env[c.name] })).filter(x => x.e && x.e.available > 0)
       .map(x => ({ n: x.c.name, left: Math.round((x.e.available - x.e.spent) * 100) / 100, pct: Math.min(1, Math.max(0, x.e.spent / x.e.available)) }))
       .sort((a, b) => b.pct - a.pct);
     const head = `<div class="card-head"><h2>Resterend budget</h2><a class="hint" href="#budget" style="text-transform:capitalize">${esc(monthShort(ym))}</a></div>`;
@@ -3978,6 +4053,8 @@ if (typeof module !== "undefined") module.exports = { savKeys, activeSav, setSav
       case "tag-clear": ui.txTag = ""; render(); break;
       case "add-tx": addTxDialog(); break;
       case "cat-up": case "cat-down": { const i = rowIndex(el), j = a === "cat-up" ? i - 1 : i + 1; if (j < 0 || j >= state.categories.length) break; [state.categories[i], state.categories[j]] = [state.categories[j], state.categories[i]]; save(); render(); break; }
+      case "grp-add": groupAddDialog(); break;
+      case "sub-add": subAddDialog(el.dataset.parent); break;
       case "add-cat": state.categories.push({ name: "Nieuwe categorie", type: "Variabele kosten", budget: null }); save(); render(); break;
       case "del-cat": { const c = state.categories[rowIndex(el)]; const used = state.transactions.filter(t => t.cat === c.name).length;
         confirmDlg("Categorie verwijderen?", used ? `${used} transacties met “${c.name}” worden weer “${UNCAT}”.` : `“${c.name}” wordt verwijderd.`, "Verwijderen", () => { state.transactions.forEach(t => { if (t.cat === c.name) t.cat = UNCAT; }); state.categories.splice(state.categories.indexOf(c), 1); save(); render(); }, true); break; }
@@ -4036,7 +4113,7 @@ if (typeof module !== "undefined") module.exports = { savKeys, activeSav, setSav
         const n = setGroup(k, el.value); save(); render(); toast(`${n} transactie${n === 1 ? "" : "s"} op ${el.value} gezet`); break; }
       case "cat-name": { const c = state.categories[rowIndex(el)], old = c.name, nw = el.value.trim();
         if (!nw || (nw !== old && catNames().includes(nw))) { toast("Die naam is leeg of bestaat al."); el.value = old; break; }
-        c.name = nw; state.transactions.forEach(t => { if (t.cat === old) t.cat = nw; if (t.goal === old) t.goal = nw; }); { const sc = savConf(state); sc.entries.forEach(e => { if (e.goal === old) e.goal = nw; }); sc.pending.forEach(p => { if (p.goal === old) p.goal = nw; }); sc.transfers.forEach(x => { if (x.from === old) x.from = nw; if (x.to === old) x.to = nw; }); } state.rules.forEach(r => { if (r.cat === old) r.cat = nw; }); state.goals.forEach(g => { if (g.name === old) g.name = nw; }); save(); break; }
+        c.name = nw; state.categories.forEach(x => { if (x.parent === old) x.parent = nw; }); state.transactions.forEach(t => { if (t.cat === old) t.cat = nw; if (t.goal === old) t.goal = nw; }); { const sc = savConf(state); sc.entries.forEach(e => { if (e.goal === old) e.goal = nw; }); sc.pending.forEach(p => { if (p.goal === old) p.goal = nw; }); sc.transfers.forEach(x => { if (x.from === old) x.from = nw; if (x.to === old) x.to = nw; }); } state.rules.forEach(r => { if (r.cat === old) r.cat = nw; }); state.goals.forEach(g => { if (g.name === old) g.name = nw; }); save(); break; }
       case "pf-name": state.profile = Object.assign(state.profile || {}, { name: el.value.trim() }); save(); updateProfileLabel(); break;
       case "card-name": case "card-kw": case "card-cat": { const k = (state.cards || []).find(x => x.id === el.closest("tr").dataset.card); if (!k) break;
         if (a === "card-name") k.name = el.value.trim() || k.name; else if (a === "card-kw") { if (el.value.trim().length >= 3) k.keyword = el.value.trim(); } else k.cat = el.value === UNCAT ? "" : el.value;
@@ -4049,8 +4126,8 @@ if (typeof module !== "undefined") module.exports = { savKeys, activeSav, setSav
         if (!b) { b = { account: acc, date: row.querySelector('[data-act="bal-date"]').value, amount: null }; state.balances.push(b); }
         if (a === "bal-date") b.date = el.value; else b.amount = num(el.value);
         save(); render(); break; }
-      case "cat-type": state.categories[rowIndex(el)].type = el.value; save(); render(); break;
-      case "cat-roll": state.categories[rowIndex(el)].rollover = el.checked; save(); render(); break;
+      case "cat-type": { const c = state.categories[rowIndex(el)]; c.type = el.value; subsOf(state, c.name).forEach(x => { x.type = el.value; }); if (c.group && el.value !== "Vaste kosten" && el.value !== "Variabele kosten") { delete c.group; subsOf(state, c.name).forEach(x => { delete x.parent; }); toast("Een deelbudget moet een uitgave zijn; de subcategorieën zijn nu gewone categorieën."); } save(); render(); break; }
+      case "cat-roll": { const c = state.categories[rowIndex(el)]; c.rollover = el.checked; subsOf(state, c.name).forEach(x => { x.rollover = el.checked; }); save(); render(); break; }
       case "cat-budget": state.categories[rowIndex(el)].budget = num(el.value); save(); render(); break;
       case "cat-budget-year": state.categories[rowIndex(el)].budgetYear = num(el.value); save(); render(); break;
       case "rule-kw": state.rules[rowIndex(el)].keyword = el.value.trim(); save(); render(); break;
