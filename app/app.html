@@ -656,6 +656,23 @@ details.help-item[open] summary::after { content: "−"; }
 .help-tab a { text-decoration: none; color: var(--accent); }
 .help-keys { display: flex; flex-wrap: wrap; gap: 8px 26px; font-size: 13.5px; }
 kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: var(--r-sm); font: 600 12px var(--font-mono); color: var(--ink); background: var(--field); text-align: center; }
+#tut-dots { position: fixed; inset: 0; pointer-events: none; z-index: 6; }
+#tut-dots i, .tut-q { display: inline-grid; place-items: center; width: 15px; height: 15px; border-radius: 50%; background: var(--accent); color: var(--on-accent); font: 700 10px var(--font-body); font-style: normal; box-shadow: 0 0 8px rgba(var(--accent-rgb), calc(.8 * var(--glow))); }
+#tut-dots i { position: fixed; animation: tut-pop .3s ease-out both; }
+@keyframes tut-pop { from { transform: scale(0); } to { transform: scale(1); } }
+body.tut [data-tut]:hover { outline: 1px dashed rgba(var(--accent-rgb), .8); outline-offset: 2px; }
+#tut-tip { position: fixed; z-index: 25; display: none; pointer-events: none; max-width: 340px; padding: 11px 13px; background: rgba(var(--panel-rgb), .97); color: var(--ink); border: 1px solid var(--accent); border-radius: var(--r-card); box-shadow: 0 0 18px rgba(var(--accent-rgb), calc(.35 * var(--glow))), 0 10px 26px rgba(var(--shade-rgb), .3); font: 13px/1.45 var(--font-body); }
+#tut-tip::before { content: ""; position: absolute; left: var(--ax, 20px); top: -6px; width: 10px; height: 10px; margin-left: -5px; background: inherit; border: inherit; border-width: 1px 0 0 1px; transform: rotate(45deg); }
+#tut-tip.above::before { top: auto; bottom: -6px; border-width: 0 1px 1px 0; }
+#tut-tip .tt { display: block; margin-bottom: 4px; color: var(--accent); font: 12px var(--font-display); text-transform: var(--case-title); letter-spacing: .06em; }
+#tut-tip p { margin: 0; }
+#tut-tip .help-steps { margin: 8px 0 4px; gap: 5px; font-size: 12.5px; }
+#tut-tip .help-steps li { grid-template-columns: 20px 1fr; gap: 7px; }
+#tut-tip .help-steps li::before { width: 17px; height: 17px; font-size: 10.5px; }
+#tut-tip small { display: block; margin-top: 6px; color: var(--muted); font-size: 11.5px; }
+.tut-banner { margin-bottom: 14px; }
+.tut-banner .tut-q { vertical-align: -2px; margin: 0 2px; }
+@media (prefers-reduced-motion: reduce) { #tut-dots i { animation: none; } }
 .toast-undo { margin-left: 10px; background: none; border: 1px solid currentColor; color: inherit; font: inherit; padding: 3px 9px; border-radius: var(--r-btn); cursor: pointer; text-transform: none; }
 .toast-undo:hover { background: rgba(var(--accent-rgb), .15); }
 .toast { background: rgba(var(--panel-rgb), .96); color: var(--accent); border: 1px solid var(--accent); border-radius: var(--r-card); box-shadow: 0 0 20px rgba(var(--accent-rgb), calc(.4 * var(--glow))); text-transform: var(--case-ui); letter-spacing: .05em; font-weight: 600; }
@@ -875,6 +892,7 @@ dialog[open] { animation: fx-pop .18s ease-out; }
 <input type="file" id="file-json" accept=".json,.gz,application/json,application/gzip" hidden>
 <input type="file" id="file-lite" hidden>
 <div class="tooltip" id="tip" role="tooltip"></div>
+<div id="tut-dots" aria-hidden="true"></div><div id="tut-tip" role="tooltip"></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <dialog id="dlg"></dialog>
 
@@ -2980,6 +2998,11 @@ dialog[open] { animation: fx-pop .18s ease-out; }
     { id: "thema", icon: "🎨", title: "Thema kiezen", tab: "profiel", steps: [
       "Ga naar <b>Profiel</b> → <b>Thema</b>: Cyberpunk, Synthwave, Matrix of Oceaan, telkens donker of licht.",
       "De keuze geldt per toestel: je gsm mag een ander thema hebben dan je pc." ] },
+    { id: "tutorial", icon: "🎓", title: "Tutorialmodus", tab: "profiel", steps: [
+      "Ga naar <b>Profiel</b> en klik op <b>🎓 Tutorial</b> om hem aan of uit te zetten.",
+      "Staat hij aan, dan krijgen knoppen met uitleg een klein <b>?</b>-bolletje.",
+      "Ga met je muis over zo'n knop: er verschijnt een ballon met wat de knop doet, bij grote taken met een stappenplan.",
+      "Werkt op de pc (met muis). Bij een nieuwe, lege planner staat hij de eerste keer vanzelf aan." ] },
     { id: "gsm", icon: "📱", title: "De gsm-weergave", tab: "", steps: [
       "Op een smal scherm toont de app een <b>samenvatting</b>: saldo, budget, binnenkort te betalen en spaardoelen.",
       "Het oogje 👁 verbergt de bedragen (handig op de bus).",
@@ -2994,7 +3017,7 @@ dialog[open] { animation: fx-pop .18s ease-out; }
     ["spaar", "Spaar", "De bewegingen op je spaarrekening(en): stortingen, opnames, rente en verplaatsingen tussen doelen. Hier stem je ook het saldo af met je bank."],
     ["planner", "Planner", "Kalender met geplande betalingen en inkomsten, herinneringen en herkende vaste betalingen. Hieruit komt de saldoverwachting."],
     ["leningen", "L&K", "Leningen en kredieten: openstaand saldo, afbetalingsplan en een simulator om te zien wat extra aflossen oplevert."],
-    ["profiel", "Profiel", "Je rekeningen (zicht, spaar, kredietkaarten) met naam, kleur en startsaldo, en alle instellingen: thema, pincode, OneDrive, back-up, Excel, installeren, help en alles wissen."],
+    ["profiel", "Profiel", "Je rekeningen (zicht, spaar, kredietkaarten) met naam, kleur en startsaldo, en alle instellingen: thema, pincode, OneDrive, back-up, Excel, installeren, help, tutorial en alles wissen."],
   ];
   function viewHelp() {
     const tabName = t => (HELP_TABS.find(x => x[0] === t) || [])[1] || "";
@@ -3016,14 +3039,132 @@ dialog[open] { animation: fx-pop .18s ease-out; }
     const none = $("#help-none"); if (none) none.hidden = any;
   }
 
+  /* ---------- tutorialmodus (stap 10c) ----------
+     Aan = ?-bolletje op knoppen met uitleg + ballon bij muis-over (enkel pc). Keuze per toestel.
+     TUT: sel = CSS-selector, t = titel, x = uitleg, topic = id uit HELP_TOPICS (stappenplan in de ballon met steps: true). */
+  const TUT = [
+    { sel: '#btn-import, [data-act="pick-csv"]', t: "CSV importeren", x: "Lees de transacties van je bank in (ING of Belfius). Je kan ook een bestand in het venster slepen.", topic: "csv", steps: true },
+    { sel: "#btn-profile", t: "Profiel", x: "Je rekeningen, startsaldo's, kredietkaarten en alle instellingen: thema, back-up, OneDrive, pincode, tutorial…" },
+    { sel: "#btn-install", t: "Installeren", x: "Zet de planner als programma op je pc of gsm. Je gegevens blijven op je toestel.", topic: "install" },
+    { sel: '[data-act="period-month"], [data-act="period-year"]', t: "Maand of jaar", x: "Wissel tussen het overzicht van één maand en het jaaroverzicht met de heatmap per categorie." },
+    { sel: '[data-act="prev-month"], [data-act="next-month"], [data-act="prev-year"], [data-act="next-year"]', t: "Vorige / volgende", x: "Blader naar een andere maand of een ander jaar." },
+    { sel: '[data-act="chart-view"]', t: "Soort grafiek", x: "Kies wat de grafiek toont: saldoverwachting per rekening, vermogen, uitgaven per categorie of inkomen & uitgaven. Je keuze wordt onthouden." },
+    { sel: '[data-act="chart-acc"]', t: "Rekening tonen", x: "Zet de lijn van een rekening aan of uit. \"Alles samen\" toont het totaal als stippellijn." },
+    { sel: '[data-act="chart-catmode"]', t: "Per maand of per jaar", x: "Toon de gekozen categorieën per maand (laatste 12) of per jaar." },
+    { sel: '[data-act="chart-cat-del"]', t: "Categorie weghalen", x: "Haal deze categorie uit de grafiek. Je gegevens blijven gewoon staan." },
+    { sel: '[data-act="chart-cat-add"]', t: "Categorie toevoegen", x: "Voeg een categorie toe aan de grafiek (maximaal 5)." },
+    { sel: '[data-act="show-uncat"]', t: "Te categoriseren", x: "Toon de transacties die nog geen categorie hebben.", topic: "cat" },
+    { sel: '[data-act="set-group"]', t: "Categorie voor de groep", x: "Kies een categorie voor alle transacties van deze winkel of persoon. De keuze wordt onthouden voor de volgende keren." },
+    { sel: '[data-act="acc-open"]', t: "Transacties van deze rekening", x: "Open het tabblad Transacties met enkel deze rekening." },
+    { sel: '[data-act="goto-profile"], [data-act="goto-balance"]', t: "Startsaldo ingeven", x: "Zonder startsaldo kan de app je saldo niet berekenen.", topic: "saldo", steps: true },
+    { sel: '[data-act="acc-pick"]', t: "Rekening kiezen", x: "Toon de transacties van één rekening, of van alle rekeningen samen (met een gekleurd bolletje per rekening)." },
+    { sel: "#tx-search", t: "Zoeken", x: "Zoek op omschrijving, tegenpartij of bedrag." },
+    { sel: "#tx-cat", t: "Filter op categorie", x: "Toon enkel de transacties van één categorie." },
+    { sel: '[data-act="set-cat"]', t: "Categorie kiezen", x: "Kies de categorie van deze transactie. De app onthoudt je keuze voor dezelfde tegenpartij." },
+    { sel: '[data-act="tag-tx"]', t: "Labels (#)", x: "Geef een transactie een label, bv. #vakantie2026. Klik later op het label om alles met dat label te zien." },
+    { sel: '[data-act="split-tx"]', t: "Splitsen (⑂)", x: "Verdeel één betaling over meerdere categorieën, bv. een supermarktbon met boodschappen én dierenvoeding." },
+    { sel: '[data-act="del-tx"]', t: "Transactie verwijderen", x: "Vraagt eerst bevestiging. Daarna kan je het nog ongedaan maken.", topic: "undo" },
+    { sel: '[data-act="add-tx"]', t: "Manueel toevoegen", x: "Voeg een transactie toe die niet in je CSV staat, bv. een contante betaling." },
+    { sel: '[data-act="make-rule"]', t: "Regel maken", x: "Maak van deze tegenpartij een regel, zodat ze voortaan vanzelf in de juiste categorie komt." },
+    { sel: '[data-act="add-cat"]', t: "Categorie toevoegen", x: "Maak een nieuwe categorie. Kies daarna het soort en het budget.", topic: "budget", steps: true },
+    { sel: '[data-act="grp-add"]', t: "Deelbudget", x: "Een categorie met een eigen bedrag dat je verder verdeelt over subcategorieën.", topic: "deel", steps: true },
+    { sel: '[data-act="sub-add"]', t: "Subcategorie", x: "Voeg een subcategorie toe aan dit deelbudget en geef ze een deel van het bedrag." },
+    { sel: '[data-act="cat-type"]', t: "Soort", x: "Inkomen, Vaste kosten, Variabele kosten, Sparen of Overboeking. Overboekingen tellen niet mee als inkomen of uitgave." },
+    { sel: '[data-act="cat-budget"], [data-act="cat-budget-year"]', t: "Budget", x: "Hoeveel je per maand (of per jaar) aan deze categorie wil uitgeven." },
+    { sel: '[data-act="cat-roll"]', t: "Meenemen", x: "Wat je deze maand niet uitgeeft, schuift door naar volgende maand (en te veel gaat er af)." },
+    { sel: '[data-act="cat-up"], [data-act="cat-down"]', t: "Volgorde", x: "Zet de categorie hoger of lager in de lijsten. Slepen kan ook." },
+    { sel: '[data-act="del-cat"]', t: "Categorie verwijderen", x: "Transacties met deze categorie worden weer \"te categoriseren\". Vraagt eerst bevestiging en kan ongedaan gemaakt worden." },
+    { sel: '[data-act="rules-analyze"]', t: "Transacties analyseren", x: "De app stelt regels voor op basis van je keuzes, bekende Belgische bedrijven en terugkerende betalingen. Niets wordt toegepast tot jij aanvinkt en goedkeurt." },
+    { sel: '[data-act="add-rule"]', t: "Regel toevoegen", x: "Trefwoord → categorie. Staat het trefwoord in de omschrijving, dan krijgt de transactie die categorie." },
+    { sel: '[data-act="apply-rules"]', t: "Toepassen", x: "Pas de regels toe op alle transacties die nog te categoriseren zijn. Je eigen keuzes worden niet overschreven." },
+    { sel: '[data-act="rule-up"], [data-act="rule-down"]', t: "Volgorde van regels", x: "De bovenste regel die past, wint." },
+    { sel: '[data-act="sr-new"]', t: "Splitsregel", x: "Haal vast een stuk van een betaling naar een andere categorie, bv. € 15 van elke supermarktbetaling naar Huisdieren." },
+    { sel: '[data-act="sr-apply"]', t: "Opnieuw toepassen", x: "Pas de splitsregel opnieuw toe op alle passende transacties." },
+    { sel: '[data-act="add-goal"], [data-act="goal-new"]', t: "Spaardoel toevoegen", x: "Waarvoor spaar je? Met doelbedrag, datum en een eigen referentie SP-….", topic: "spaar", steps: true },
+    { sel: '[data-act="copy-ref"]', t: "Referentie kopiëren", x: "Kopieer de SP-referentie en plak ze in de mededeling van je overschrijving naar de spaarrekening." },
+    { sel: '[data-act="sav-pick"]', t: "Spaarrekening kiezen", x: "Toon de bewegingen en doelen van één spaarrekening." },
+    { sel: '[data-act="sav-move"]', t: "Storten / opnemen", x: "Plan een storting of opname. Komt ze later in je CSV, dan wordt ze vanzelf afgevinkt." },
+    { sel: '[data-act="sav-transfer"]', t: "Verplaatsen", x: "Schuif geld van het ene spaardoel naar het andere, zonder dat er echt geld beweegt." },
+    { sel: '[data-act="sav-entry"]', t: "Rente / premie / correctie", x: "Voeg een beweging toe die niet via je zichtrekening liep, bv. rente of getrouwheidspremie." },
+    { sel: '[data-act="sav-sync"]', t: "Saldo afstemmen", x: "Vul het saldo van je bank in, dan rekent de app vanaf daar verder." },
+    { sel: '[data-act="sav-approve-all"]', t: "Goedkeuren", x: "Keur alle bewegingen goed waarvoor de app al een spaardoel vond." },
+    { sel: '[data-act="pl-new"]', t: "Planning toevoegen", x: "Zet een toekomstige betaling of inkomst in de planner, eventueel terugkerend.", topic: "plan", steps: true },
+    { sel: '[data-act="pl-ics"]', t: "Naar agenda", x: "Download de planning als .ics-bestand voor Outlook, Google of je gsm-agenda." },
+    { sel: '[data-act="pl-today"], [data-act="pl-prev"], [data-act="pl-next"]', t: "Bladeren", x: "Ga naar vandaag, of een periode terug of vooruit." },
+    { sel: '[data-act="pl-view"]', t: "Weergave", x: "Kies hoe de planner eruitziet." },
+    { sel: '[data-act="pl-detected"]', t: "Herkende betalingen", x: "Toon vaste betalingen die de app zelf in je transacties herkende." },
+    { sel: '[data-act="pl-adopt"]', t: "In planner zetten", x: "Neem deze herkende betaling op in je planner, zodat ze meetelt in de saldoverwachting." },
+    { sel: '[data-act="pl-paid"]', t: "Betaald", x: "Vink deze planning af als betaald. Meestal gebeurt dat vanzelf bij de volgende CSV-import." },
+    { sel: '[data-act="loan-add"]', t: "Lening toevoegen", x: "Vul het saldo, de rente en het maandbedrag in. Met een trefwoord herkent de app de afbetalingen in je transacties." },
+    { sel: '[data-act="credit-add"]', t: "Krediet toevoegen", x: "Een kredietlijn of reserve: de app houdt bij hoeveel je opnam en terugbetaalde." },
+    { sel: '[data-act="credit-sync"]', t: "Saldo afstemmen", x: "Vul het saldo van je bank in als vertrekpunt." },
+    { sel: '[data-act="sim-extra"]', t: "Simulator", x: "Wat als je elke maand extra aflost? Je ziet meteen hoeveel sneller je klaar bent en hoeveel rente je uitspaart." },
+    { sel: '[data-act="acc-add"]', t: "Rekening toevoegen", x: "Voeg een zicht- of spaarrekening toe. Een nieuw rekeningnummer in een CSV wordt ook vanzelf gevraagd." },
+    { sel: '[data-act="acc-color"]', t: "Kleur", x: "Klik om de kleur van deze rekening te wisselen. Die kleur zie je in lijsten en grafieken." },
+    { sel: '[data-act="bal-date"], [data-act="bal-amount"]', t: "Startsaldo", x: "Het saldo op een gekozen dag. Vanaf daar rekent de app je saldo verder.", topic: "saldo", steps: true },
+    { sel: '[data-act="acc-warn"]', t: "Waarschuwen onder", x: "Komt de saldoverwachting onder dit bedrag, dan krijg je een waarschuwing." },
+    { sel: '[data-act="card-add"]', t: "Kredietkaart", x: "Zolang de losse aankopen niet ingelezen worden, telt de maandelijkse afrekening als uitgave in de categorie van de kaart." },
+    { sel: '[data-act="theme-open"]', t: "Thema", x: "Cyberpunk, Synthwave, Matrix of Oceaan, telkens donker of licht. Per toestel." },
+    { sel: '[data-act="folder-open"]', t: "OneDrive-back-up", x: "Automatisch een back-up en gsm-samenvatting in je OneDrive-map.", topic: "onedrive", steps: true },
+    { sel: '[data-act="export-json"]', t: "Back-up exporteren", x: "Al je gegevens in één .json-bestand. Bewaar het goed.", topic: "backup" },
+    { sel: '[data-act="import-json"]', t: "Back-up terugzetten", x: "Laad een eerder geëxporteerd bestand. Je ziet eerst een samenvatting voor er iets vervangen wordt." },
+    { sel: '[data-act="export-csv"]', t: "Naar Excel", x: "Al je transacties als .csv met puntkomma's, opent rechtstreeks in Excel." },
+    { sel: '[data-act="pin-open"]', t: "Pincode", x: "Scherm de planner af met een code, bv. op een gedeelde pc." },
+    { sel: '[data-act="tut-toggle"]', t: "Tutorial", x: "Zet deze uitleg-ballonnen aan of uit." },
+    { sel: '[data-act="reset"]', t: "Alles wissen", x: "Verwijdert alle gegevens in deze browser. Je moet eerst WISSEN intypen; maak vooraf een back-up." },
+  ];
+  // de tabbladen in de menubalk krijgen de uitleg van de hulppagina
+  HELP_TABS.forEach(([k, n, x]) => TUT.push({ sel: `#nav a[href="#${k}"]`, t: n, x }));
+  TUT.push({ sel: '#nav a[href="#help"]', t: "Help", x: "Alle uitleg en stappenplannen op één pagina, met een zoekveld." });
+
+  function tutOn() { try { return localStorage.getItem(KEY + ".tut") === "1"; } catch (e) { return false; } }
+  function setTut(on) { try { localStorage.setItem(KEY + ".tut", on ? "1" : "0"); } catch (e) {} }
+  // enkel op een toestel met muis (op de gsm toont de app vooral gegevens)
+  const tutActive = () => tutOn() && !document.body.classList.contains("lite") && matchMedia("(hover: hover) and (pointer: fine)").matches;
+  function tutBanner() {
+    return `<div class="notice info tut-banner"><span>🎓 <b>Tutorialmodus</b> · Ga met je muis over een knop met een <i class="tut-q">?</i> voor uitleg.${state.transactions.length ? "" : ` Nieuw hier? Begin bij <button class="linkbtn" data-act="help-topic" data-topic="start" type="button">Help → De eerste keer starten</button>.`}</span><button class="btn small" data-act="tut-toggle" type="button">Tutorial uitzetten</button></div>`;
+  }
+  function tutPaint() {
+    document.querySelectorAll("[data-tut]").forEach(e => e.removeAttribute("data-tut"));
+    const on = tutActive(); document.body.classList.toggle("tut", on); tutHide();
+    if (!on) { $("#tut-dots").innerHTML = ""; return; }
+    TUT.forEach((t, i) => document.querySelectorAll(t.sel).forEach(el => { if (!el.closest("dialog")) el.dataset.tut = i; }));
+    tutPlace(); clearTimeout(tutPaint._t); tutPaint._t = setTimeout(tutPlace, 900);   // na de binnenkom-animatie opnieuw
+  }
+  // één bolletje per soort knop (de eerste die in beeld is), vast op het scherm
+  function tutPlace() {
+    if (!document.body.classList.contains("tut")) return;
+    const hb = $("header").getBoundingClientRect().bottom, done = new Set(); let h = "";
+    document.querySelectorAll("[data-tut]").forEach(el => {
+      const k = el.dataset.tut; if (done.has(k)) return;
+      const r = el.getBoundingClientRect(); if (!r.width || r.bottom < 0 || r.top > innerHeight || (!el.closest("header") && r.top < hb)) return;
+      done.add(k); const y = r.height > 34 ? r.top + r.height / 2 - 19 : r.top - 7;   // hoge elementen (menubalk): naast de tekst
+      h += `<i style="left:${Math.round(r.right - 7)}px;top:${Math.round(Math.max(2, y))}px">?</i>`;
+    });
+    $("#tut-dots").innerHTML = h;
+  }
+  let tutCur = null;
+  function tutHide() { tutCur = null; $("#tut-tip").style.display = "none"; }
+  function tutShow(el) {
+    const t = TUT[+el.dataset.tut]; if (!t) return; tutCur = el;
+    const topic = t.topic && HELP_TOPICS.find(x => x.id === t.topic), box = $("#tut-tip");
+    box.innerHTML = `<b class="tt">${esc(t.t)}</b><p>${t.x}</p>${topic && t.steps ? `<ol class="help-steps">${topic.steps.map(x => `<li><span>${x}</span></li>`).join("")}</ol>` : ""}${topic ? `<small>Meer uitleg: Help → ${esc(topic.title)}</small>` : ""}`;
+    box.style.display = "block";
+    const r = el.getBoundingClientRect(), w = box.offsetWidth, h = box.offsetHeight;
+    let x = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), innerWidth - w - 8), y = r.bottom + 10, below = true;
+    if (y + h > innerHeight - 8) { y = r.top - h - 10; below = false; }
+    box.style.left = x + "px"; box.style.top = Math.max(8, y) + "px"; box.classList.toggle("above", !below);
+    box.style.setProperty("--ax", Math.round(Math.min(w - 14, Math.max(14, r.left + r.width / 2 - x))) + "px");
+  }
+
   const VIEWS = { help: viewHelp, overzicht: viewOverview, transacties: viewTransactions, budget: viewBudget, regels: viewRules, spaardoelen: viewGoals, spaar: viewSavings, planner: viewPlanner, leningen: viewLoans, profiel: viewProfile };
   const route = () => { const r = location.hash.slice(1); return VIEWS[r] ? r : "overzicht"; };
   function render() {
     setSav(ui.sav);   // de spaarfuncties rekenen voor de spaarrekening die op het tabblad Spaar gekozen is
     const r = route(), focusId = document.activeElement && document.activeElement.id, selStart = document.activeElement && document.activeElement.selectionStart;
-    if (liteMode()) { document.body.classList.add("lite"); document.body.classList.toggle("eye-off", liteHidden()); $("#main").innerHTML = viewLite(); afterRender("lite"); return; }
+    if (liteMode()) { document.body.classList.add("lite"); document.body.classList.toggle("eye-off", liteHidden()); $("#main").innerHTML = viewLite(); afterRender("lite"); tutPaint(); return; }
     document.body.classList.remove("lite", "eye-off");
-    $("#main").innerHTML = VIEWS[r]();
+    $("#main").innerHTML = (tutActive() ? tutBanner() : "") + VIEWS[r]();
     updateBadge();
     document.querySelectorAll("#nav a").forEach(a => { if (a.getAttribute("href") === "#" + r) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
     if (focusId) { const el = document.getElementById(focusId); if (el) { el.focus(); try { el.setSelectionRange(selStart, selStart); } catch (e) {} } }
@@ -3031,6 +3172,7 @@ dialog[open] { animation: fx-pop .18s ease-out; }
     const cur = document.querySelector(`#nav a[href="#${r}"]`); $("#nav-cur").textContent = cur ? cur.firstChild.textContent.trim() : r === "profiel" ? "Profiel" : r === "help" ? "Help" : ""; navOpen(false);
     $("#btn-profile").classList.toggle("active", r === "profiel"); updateProfileLabel();
     afterRender(r + (r === "overzicht" ? ui.period : ""));
+    tutPaint();
   }
   /* ---------- profiel: rekeningen en instellingen (stap 8a) ---------- */
   const ACC_COLORS = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--pos)"];
@@ -3085,7 +3227,7 @@ dialog[open] { animation: fx-pop .18s ease-out; }
     h += `</tbody></table></div><div style="margin-top:12px"><button class="btn" data-act="card-add" type="button">+ Kredietkaart toevoegen</button></div></section>`;
     const items = [["theme-open", "🎨", "Thema", "Cyberpunk, Synthwave, Matrix of Oceaan · donker of licht"], ["folder-open", "☁", "OneDrive-back-up", "Automatisch een kopie + gsm-samenvatting"],
       ["export-json", "↓", "Back-up exporteren", "Alles in één .json-bestand"], ["import-json", "↑", "Back-up terugzetten", "Een eerder geëxporteerd bestand laden"],
-      ["export-csv", "⊞", "Transacties naar Excel", ".csv met puntkomma, opent in Excel"], ["pin-open", "🔒", "Pincode", "De planner afschermen met een code"], ["help-open", "?", "Help", "Uitleg en stappenplannen"],
+      ["export-csv", "⊞", "Transacties naar Excel", ".csv met puntkomma, opent in Excel"], ["pin-open", "🔒", "Pincode", "De planner afschermen met een code"], ["help-open", "?", "Help", "Uitleg en stappenplannen"], ["tut-toggle", "🎓", tutOn() ? "Tutorial: aan" : "Tutorial: uit", "Uitleg-ballonnen bij de knoppen (pc)"],
       ...(isStandalone() ? [] : [["install", "⤓", "App installeren", "Als programma op je pc of gsm"]]), ["reset", "✕", "Alles wissen", "Verwijdert alle gegevens in deze browser", "danger"]];
     h += `<section class="card"><div class="card-head"><h2>Instellingen</h2></div><div class="pf-grid">${items.map(([act, ic, t, sub, cls]) => `<button type="button" class="pf-item${cls ? " " + cls : ""}" data-act="${act}"><b>${ic} ${t}</b><small>${sub}</small></button>`).join("")}</div></section>`;
     return h;
@@ -3262,6 +3404,9 @@ dialog[open] { animation: fx-pop .18s ease-out; }
       case "install": installApp(); break;
       case "theme-open": themeDialog(); break;
       case "help-open": location.hash = "help"; window.scrollTo(0, 0); break;
+      case "help-topic": { const id = el.dataset.topic; location.hash = "help"; setTimeout(() => { const d = $("#help-" + id); if (d) { d.open = true; d.scrollIntoView({ block: "center" }); } }, 150); break; }
+      case "tut-toggle": { const on = !tutOn(); setTut(on); render();
+        toast(on ? (tutActive() ? "Tutorial aan: ga met je muis over een knop met een ?" : "Tutorial aan. De ballonnen werken op een toestel met muis.") : "Tutorial uit. Alle uitleg staat in het tabblad Help."); break; }
       case "acc-add": accAddDialog(el.dataset.type); break;
       case "card-add": cardAddDialog(); break;
       case "card-del": { const id = el.closest("tr").dataset.card, k = (state.cards || []).find(x => x.id === id);
@@ -3508,6 +3653,17 @@ dialog[open] { animation: fx-pop .18s ease-out; }
     dragFrom = null; render(); }, true);
   document.addEventListener("dragend", () => { if (dragFrom !== null) { dragFrom = null; render(); } });
 
+  /* tutorialballon */
+  document.addEventListener("mousemove", e => {
+    if (!document.body.classList.contains("tut")) return;
+    const el = e.target.closest && e.target.closest("[data-tut]");
+    if (!el) { if (tutCur) tutHide(); return; }
+    if (el !== tutCur) tutShow(el);
+  });
+  let tutRaf = 0; const tutQueue = () => { if (tutCur) tutHide(); if (!tutRaf) tutRaf = requestAnimationFrame(() => { tutRaf = 0; tutPlace(); }); };
+  addEventListener("scroll", tutQueue, { passive: true }); addEventListener("resize", () => { tutQueue(); tutPaint(); });
+  document.addEventListener("toggle", tutQueue, true);
+
   /* tooltip */
   const tip = $("#tip");
   function hideTip() { tip.style.display = "none"; }
@@ -3530,7 +3686,9 @@ dialog[open] { animation: fx-pop .18s ease-out; }
   });
 
   $("#main").innerHTML = `<p class="muted" style="padding:40px 0;text-align:center">Gegevens laden…</p>`;
-  loadState().then(st => { state = st; ui.month = state.transactions.length ? state.transactions[0].date.slice(0, 7) : todayYm();
+  loadState().then(st => { state = st;
+      try { if (localStorage.getItem(KEY + ".tut") === null) setTut(!state.transactions.length); } catch (e) {}   // nieuwe, lege planner: tutorial aan
+      ui.month = state.transactions.length ? state.transactions[0].date.slice(0, 7) : todayYm();
       syncThemeColor();
       const start = () => {
         updateInstallUi(); if (state.transactions.length) askPersist();
