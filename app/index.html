@@ -656,10 +656,6 @@ details.help-item[open] summary::after { content: "−"; }
 .help-tab a { text-decoration: none; color: var(--accent); }
 .help-keys { display: flex; flex-wrap: wrap; gap: 8px 26px; font-size: 13.5px; }
 kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: var(--r-sm); font: 600 12px var(--font-mono); color: var(--ink); background: var(--field); text-align: center; }
-#tut-dots { position: fixed; inset: 0; pointer-events: none; z-index: 6; }
-#tut-dots i, .tut-q { display: inline-grid; place-items: center; width: 15px; height: 15px; border-radius: 50%; background: var(--accent); color: var(--on-accent); font: 700 10px var(--font-body); font-style: normal; box-shadow: 0 0 8px rgba(var(--accent-rgb), calc(.8 * var(--glow))); }
-#tut-dots i { position: fixed; animation: tut-pop .3s ease-out both; }
-@keyframes tut-pop { from { transform: scale(0); } to { transform: scale(1); } }
 body.tut [data-tut]:hover { outline: 1px dashed rgba(var(--accent-rgb), .8); outline-offset: 2px; }
 #tut-tip { position: fixed; z-index: 25; display: none; pointer-events: none; max-width: 340px; padding: 11px 13px; background: rgba(var(--panel-rgb), .97); color: var(--ink); border: 1px solid var(--accent); border-radius: var(--r-card); box-shadow: 0 0 18px rgba(var(--accent-rgb), calc(.35 * var(--glow))), 0 10px 26px rgba(var(--shade-rgb), .3); font: 13px/1.45 var(--font-body); }
 #tut-tip::before { content: ""; position: absolute; left: var(--ax, 20px); top: -6px; width: 10px; height: 10px; margin-left: -5px; background: inherit; border: inherit; border-width: 1px 0 0 1px; transform: rotate(45deg); }
@@ -671,8 +667,6 @@ body.tut [data-tut]:hover { outline: 1px dashed rgba(var(--accent-rgb), .8); out
 #tut-tip .help-steps li::before { width: 17px; height: 17px; font-size: 10.5px; }
 #tut-tip small { display: block; margin-top: 6px; color: var(--muted); font-size: 11.5px; }
 .tut-banner { margin-bottom: 14px; }
-.tut-banner .tut-q { vertical-align: -2px; margin: 0 2px; }
-@media (prefers-reduced-motion: reduce) { #tut-dots i { animation: none; } }
 .toast-undo { margin-left: 10px; background: none; border: 1px solid currentColor; color: inherit; font: inherit; padding: 3px 9px; border-radius: var(--r-btn); cursor: pointer; text-transform: none; }
 .toast-undo:hover { background: rgba(var(--accent-rgb), .15); }
 .toast { background: rgba(var(--panel-rgb), .96); color: var(--accent); border: 1px solid var(--accent); border-radius: var(--r-card); box-shadow: 0 0 20px rgba(var(--accent-rgb), calc(.4 * var(--glow))); text-transform: var(--case-ui); letter-spacing: .05em; font-weight: 600; }
@@ -892,7 +886,7 @@ dialog[open] { animation: fx-pop .18s ease-out; }
 <input type="file" id="file-json" accept=".json,.gz,application/json,application/gzip" hidden>
 <input type="file" id="file-lite" hidden>
 <div class="tooltip" id="tip" role="tooltip"></div>
-<div id="tut-dots" aria-hidden="true"></div><div id="tut-tip" role="tooltip"></div>
+<div id="tut-tip" role="tooltip"></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <dialog id="dlg"></dialog>
 
@@ -3963,8 +3957,7 @@ if (typeof module !== "undefined") module.exports = { belfiusDesc, catByName, pa
       "De keuze geldt per toestel: je gsm mag een ander thema hebben dan je pc." ] },
     { id: "tutorial", icon: "🎓", title: "Tutorialmodus", tab: "profiel", steps: [
       "Ga naar <b>Profiel</b> en klik op <b>🎓 Tutorial</b> om hem aan of uit te zetten.",
-      "Staat hij aan, dan krijgen knoppen met uitleg een klein <b>?</b>-bolletje.",
-      "Ga met je muis over zo'n knop: er verschijnt een ballon met wat de knop doet, bij grote taken met een stappenplan.",
+            "Ga met je muis over een knop: er verschijnt een ballon met wat de knop doet, bij grote taken met een stappenplan.",
       "Werkt op de pc (met muis). Bij een nieuwe, lege planner staat hij de eerste keer vanzelf aan." ] },
     { id: "gsm", icon: "📱", title: "De gsm-weergave", tab: "", steps: [
       "Op een smal scherm toont de app een <b>samenvatting</b>: saldo, budget, binnenkort te betalen en spaardoelen.",
@@ -4003,7 +3996,7 @@ if (typeof module !== "undefined") module.exports = { belfiusDesc, catByName, pa
   }
 
   /* ---------- tutorialmodus (stap 10c) ----------
-     Aan = ?-bolletje op knoppen met uitleg + ballon bij muis-over (enkel pc). Keuze per toestel.
+     Aan = ballon met uitleg bij muis-over (enkel pc); op vraag van Benny geen ?-bolletjes (te druk). Keuze per toestel.
      TUT: sel = CSS-selector, t = titel, x = uitleg, topic = id uit HELP_TOPICS (stappenplan in de ballon met steps: true). */
   const TUT = [
     { sel: '#btn-import, [data-act="pick-csv"]', t: "CSV importeren", x: "Lees de transacties van je bank in (ING of Belfius). Je kan ook een bestand in het venster slepen.", topic: "csv", steps: true },
@@ -4085,26 +4078,13 @@ if (typeof module !== "undefined") module.exports = { belfiusDesc, catByName, pa
   // enkel op een toestel met muis (op de gsm toont de app vooral gegevens)
   const tutActive = () => tutOn() && !document.body.classList.contains("lite") && matchMedia("(hover: hover) and (pointer: fine)").matches;
   function tutBanner() {
-    return `<div class="notice info tut-banner"><span>🎓 <b>Tutorialmodus</b> · Ga met je muis over een knop met een <i class="tut-q">?</i> voor uitleg.${state.transactions.length ? "" : ` Nieuw hier? Begin bij <button class="linkbtn" data-act="help-topic" data-topic="start" type="button">Help → De eerste keer starten</button>.`}</span><button class="btn small" data-act="tut-toggle" type="button">Tutorial uitzetten</button></div>`;
+    return `<div class="notice info tut-banner"><span>🎓 <b>Tutorialmodus</b> · Ga met je muis over een knop voor uitleg.${state.transactions.length ? "" : ` Nieuw hier? Begin bij <button class="linkbtn" data-act="help-topic" data-topic="start" type="button">Help → De eerste keer starten</button>.`}</span><button class="btn small" data-act="tut-toggle" type="button">Tutorial uitzetten</button></div>`;
   }
   function tutPaint() {
     document.querySelectorAll("[data-tut]").forEach(e => e.removeAttribute("data-tut"));
     const on = tutActive(); document.body.classList.toggle("tut", on); tutHide();
-    if (!on) { $("#tut-dots").innerHTML = ""; return; }
+    if (!on) return;
     TUT.forEach((t, i) => document.querySelectorAll(t.sel).forEach(el => { if (!el.closest("dialog")) el.dataset.tut = i; }));
-    tutPlace(); clearTimeout(tutPaint._t); tutPaint._t = setTimeout(tutPlace, 900);   // na de binnenkom-animatie opnieuw
-  }
-  // één bolletje per soort knop (de eerste die in beeld is), vast op het scherm
-  function tutPlace() {
-    if (!document.body.classList.contains("tut")) return;
-    const hb = $("header").getBoundingClientRect().bottom, done = new Set(); let h = "";
-    document.querySelectorAll("[data-tut]").forEach(el => {
-      const k = el.dataset.tut; if (done.has(k)) return;
-      const r = el.getBoundingClientRect(); if (!r.width || r.bottom < 0 || r.top > innerHeight || (!el.closest("header") && r.top < hb)) return;
-      done.add(k); const y = r.height > 34 ? r.top + r.height / 2 - 19 : r.top - 7;   // hoge elementen (menubalk): naast de tekst
-      h += `<i style="left:${Math.round(r.right - 7)}px;top:${Math.round(Math.max(2, y))}px">?</i>`;
-    });
-    $("#tut-dots").innerHTML = h;
   }
   let tutCur = null;
   function tutHide() { tutCur = null; $("#tut-tip").style.display = "none"; }
@@ -4369,7 +4349,7 @@ if (typeof module !== "undefined") module.exports = { belfiusDesc, catByName, pa
       case "help-open": location.hash = "help"; window.scrollTo(0, 0); break;
       case "help-topic": { const id = el.dataset.topic; location.hash = "help"; setTimeout(() => { const d = $("#help-" + id); if (d) { d.open = true; d.scrollIntoView({ block: "center" }); } }, 150); break; }
       case "tut-toggle": { const on = !tutOn(); setTut(on); render();
-        toast(on ? (tutActive() ? "Tutorial aan: ga met je muis over een knop met een ?" : "Tutorial aan. De ballonnen werken op een toestel met muis.") : "Tutorial uit. Alle uitleg staat in het tabblad Help."); break; }
+        toast(on ? (tutActive() ? "Tutorial aan: ga met je muis over een knop" : "Tutorial aan. De ballonnen werken op een toestel met muis.") : "Tutorial uit. Alle uitleg staat in het tabblad Help."); break; }
       case "acc-add": accAddDialog(el.dataset.type); break;
       case "card-add": cardAddDialog(); break;
       case "card-del": { const id = el.closest("tr").dataset.card, k = (state.cards || []).find(x => x.id === id);
@@ -4623,9 +4603,7 @@ if (typeof module !== "undefined") module.exports = { belfiusDesc, catByName, pa
     if (!el) { if (tutCur) tutHide(); return; }
     if (el !== tutCur) tutShow(el);
   });
-  let tutRaf = 0; const tutQueue = () => { if (tutCur) tutHide(); if (!tutRaf) tutRaf = requestAnimationFrame(() => { tutRaf = 0; tutPlace(); }); };
-  addEventListener("scroll", tutQueue, { passive: true }); addEventListener("resize", () => { tutQueue(); tutPaint(); });
-  document.addEventListener("toggle", tutQueue, true);
+  addEventListener("scroll", () => { if (tutCur) tutHide(); }, { passive: true }); addEventListener("resize", tutPaint);
 
   /* tooltip */
   const tip = $("#tip");
