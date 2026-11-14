@@ -734,6 +734,20 @@ td.desc > .acc-mini { float: left; margin-top: 7px; }
 /* overboeking tussen eigen rekeningen: neutraal, geen plus of min */
 .xfer { color: var(--ink); } td.amount.xfer { white-space: nowrap; } td.amount.xfer small { display: block; font-size: 11px; color: var(--muted); font-family: var(--font-body); }
 td.amount.xfer::first-letter { color: var(--accent); }
+/* saldoverwachting per rekening + overboekingen (stap 8c-2/3) */
+.fc-acc { display: inline-flex; align-items: center; margin-left: 8px; color: var(--ink); }
+.fc-stats { display: flex; flex-wrap: wrap; gap: 6px 22px; align-items: baseline; margin: 0 0 8px; font-size: 13.5px; }
+.fc-warn { color: var(--neg); font-weight: 600; }
+.flows { display: grid; gap: 10px; }
+.flow { display: grid; grid-template-columns: minmax(110px, auto) minmax(160px, 1fr) minmax(110px, auto) auto; align-items: center; gap: 12px; }
+.flow-acc { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--c); border-radius: var(--r-pill); clip-path: var(--notch-sm); font-weight: 600; font-size: 13px; white-space: nowrap; }
+.flow-acc i { width: 9px; height: 9px; border-radius: 50%; background: var(--c); box-shadow: 0 0 6px var(--c); }
+.flow-line { position: relative; display: flex; justify-content: center; align-items: baseline; gap: 6px; padding-bottom: 8px; }
+.flow-line::before { content: ""; position: absolute; left: 0; right: 10px; bottom: 2px; height: 2px; background: linear-gradient(90deg, var(--c1), var(--c2)); box-shadow: 0 0 8px rgba(var(--accent-rgb), calc(.4 * var(--glow))); }
+.flow-line::after { content: ""; position: absolute; right: 0; bottom: -2px; width: 12px; height: 10px; background: var(--c2); clip-path: polygon(0 0, 100% 50%, 0 100%); }
+.flow-line small { color: var(--muted); font-size: 11.5px; }
+.flow-hist { display: flex; align-items: flex-end; gap: 3px; height: 28px; } .flow-hist i { width: 7px; background: rgba(var(--accent-rgb), .55); border-radius: 1px; }
+@media (max-width: 700px) { .flow { grid-template-columns: 1fr auto 1fr; } .flow-hist { display: none; } .flow-acc { font-size: 12px; padding: 5px 8px; } }
 /* ================= ANIMATIES (stap 6c) =================
    Kort en spaarzaam. Alles valt weg bij "minder beweging" (zie onderaan).
    #main.enter wordt kort gezet als je van tabblad wisselt of de app opent. */
@@ -1423,7 +1437,8 @@ dialog[open] { animation: fx-pop .18s ease-out; }
     </section>`;
     const uncatHtml = s.uncatCount ? uncatCard(ui.month) : "";
     h += goalsWide();
-    h += `<div class="grid-2">${forecastCard()}${netWorthCard()}</div>`;
+    const fcAccs = zichtList(state).length ? (multiAcc() ? zichtList(state) : [zichtList(state)[0]]) : [""];
+    h += `<div class="stack">${netWorthCard()}${fcAccs.map(a => forecastCard(a)).join("")}${transferCard()}</div>`;
     h += `<div class="grid-2"><div class="stack"><section class="card">${catChart(s)}</section>${debtCard()}${uncatHtml}</div><div class="stack">${(state.plans.length || detectRecurring(state).length) ? soonCard(14, true) : ""}<section class="card trend">${trendChart()}</section>${carryCard()}</div></div>`;
     return h;
   }
@@ -1454,11 +1469,16 @@ dialog[open] { animation: fx-pop .18s ease-out; }
   }
 
   /* ---------- saldoverwachting ---------- */
-  function forecast(days) {
-    const t = todayS(), b = balanceAt(state, t.slice(0, 7));
-    if (!b.set) return null;
-    const items = agenda(state, addD(t, -10), addD(t, days), true).filter(it => !it.paid && !(it.plan.auto && it.date < t) && !(it.date < t && !it.plan.auto && it.date < addD(t, -10)));
-    const pts = [{ date: t, value: b.total, items: [] }]; let v = b.total;
+  // van welke rekening een planner-item (of herkende betaling) betaald wordt; standaard de eerste zichtrekening
+  function planAcc(pl) { const z = zichtList(state); const a = pl && pl.account ? accKey(state, pl.account) : ""; return z.find(k => sameAcc(k, a)) || z[0] || ""; }
+  function accWarn(acc) { const a = acc && state.accounts[acc]; const w = a && a.warn !== undefined && a.warn !== null ? a.warn : state.warnBelow; return +(w ?? 0); }
+  // acc leeg = alle rekeningen samen (zoals vroeger, o.a. voor de gsm-samenvatting)
+  function forecast(days, acc) {
+    const t = todayS(), b = balanceAt(state, t.slice(0, 7)), per = acc ? b.per.find(x => sameAcc(x.account, acc)) : null;
+    if (acc ? !per : !b.set) return null;
+    const startBal = acc ? per.value : b.total;
+    const items = agenda(state, addD(t, -10), addD(t, days), true).filter(it => !it.paid && !(it.plan.auto && it.date < t) && !(it.date < t && !it.plan.auto && it.date < addD(t, -10)) && (!acc || sameAcc(planAcc(it.plan), acc)));
+    const pts = [{ date: t, value: startBal, items: [] }]; let v = startBal;
     const byDate = new Map(); for (const it of items) { const d = it.date < t ? t : it.date; if (!byDate.has(d)) byDate.set(d, []); byDate.get(d).push(it); }
     for (let d = t; d <= addD(t, days); d = addD(d, 1)) {
       const its = byDate.get(d) || []; for (const it of its) v += (it.plan.kind === "inkomst" ? 1 : -1) * (+it.plan.amount || 0);
@@ -1466,12 +1486,13 @@ dialog[open] { animation: fx-pop .18s ease-out; }
     }
     const low = pts.reduce((m, p) => p.value < m.value ? p : m, pts[0]);
     const nextInc = items.find(it => it.plan.kind === "inkomst" && it.date > t && it.plan.amount > 300);
-    return { pts, low, start: b.total, nextInc, end: pts[pts.length - 1].value };
+    return { pts, low, start: startBal, nextInc, end: pts[pts.length - 1].value };
   }
-  function forecastCard() {
-    const days = 45, f = forecast(days), warn = +(state.warnBelow ?? 0);
-    if (!f) return `<section class="card"><div class="card-head"><h2>Saldoverwachting</h2></div><p class="muted">Vul eerst je startsaldo in (tabblad Budget), dan berekent de planner hoe je saldo de komende weken evolueert.</p></section>`;
-    const W = 520, H = 170, L = 48, R = 8, T = 12, B = 22, iw = W - L - R, ih = H - T - B;
+  function forecastCard(acc) {
+    const days = 45, f = forecast(days, acc), warn = accWarn(acc), multi = multiAcc() && acc;
+    const title = `Saldoverwachting${multi ? ` <span class="fc-acc" style="--c:${accColor(acc)}"><i class="acc-mini" style="--c:${accColor(acc)}"></i>${esc(accName(state, acc))}</span>` : ""}`;
+    if (!f) return `<section class="card"><div class="card-head"><h2>${title}</h2></div><p class="muted" style="margin:0">Vul het startsaldo${multi ? ` van ${esc(accName(state, acc))}` : ""} in bij <a class="hint" href="#profiel">Profiel</a>, dan berekent de planner hoe het saldo de komende weken evolueert.</p></section>`;
+    const wideChart = !narrow(), W = wideChart ? 1100 : 520, H = wideChart ? 200 : 170, L = 48, R = 8, T = 12, B = 22, iw = W - L - R, ih = H - T - B;
     const vals = f.pts.map(p => p.value), mx = Math.max(...vals, warn), mn = Math.min(...vals, warn, 0);
     const step = niceStep((mx - mn || 1) / 3), top = Math.ceil(mx / step) * step, bot = Math.floor(mn / step) * step;
     const x = i => L + i / (f.pts.length - 1) * iw, y = v => T + (top - v) / (top - bot || 1) * ih;
@@ -1483,13 +1504,12 @@ dialog[open] { animation: fx-pop .18s ease-out; }
     const li = f.pts.indexOf(f.low);
     g += `<circle cx="${x(li)}" cy="${y(f.low.value)}" r="4.5" fill="${f.low.value < warn ? "var(--neg)" : "var(--gold)"}" stroke="var(--bg)" stroke-width="1.5"/>`;
     f.pts.forEach((p, i) => { if (p.items.length) g += `<circle cx="${x(i)}" cy="${y(p.value)}" r="2.5" fill="var(--accent)"/>`; g += `<rect x="${x(i) - iw / f.pts.length / 2}" y="${T}" width="${iw / f.pts.length}" height="${ih}" fill="transparent" data-tip="${esc(`<b>${fmtDate(p.date)}</b><br>Verwacht saldo: ${eur(p.value)}${p.items.map(it => `<br>${it.plan.kind === "inkomst" ? "+" : "−"}${eur(it.plan.amount || 0)} ${esc(it.plan.title)}`).join("")}`)}"/>`; });
-    [0, 15, 30, 45].forEach(i => { if (f.pts[i]) g += `<text x="${x(i)}" y="${H - 6}" text-anchor="${i === 0 ? "start" : i === 45 ? "end" : "middle"}">${i === 0 ? "vandaag" : fmtDate(f.pts[i].date).slice(0, 5)}</text>`; });
+    (wideChart ? [0, 7, 14, 21, 28, 35, 45] : [0, 15, 30, 45]).forEach(i => { if (f.pts[i]) g += `<text x="${x(i)}" y="${H - 6}" text-anchor="${i === 0 ? "start" : i === 45 ? "end" : "middle"}">${i === 0 ? "vandaag" : fmtDate(f.pts[i].date).slice(0, 5)}</text>`; });
     const danger = f.low.value < warn;
-    return `<section class="card chart"><div class="card-head"><h2>Saldoverwachting</h2><span class="hint">Komende ${days} dagen, met je planner en herkende vaste betalingen</span></div>
-      <div class="pl-sum" style="margin:0 0 8px"><span>Nu <b class="${f.start < 0 ? "neg" : "gold"}">${eur(f.start)}</b></span><span>Laagste punt <b class="${danger ? "neg" : ""}">${eur(f.low.value)}</b> op ${fmtDate(f.low.date)}</span>${f.nextInc ? `<span>Volgende loon ±${fmtDate(f.nextInc.date)}</span>` : ""}</div>
-      ${danger ? `<div class="notice warn" style="margin-bottom:8px"><span>⚠ Je saldo zakt naar verwachting onder ${eur0(warn)} op ${fmtDate(f.low.date)}.</span></div>` : ""}
+    return `<section class="card chart fc-card"><div class="card-head"><h2>${title}</h2><span class="hint">Komende ${days} dagen · planner + herkende vaste betalingen</span></div>
+      <div class="fc-stats"><span>Nu <b class="num ${f.start < 0 ? "neg" : "gold"}">${eur(f.start)}</b></span><span>Laagste punt <b class="num ${danger ? "neg" : ""}">${eur(f.low.value)}</b> <span class="muted">op ${fmtDate(f.low.date)}</span></span>${f.nextInc ? `<span>Volgende inkomst <b>±${fmtDate(f.nextInc.date).slice(0, 5)}</b></span>` : ""}${danger ? `<span class="fc-warn">⚠ onder ${eur0(warn)} op ${fmtDate(f.low.date).slice(0, 5)}</span>` : ""}</div>
       <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Verwacht saldo">${g}</svg>
-      <div class="legend"><span>Waarschuwen onder <input class="input num" style="width:90px;padding:2px 6px" data-act="warn-below" inputmode="decimal" value="${warn}"> €</span><a class="hint" href="#planner">Planner</a></div></section>`;
+      <div class="legend"><span class="muted">Grens ${eur0(warn)} · <a class="hint" href="#profiel">aanpassen in Profiel</a></span><a class="hint" href="#planner">Planner</a></div></section>`;
   }
 
   /* ---------- vermogen ---------- */
@@ -1509,7 +1529,7 @@ dialog[open] { animation: fx-pop .18s ease-out; }
     const months = []; for (let i = 12; i >= 1; i--) months.push(endOfMonth(shiftMonth(t.slice(0, 7), -i)));
     const series = [...months.map(e => ({ date: e, v: netWorthAt(e).total })), { date: t, v: now.total }];
     const first = series[0].v, delta = now.total - first;
-    const W = 520, H = 120, L = 48, R = 8, T = 10, B = 20, iw = W - L - R, ih = H - T - B;
+    const wideChart = !narrow(), W = wideChart ? 1100 : 520, H = wideChart ? 170 : 120, L = 48, R = 8, T = 10, B = 20, iw = W - L - R, ih = H - T - B;
     const vals = series.map(p => p.v), mx = Math.max(...vals, 0), mn = Math.min(...vals, 0), step = niceStep((mx - mn || 1) / 3), top = Math.ceil(mx / step) * step, bot = Math.floor(mn / step) * step;
     const x = i => L + i / (series.length - 1) * iw, y = v => T + (top - v) / (top - bot || 1) * ih;
     let g = ""; for (let v = bot; v <= top + 1e-9; v += step) g += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" ${Math.abs(v) < 1e-9 ? 'style="stroke:var(--muted)"' : ""}/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${Math.abs(v) >= 1000 ? (v / 1000).toLocaleString("nl-BE") + "k" : v}</text>`;
@@ -2327,6 +2347,7 @@ dialog[open] { animation: fx-pop .18s ease-out; }
         <div><label for="p-rep">Herhaling</label><select class="input" id="p-rep">${Object.entries(REPEATS).map(([k, l]) => `<option value="${k}"${(p.repeat || "none") === k ? " selected" : ""}>${l}</option>`).join("")}</select></div>
         <div><label for="p-until">Herhalen tot (optioneel)</label><input class="input" type="date" id="p-until" value="${esc(p.until || "")}"></div>
         <div><label for="p-rem">Herinnering (dagen vooraf)</label><input class="input" id="p-rem" inputmode="numeric" value="${p.remind ?? 3}"></div>
+        ${multiAcc() ? `<div><label for="p-acc">Rekening</label><select class="input" id="p-acc">${zichtList(state).map(a => `<option value="${esc(a)}"${sameAcc(a, planAcc(p)) ? " selected" : ""}>${esc(accName(state, a))}</option>`).join("")}</select></div>` : ""}
         <div><label for="p-cat">Categorie (optioneel)</label><select class="input" id="p-cat"><option value="">—</option>${state.categories.map(c => `<option${c.name === p.cat ? " selected" : ""}>${esc(c.name)}</option>`).join("")}</select></div>
         <div><label for="p-match">Trefwoord in bankomschrijving (optioneel)</label><input class="input" id="p-match" value="${esc(p.match || "")}" placeholder="voor automatisch afvinken"></div>
         <div class="full"><label for="p-note">Notitie (optioneel)</label><input class="input" id="p-note" value="${esc(p.note || "")}"></div>
@@ -2340,7 +2361,7 @@ dialog[open] { animation: fx-pop .18s ease-out; }
       d.querySelector("#p-ok").addEventListener("click", () => {
         const g = q => d.querySelector(q).value.trim();
         if (!g("#p-title") || !g("#p-date")) { d.querySelector("#p-err").textContent = "Vul minstens in wat het is en de datum."; return; }
-        const obj = { title: g("#p-title"), kind: g("#p-kind"), amount: num(g("#p-amt")), date: g("#p-date"), repeat: g("#p-rep"), until: g("#p-until"), remind: Math.max(0, Math.min(60, parseInt(g("#p-rem")) || 0)), cat: g("#p-cat"), match: g("#p-match"), note: g("#p-note") };
+        const obj = { title: g("#p-title"), kind: g("#p-kind"), amount: num(g("#p-amt")), date: g("#p-date"), repeat: g("#p-rep"), until: g("#p-until"), remind: Math.max(0, Math.min(60, parseInt(g("#p-rem")) || 0)), cat: g("#p-cat"), match: g("#p-match"), note: g("#p-note"), ...(d.querySelector("#p-acc") ? { account: g("#p-acc") } : {}) };
         if (id) Object.assign(p, obj); else state.plans.push(Object.assign({ id: "pl" + Date.now().toString(36), done: {} }, obj));
         save(); d.close(); render(); toast("Planning opgeslagen");
       });
@@ -2731,7 +2752,7 @@ dialog[open] { animation: fx-pop .18s ease-out; }
     let h = `<div class="page-head"><div><h1>Profiel</h1><p>Je rekeningen en instellingen</p></div></div>`;
     h += `<section class="card"><div class="card-head"><h2>Jij</h2></div><label for="pf-name">Naam</label><input class="input" id="pf-name" data-act="pf-name" value="${esc(pr.name || "")}" placeholder="bv. Benny" autocomplete="off" style="max-width:320px"></section>`;
     h += `<section class="card" id="pf-zicht"><div class="card-head"><h2>Zichtrekeningen <span class="muted num">${z.length}/${MAX_ZICHT}</span></h2><span class="hint">Komen overeen met de rekeningnummers in je CSV's. Startsaldo = het saldo op het einde van de dag vóór je oudste transactie (zie je rekeninguittreksel).</span></div>
-      <div class="table-wrap"><table><thead><tr><th style="width:36px"></th><th>Naam</th><th>Rekeningnummer</th><th class="r">Transacties</th><th>Startsaldo op</th><th class="r">Startsaldo</th><th class="r">Saldo nu</th><th></th></tr></thead><tbody>`;
+      <div class="table-wrap"><table><thead><tr><th style="width:36px"></th><th>Naam</th><th>Rekeningnummer</th><th class="r">Transacties</th><th>Startsaldo op</th><th class="r">Startsaldo</th><th class="r">Saldo nu</th><th class="r" title="Saldoverwachting: waarschuwen als het saldo hieronder zakt">Waarschuwen onder</th><th></th></tr></thead><tbody>`;
     for (const acc of z) {
       const tx = txOf(acc), b = state.balances.find(x => x.account === acc) || { date: oldestDay(acc), amount: null }, per = bal.per.find(x => x.account === acc);
       h += `<tr data-acc="${esc(acc)}"><td><button class="acc-dot" data-act="acc-color" type="button" style="--c:${accColor(acc)}" title="Andere kleur" aria-label="Andere kleur"></button></td>
@@ -2740,9 +2761,10 @@ dialog[open] { animation: fx-pop .18s ease-out; }
         <td><input class="cell" type="date" data-act="bal-date" value="${esc(b.date || "")}" aria-label="Datum startsaldo"></td>
         <td class="r"><input class="cell r num" data-act="bal-amount" inputmode="decimal" placeholder="bv. 1.250,00" value="${b.amount ?? ""}" aria-label="Startsaldo"></td>
         <td class="r num">${per ? `<b class="${per.value < 0 ? "neg" : ""}">${eur(per.value)}</b>` : `<span class="muted">—</span>`}</td>
+        <td class="r"><input class="cell r num" data-act="acc-warn" inputmode="decimal" style="max-width:90px" value="${accWarn(acc)}" aria-label="Waarschuwen onder"></td>
         <td class="r">${tx.length ? "" : `<button class="btn small ghost" data-act="acc-del" type="button" title="Verwijderen" aria-label="Rekening verwijderen">✕</button>`}</td></tr>`;
     }
-    if (!z.length) h += `<tr class="empty-row"><td colspan="8">Nog geen zichtrekeningen. Importeer een CSV of voeg er een toe.</td></tr>`;
+    if (!z.length) h += `<tr class="empty-row"><td colspan="9">Nog geen zichtrekeningen. Importeer een CSV of voeg er een toe.</td></tr>`;
     h += `</tbody></table></div><div style="margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn" data-act="acc-add" data-type="zicht" type="button" ${z.length >= MAX_ZICHT ? "disabled" : ""}>+ Zichtrekening toevoegen</button>${z.length >= MAX_ZICHT ? `<span class="muted" style="font-size:12.5px">Maximum ${MAX_ZICHT} zichtrekeningen bereikt.</span>` : ""}</div></section>`;
     h += `<section class="card" id="pf-spaar"><div class="card-head"><h2>Spaarrekeningen</h2><span class="hint">Je spaardoelen beheer je in het tabblad <a class="hint" href="#spaar">Spaar</a>.</span></div>
       <div class="table-wrap"><table><thead><tr><th>Naam</th><th>Rekeningnummer</th><th class="r">Bewegingen</th><th class="r">Saldo nu</th><th></th></tr></thead><tbody>`;
@@ -2802,6 +2824,23 @@ dialog[open] { animation: fx-pop .18s ease-out; }
         inn: Math.round(tx.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0) * 100) / 100,
         out: Math.round(tx.filter(t => t.amount < 0).reduce((s, t) => s + t.amount, 0) * 100) / 100, n: tx.length };
     });
+  }
+  function transferCard() {
+    if (!multiAcc()) return "";
+    const flows = transferFlows(state, ui.month); if (!flows.length) return "";
+    const months = []; for (let i = 5; i >= 0; i--) months.push(shiftMonth(ui.month, -i));
+    const hist = months.map(ym => transferFlows(state, ym));
+    const net = {}; for (const f of flows) { net[f.from] = (net[f.from] || 0) - f.total; net[f.to] = (net[f.to] || 0) + f.total; }
+    const rows = flows.map(f => {
+      const per = hist.map(h => (h.find(x => x.from === f.from && x.to === f.to) || { total: 0 }).total), mx = Math.max(1, ...per);
+      return `<div class="flow"><span class="flow-acc" style="--c:${accColor(f.from)}"><i></i>${esc(accName(state, f.from))}</span>
+        <span class="flow-line" style="--c1:${accColor(f.from)};--c2:${accColor(f.to)}"><b class="num">${eur(f.total)}</b><small>${f.count}×</small></span>
+        <span class="flow-acc" style="--c:${accColor(f.to)}"><i></i>${esc(accName(state, f.to))}</span>
+        <span class="flow-hist" title="Laatste 6 maanden">${per.map((v, k) => `<i style="height:${Math.max(2, v / mx * 26).toFixed(0)}px" data-tip="${esc(`<b>${monthName(months[k])}</b><br>${eur(v)}`)}"></i>`).join("")}</span></div>`;
+    }).join("");
+    return `<section class="card"><div class="card-head"><h2>⇄ Overboekingen tussen je rekeningen</h2><span class="hint" style="text-transform:capitalize">${esc(monthName(ui.month))} · geen inkomen of uitgave, enkel verplaatsing</span></div>
+      <div class="flows">${rows}</div>
+      <div class="pl-sum" style="margin-top:10px">${Object.entries(net).map(([a, v]) => `<span><i class="acc-mini" style="--c:${accColor(a)}"></i>${esc(accName(state, a))} <b class="num">${v > 0 ? "+" : v < 0 ? "−" : ""}${eur(Math.abs(v))}</b></span>`).join("")}</div></section>`;
   }
   function accSide() {
     if (!multiAcc()) return "";
@@ -3031,6 +3070,7 @@ dialog[open] { animation: fx-pop .18s ease-out; }
         if (!nw || (nw !== old && catNames().includes(nw))) { toast("Die naam is leeg of bestaat al."); el.value = old; break; }
         c.name = nw; state.transactions.forEach(t => { if (t.cat === old) t.cat = nw; if (t.goal === old) t.goal = nw; }); { const sc = savConf(state); sc.entries.forEach(e => { if (e.goal === old) e.goal = nw; }); sc.pending.forEach(p => { if (p.goal === old) p.goal = nw; }); sc.transfers.forEach(x => { if (x.from === old) x.from = nw; if (x.to === old) x.to = nw; }); } state.rules.forEach(r => { if (r.cat === old) r.cat = nw; }); state.goals.forEach(g => { if (g.name === old) g.name = nw; }); save(); break; }
       case "pf-name": state.profile = Object.assign(state.profile || {}, { name: el.value.trim() }); save(); updateProfileLabel(); break;
+      case "acc-warn": { const a = state.accounts[el.closest("tr").dataset.acc]; if (a) { const v = num(el.value); a.warn = v === null ? 0 : v; save(); render(); } break; }
       case "acc-name": { const a = state.accounts[el.closest("tr").dataset.acc]; if (a) { a.name = el.value.trim(); save(); render(); } break; }
       case "bal-date": case "bal-amount": {
         const acc = el.closest("tr").dataset.acc; const row = el.closest("tr");
