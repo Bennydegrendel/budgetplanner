@@ -83,10 +83,10 @@ Werk ze in volgorde af. Na elke stap: commit, korte uitleg, en wacht op Benny vo
 - [x] **Stap 3 – Installeerbaar (PWA).** `manifest.webmanifest` (naam "Budgetplanner", kort "Budget", zwarte achtergrond, themakleur `#000000` – op vraag van Benny zwart i.p.v. cyaan, zodat de titelbalk/statusbalk zwart is), iconen in 192/512 px + maskable (roze €-logo), en een service worker voor offline gebruik. Test installeren op pc en gsm.
 - [x] **Stap 4 – Gegevens overzetten.** Duidelijke import van een v1.0-back-up (`.json`), met controle en een samenvatting ("x transacties, y categorieën…"). Benny exporteert uit de claude.ai-versie en importeert in de app.
 - [x] **Stap 5 – OneDrive-back-up via de OneDrive-map.** Desktop (Edge/Chrome): de gebruiker kiest één keer een map die de OneDrive-app synchroniseert (File System Access API, `showDirectoryPicker`; de map-toegang staat in IndexedDB onder sleutel `"dirHandle"`). De app schrijft daar dezelfde bestanden als v1.0: `budgetplanner-backup.json.gz`, `budgetplanner-backup-JJJJ-MM.json.gz` en `budgetplanner-mobiel.txt`, automatisch na een import, bij openen (max. 1×/dag) en bij wegklikken na een wijziging. Na een herstart kan de browser opnieuw toestemming vragen → melding "Hervatten". Gsm: ⟳ opent het kiesvenster, de gebruiker kiest `budgetplanner-mobiel.txt` uit OneDrive (of een volledige back-up); nieuwer → "⚡ Nieuwe update". *Waarom niet MSAL/Graph zoals eerst gepland:* een app registreren in Microsoft Entra lukt niet met een persoonlijk Microsoft-account zonder eigen tenant (fout AADSTS50020); daarvoor is een Azure-account met creditcard nodig. Kan later alsnog bovenop deze oplossing komen.
-- [ ] **Stap 6 – Thema's (licht/donker).** Op vraag van Benny vóór de layout.
+- [x] **Stap 6 – Thema's (licht/donker).** Op vraag van Benny vóór de layout.
   - [x] 6a – Opkuis: alle losse kleuren naar tokens (pixelvergelijking vóór/na: 0 verschillen).
   - [x] 6b – Licht/donker + themakiezer, voor de volledige app en de gsm-weergave.
-  - [ ] 6c – Karakter per thema (lettertypes, hoeken, accenten) + animaties (kort en spaarzaam, respecteert "minder beweging").
+  - [x] 6c – Karakter per thema (lettertypes, hoeken, accenten) + animaties (kort en spaarzaam, respecteert "minder beweging").
 - [ ] **Stap 7 – Layout voor elk scherm.** Gsm-weergave verfijnen en de lege ruimte op brede schermen benutten (bv. breder raster of zijpaneel met "binnenkort te betalen", spaardoelen, resterend budget).
 
 ## Regels
