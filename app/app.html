@@ -1027,6 +1027,7 @@ dialog[open] { animation: fx-pop .18s ease-out; }
       const r = mergeRows(state, res.rows); added += r.added; dup += r.dup; uncat += r.uncat; auto += r.auto;
       savAdded += 0;
     }
+    const banks = [...new Set(parsed.map(p => p.bank).filter(Boolean))].join(" + ");
     const sug = 0; const resolved = resolvePending(state); applyAllSplitRules(state); applyOwnTransfers(state); applyCards(state);
     if (added) { askPersist(); setTimeout(() => folderAuto("import"), 800); }
     const newSav = savMoves(state).filter(m => m.src === "bank" && !m.checked && m.date >= (minD || "0")).length;
@@ -1036,7 +1037,7 @@ dialog[open] { animation: fx-pop .18s ease-out; }
     if (errors.length) { dialog(`<h3>Import niet gelukt</h3><p>${errors.map(esc).join("<br>")}</p><div class="row"><button class="btn primary" data-close type="button">OK</button></div>`); return; }
     const period = minD ? `${fmtDate(minD)} tot ${fmtDate(maxD)}` : "";
     dialog(`<h3>Import klaar</h3>
-      <p>${period ? `Bestand met transacties van <b>${period}</b>.<br>` : ""}<b>${added}</b> nieuwe transactie${added === 1 ? "" : "s"} toegevoegd · ${dup} stond${dup === 1 ? "" : "en"} er al in${auto ? ` · ${auto} herkend van eerder` : ""} · ${uncat} te categoriseren.${newSav ? `<br><b>${newSav}</b> beweging${newSav === 1 ? "" : "en"} van of naar je spaarrekening te controleren in Spaar.` : ""}${skipped ? `<br>${skipped} transactie${skipped === 1 ? "" : "s"} van niet-geïmporteerde rekeningen overgeslagen.` : ""}${resolved ? `<br>${resolved} geplande spaarverrichting${resolved === 1 ? "" : "en"} teruggevonden en afgevinkt.` : ""}</p>
+      <p>${period ? `${banks ? banks + "-bestand" : "Bestand"} met transacties van <b>${period}</b>.<br>` : ""}<b>${added}</b> nieuwe transactie${added === 1 ? "" : "s"} toegevoegd · ${dup} stond${dup === 1 ? "" : "en"} er al in${auto ? ` · ${auto} herkend van eerder` : ""} · ${uncat} te categoriseren.${newSav ? `<br><b>${newSav}</b> beweging${newSav === 1 ? "" : "en"} van of naar je spaarrekening te controleren in Spaar.` : ""}${skipped ? `<br>${skipped} transactie${skipped === 1 ? "" : "s"} van niet-geïmporteerde rekeningen overgeslagen.` : ""}${resolved ? `<br>${resolved} geplande spaarverrichting${resolved === 1 ? "" : "en"} teruggevonden en afgevinkt.` : ""}</p>
       <div class="row"><button class="btn" data-close type="button">Sluiten</button>${uncat ? `<button class="btn" id="imp-rules" type="button">🔍 Regels voorstellen</button>` : ""}${newSav ? `<button class="btn" id="imp-sav" type="button">Naar Spaar</button>` : ""}${minD ? `<button class="btn" id="imp-tx" type="button">Bekijk transacties</button><button class="btn primary" id="imp-year" type="button">Bekijk ${maxD.slice(0, 4)}</button>` : ""}</div>`, d => {
       const ir = d.querySelector("#imp-rules"); if (ir) ir.addEventListener("click", () => { d.close(); analyzeRules(); });
       const sv = d.querySelector("#imp-sav"); if (sv) sv.addEventListener("click", () => { d.close(); location.hash = "spaar"; });
@@ -1401,7 +1402,7 @@ dialog[open] { animation: fx-pop .18s ease-out; }
   function emptyState() {
     return `<section class="drop" id="drop">
       <h2>Begin met je bankafschrift</h2>
-      <p>Download je transacties als CSV in Home'Bank of de ING-app en sleep het bestand hierheen. Bekende winkels en je loon worden meteen gecategoriseerd. Bestanden die overlappen, geven geen dubbels.</p>
+      <p>Download je transacties als CSV in Home'Bank of de ING-app, of in Belfius Direct Net, en sleep het bestand hierheen. Bekende winkels en je loon worden meteen gecategoriseerd. Bestanden die overlappen, geven geen dubbels.</p>
       <button class="btn primary" data-act="pick-csv" type="button">CSV-bestand kiezen</button>
       <p class="muted" style="margin:14px auto 0;font-size:12.5px">Gebruikte je de Budgetplanner al op claude.ai, of heb je een back-up? Exporteer daar via <b>Back-up → Back-up exporteren</b> en zet het bestand hier terug: <button class="btn small ghost" data-act="import-json" type="button">Back-up terugzetten</button></p>
     </section>`;
