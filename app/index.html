@@ -492,6 +492,7 @@ a.hint, .legend a { color: var(--accent); }
         <button class="btn" type="button" id="btn-backup" aria-haspopup="true" aria-expanded="false">Back-up ▾</button>
         <div class="menu-list" role="menu">
           <button type="button" data-act="export-json" role="menuitem">Back-up exporteren<small>Alles in één .json-bestand</small></button>
+          <button type="button" data-act="folder-open" role="menuitem">OneDrive-back-up<small>Automatisch een kopie + gsm-samenvatting in je OneDrive</small></button>
           <button type="button" data-act="import-json" role="menuitem">Back-up terugzetten<small>Laad een eerder geëxporteerd .json-bestand</small></button>
           <button type="button" data-act="install" role="menuitem" id="mi-install">App installeren<small>Als programma op je pc of gsm, werkt ook offline</small></button>
           <button type="button" data-act="pin-open" role="menuitem">Pincode<small>De planner afschermen met een code</small></button>
@@ -508,6 +509,7 @@ a.hint, .legend a { color: var(--accent); }
 
 <input type="file" id="file-csv" accept=".csv,text/csv" multiple hidden>
 <input type="file" id="file-json" accept=".json,.gz,application/json,application/gzip" hidden>
+<input type="file" id="file-lite" hidden>
 <div class="tooltip" id="tip" role="tooltip"></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <dialog id="dlg"></dialog>
@@ -1393,7 +1395,9 @@ if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, 
     }
   }
   let writing = false, dirty = false;
+  let unsynced = false;   // iets veranderd sinds de laatste OneDrive-back-up
   function save() {
+    unsynced = true;
     if (backend === "ls") {
       try { localStorage.setItem(KEY, JSON.stringify(state)); storageOk = true; storageFull = false; }
       catch (e) { storageOk = false; storageFull = !!(e && (e.name === "QuotaExceededError" || e.code === 22 || e.code === 1014)); }
@@ -1411,7 +1415,7 @@ if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, 
     })();
   }
   let state = newState();
-  const ui = { month: null, txAll: false, txSearch: "", txCat: "", open: new Set(), period: "maand", year: null, ruleSug: null };
+  const ui = { month: null, txAll: false, txSearch: "", txCat: "", open: new Set(), period: "maand", year: null, ruleSug: null, folderAsk: false };
   ui.month = todayYm();
 
   /* ---------- helpers ---------- */
@@ -1469,7 +1473,7 @@ if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, 
       savAdded += 0;
     }
     const sug = 0; const resolved = resolvePending(state); applyAllSplitRules(state);
-    if (added) askPersist();
+    if (added) { askPersist(); setTimeout(() => folderAuto("import"), 800); }
     const newSav = savMoves(state).filter(m => m.src === "bank" && !m.checked && m.date >= (minD || "0")).length;
     save();
     if (maxD) { ui.month = maxD.slice(0, 7); ui.year = +maxD.slice(0, 4); }
@@ -1549,15 +1553,18 @@ if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, 
     state.lastBackup = new Date().toISOString(); save(); render();
     if (ok) toast("Back-up opgeslagen");
   }
-  async function importJson(file) {
-    let data;
+  // Leest een .json/.txt/.json.gz-bestand en geeft het object terug (of null).
+  async function readJsonFile(file) {
     try {
       let buf = await file.arrayBuffer();
       const u8 = new Uint8Array(buf);
       if (u8[0] === 0x1f && u8[1] === 0x8b) buf = await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer();
       const txt = decodeBytes(buf), a = txt.indexOf("{"), b = txt.lastIndexOf("}");
-      data = JSON.parse(a >= 0 ? txt.slice(a, b + 1) : txt);
-    } catch (e) { data = null; }
+      return JSON.parse(a >= 0 ? txt.slice(a, b + 1) : txt);
+    } catch (e) { return null; }
+  }
+  async function importJson(file) {
+    const data = await readJsonFile(file);
     const chk = checkBackup(data);
     if (!chk.ok) { dialog(`<h3>Back-up niet teruggezet</h3><p>${esc(chk.error || "Dit bestand kon niet gelezen worden.")}</p><p class="muted" style="font-size:12.5px">Bestand: ${esc(file.name)}. Er is niets veranderd aan je gegevens.</p><div class="row"><button class="btn primary" data-close type="button">OK</button></div>`); return; }
     const m = chk.summary, n = (x, een, meer) => `${x} ${x === 1 ? een : meer}`;
@@ -1584,11 +1591,12 @@ if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, 
       const sv = d.querySelector("#bk-save"); if (sv) sv.addEventListener("click", () => exportJson());
       d.querySelector("#bk-ok").addEventListener("click", () => {
         d.close();
-        state = hydrate(cleanBackup(data)); ui.ruleSug = null; ui.txAll = false; ui.txCat = ""; ui.txSearch = "";
+        const keepFolder = state.folder;   // de gekozen OneDrive-map hoort bij dit toestel, niet bij de back-up
+        state = hydrate(cleanBackup(data)); if (keepFolder) state.folder = keepFolder; else delete state.folder; ui.ruleSug = null; ui.txAll = false; ui.txCat = ""; ui.txSearch = "";
         ui.month = state.transactions.length ? state.transactions[0].date.slice(0, 7) : todayYm(); ui.year = +ui.month.slice(0, 4);
         if (state.pin && state.pin.hash) setUnlocked();
         save(); askPersist();
-        if (liteMode()) { liteRefresh(false); return; }
+        if (liteMode()) { liteFromLocal(); return; }
         if (location.hash !== "#overzicht") location.hash = "overzicht";
         render(); window.scrollTo(0, 0);
         dialog(`<h3>Back-up teruggezet</h3><p><b>${m.transactions}</b> transacties, <b>${m.categories}</b> categorieën, <b>${m.rules}</b> regels en <b>${m.goals}</b> spaardoelen staan nu in de app.</p>
@@ -1598,6 +1606,76 @@ if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, 
     });
   }
 
+
+  /* ---------- OneDrive-back-up (via de OneDrive-map op de pc) ----------
+     De app schrijft de bestanden in een map die de OneDrive-app op je pc synchroniseert;
+     OneDrive zet ze dan zelf online. Werkt in Edge en Chrome (File System Access).
+     De toegang tot de map ("handle") wordt in IndexedDB bewaard, niet in de back-up. */
+  const canFolder = () => typeof window.showDirectoryPicker === "function";
+  let dirHandle = null, folderBusy = false;
+  async function loadDirHandle() { if (!dirHandle) { try { dirHandle = (await idbGet("dirHandle")) || null; } catch (e) {} } return dirHandle; }
+  async function folderAllowed(h, ask) {
+    const o = { mode: "readwrite" };
+    try { if ((await h.queryPermission(o)) === "granted") return true; return ask ? (await h.requestPermission(o)) === "granted" : false; } catch (e) { return false; }
+  }
+  async function writeFile(dir, name, data) { const fh = await dir.getFileHandle(name, { create: true }); const w = await fh.createWritable(); await w.write(data); await w.close(); }
+  async function folderBackup(manual) {
+    if (folderBusy) return false; folderBusy = true;
+    try {
+      const h = await loadDirHandle();
+      if (!h) { if (manual) folderDialog(); return false; }
+      if (!(await folderAllowed(h, manual))) { ui.folderAsk = true; return false; }
+      ui.folderAsk = false;
+      const now = new Date().toISOString();
+      const gz = await new Response(new Blob([JSON.stringify(Object.assign({}, state, { exportedAt: now }))]).stream().pipeThrough(new CompressionStream("gzip"))).blob();
+      await writeFile(h, "budgetplanner-backup.json.gz", gz);
+      await writeFile(h, `budgetplanner-backup-${now.slice(0, 7)}.json.gz`, gz);   // één per maand als geschiedenis
+      await writeFile(h, "budgetplanner-mobiel.txt", JSON.stringify(buildSummary()));
+      state.folder = Object.assign(state.folder || {}, { enabled: true, name: h.name, last: now, error: "" }); state.lastBackup = now; save(); unsynced = false;
+      if (manual) toast(`☁ Back-up + gsm-samenvatting in je OneDrive-map gezet (${Math.max(1, Math.round(gz.size / 1024))} kB)`);
+      return true;
+    } catch (e) {
+      console.error(e);
+      state.folder = Object.assign(state.folder || {}, { error: "Back-up naar je OneDrive-map mislukt" + (e && e.message ? ": " + String(e.message).slice(0, 140) : ".") }); save();
+      if (manual) dialog(`<h3>OneDrive-back-up</h3><p>${esc(state.folder.error)}</p><p class="muted" style="font-size:12.5px">Bestaat de map nog? Kies hem eventueel opnieuw via Back-up → OneDrive-back-up → Andere map.</p><div class="row"><button class="btn primary" data-close type="button">OK</button></div>`);
+      return false;
+    } finally { folderBusy = false; render(); }
+  }
+  // automatisch: bij openen (max. 1× per dag), na een import, en bij wegklikken als er iets veranderde
+  async function folderAuto(reason) {
+    const f = state.folder; if (!f || !f.enabled || !canFolder()) return;
+    if (reason === "open" && f.last && Date.now() - new Date(f.last) < 864e5) {
+      const h = await loadDirHandle(); if (h && !(await folderAllowed(h, false))) { ui.folderAsk = true; render(); }
+      return;
+    }
+    folderBackup(false);
+  }
+  async function pickFolder(d) {
+    let h;
+    try { h = await window.showDirectoryPicker({ id: "budgetplanner-onedrive", mode: "readwrite" }); }
+    catch (e) { return; }   // venster gesloten zonder keuze
+    dirHandle = h; try { await idbPut("dirHandle", h); } catch (e) {}
+    state.folder = Object.assign(state.folder || {}, { enabled: true, name: h.name, error: "" }); save();
+    if (d) d.close();
+    folderBackup(true);
+  }
+  function folderDialog() {
+    const f = state.folder || {};
+    if (!canFolder()) {
+      dialog(`<h3>OneDrive-back-up</h3><p>${liteMode() ? "Op je gsm lees je de samenvatting die je pc in je OneDrive zet: tik in het overzicht op <b>⟳</b> en kies <b>budgetplanner-mobiel.txt</b>." : "Deze browser kan niet rechtstreeks in een map schrijven. Gebruik de app in <b>Edge</b> of <b>Chrome</b> op je pc, of maak met de hand een back-up via <b>Back-up exporteren</b>."}</p><div class="row"><button class="btn primary" data-close type="button">OK</button></div>`);
+      return;
+    }
+    dialog(`<h3>OneDrive-back-up</h3>
+      <p>De planner zet automatisch een kopie van al je gegevens in een map van je OneDrive: <code>budgetplanner-backup.json.gz</code>, één bestand per maand als geschiedenis, en een kleine samenvatting <code>budgetplanner-mobiel.txt</code> voor je gsm. De OneDrive-app op je pc zet ze online.</p>
+      <p>${f.enabled && f.name ? `Map: <b>${esc(f.name)}</b><br>` : ""}${f.last ? `Laatste back-up: <b>${new Date(f.last).toLocaleString("nl-BE")}</b>` : "Nog geen back-up in OneDrive."}${f.error ? `<br><span class="neg">${esc(f.error)}</span>` : ""}</p>
+      ${f.enabled ? "" : `<p class="muted" style="font-size:12.5px">Klik op <b>Map kiezen</b>, klik links op <b>OneDrive</b>, maak met <b>Nieuwe map</b> een map <b>Budgetplanner</b>, open ze en klik op <b>Map selecteren</b>. Geef daarna toestemming om bestanden op te slaan.</p>`}
+      <p class="muted" style="font-size:12.5px;margin:10px 0 0">De back-up loopt vanzelf: na elke import, bij het openen (max. 1× per dag) en als je de app wegklikt na een wijziging. Terugzetten: Back-up → Back-up terugzetten en kies het bestand uit die map.</p>
+      <div class="row"><button class="btn" data-close type="button">Sluiten</button>${f.enabled ? `<button class="btn danger" id="fd-off" type="button">Uitschakelen</button><button class="btn" id="fd-pick" type="button">Andere map</button><button class="btn primary" id="fd-now" type="button">Nu back-uppen</button>` : `<button class="btn primary" id="fd-pick" type="button">Map kiezen</button>`}</div>`, d => {
+      d.querySelector("#fd-pick").addEventListener("click", () => pickFolder(d));
+      const now = d.querySelector("#fd-now"); if (now) now.addEventListener("click", () => { d.close(); folderBackup(true); });
+      const off = d.querySelector("#fd-off"); if (off) off.addEventListener("click", async () => { state.folder.enabled = false; dirHandle = null; try { await idbPut("dirHandle", null); } catch (e) {} ui.folderAsk = false; save(); d.close(); render(); toast("OneDrive-back-up uitgeschakeld"); });
+    });
+  }
 
   /* ---------- mobiele samenvatting ---------- */
   function buildSummary() {
@@ -1628,21 +1706,37 @@ if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, 
     return window.matchMedia && matchMedia("(max-width: 700px)").matches && pref !== "1";
   }
   function liteLoadCache() { try { const r = localStorage.getItem(LITE_KEY); if (r) lite.data = JSON.parse(r); } catch (e) {} }
-  // De gsm-weergave toont een samenvatting van de gegevens op dit toestel.
-  // (In v1.0 kwam die uit OneDrive; dat komt terug in stap 5.)
-  async function liteRefresh(manual) {
-    if (lite.busy) return; lite.busy = true; lite.status = "";
+  // De gsm-weergave toont de samenvatting die de pc in OneDrive zet (budgetplanner-mobiel.txt),
+  // gekozen via ⟳. Zolang er nog geen gekozen is, een samenvatting van de gegevens op dit toestel.
+  function liteStore(p, src) { lite.data = Object.assign(p, { src }); try { localStorage.setItem(LITE_KEY, JSON.stringify(lite.data)); } catch (e) {} }
+  function liteFromLocal(force) {
+    if (!force && lite.data && lite.data.src === "bestand") { render(); return; }   // samenvatting uit OneDrive blijft staan
+    lite.status = "";
+    if (!state.transactions.length) { if (force || !lite.data || lite.data.src !== "bestand") lite.data = null; render(); return; }
+    try { liteStore(buildSummary(), "toestel"); } catch (e) { console.error(e); lite.status = "Samenvatting maken lukte niet."; }
+    render();
+  }
+  async function liteFromFile(file) {
+    lite.busy = true; lite.status = ""; render();
     try {
-      if (!state.transactions.length) { lite.data = null; return; }
-      const p = buildSummary(), old = lite.data;
-      if (old && p.tx.length) {
-        const seen = new Set((old.tx || []).map(x => x.id)), n = p.tx.filter(x => !seen.has(x.id)).length;
-        if (n) lite.news = { at: p.at, newTx: n, first: false };
+      const data = await readJsonFile(file);
+      let p = null;
+      if (data && data.k && Array.isArray(data.tx)) p = data;                       // budgetplanner-mobiel.txt
+      else if (checkBackup(data).ok) {                                               // of een volledige back-up
+        const keep = state; try { state = hydrate(cleanBackup(data)); p = buildSummary(); p.at = data.exportedAt || p.at; } finally { state = keep; }
       }
-      lite.data = p; try { localStorage.setItem(LITE_KEY, JSON.stringify(p)); } catch (e) {}
-      if (manual && !lite.news) toast("Alles is up-to-date");
+      if (!p) { lite.status = `“${file.name}” is geen samenvatting of back-up van de planner. Kies budgetplanner-mobiel.txt in je OneDrive-map.`; return; }
+      const old = lite.data && lite.data.src === "bestand" ? lite.data : null;
+      if (old && p.at <= old.at) { toast(`Alles is up-to-date (samenvatting van ${new Date(p.at).toLocaleString("nl-BE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })})`); return; }
+      const seen = new Set((old && old.tx || []).map(x => x.id));
+      lite.news = { at: p.at, newTx: old ? p.tx.filter(x => !seen.has(x.id)).length : 0, first: !old };
+      liteStore(p, "bestand");
     } catch (e) { console.error(e); lite.status = "Bijwerken lukte niet" + (e && e.message ? ": " + String(e.message).slice(0, 120) : "."); }
     finally { lite.busy = false; render(); }
+  }
+  function liteRefresh(manual) {
+    if (manual) { const inp = $("#file-lite"); inp.value = ""; inp.click(); return; }
+    liteFromLocal();
   }
   const EYE_ON = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>`;
   const EYE_OFF = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3 3.9M6.6 6.6C3.7 8.4 2 12 2 12s3.6 7 10 7c1.9 0 3.6-.6 5-1.5"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><path d="M3 3l18 18"/></svg>`;
@@ -1652,7 +1746,7 @@ if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, 
     let h = `<div class="lite-head"><div><h1>Overzicht</h1><p class="muted">${d ? `Bijgewerkt ${esc(ago(d.at))}` : "Nog geen gegevens"}</p></div><div class="lite-btns"><button class="btn lite-eye" data-act="lite-eye" type="button" aria-pressed="${liteHidden() ? "false" : "true"}" aria-label="${liteHidden() ? "Bedragen tonen" : "Bedragen verbergen"}">${liteHidden() ? EYE_OFF : EYE_ON}</button><button class="btn${lite.busy ? "" : " primary"}" data-act="lite-refresh" type="button" ${lite.busy ? "disabled" : ""}>${lite.busy ? "…" : "⟳"}</button></div></div>`;
     if (lite.news) h += `<div class="lite-news" data-act="lite-news-ok">⚡ <b>Nieuwe update</b> van je planner · ${esc(new Date(lite.news.at).toLocaleString("nl-BE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }))}${lite.news.newTx ? ` · ${lite.news.newTx} nieuwe transactie${lite.news.newTx === 1 ? "" : "s"}` : ""}<span>✕</span></div>`;
     if (lite.status) h += `<div class="notice ${/lukte|niet|Open/.test(lite.status) ? "warn" : "info"}"><span>${esc(lite.status)}</span></div>`;
-    if (!d) return h + `<section class="card"><p>Er staan nog geen gegevens op dit toestel.</p><p class="muted">Zet een back-up terug (bv. uit de claude.ai-versie of van je pc), of open de volledige planner om een CSV van je bank te importeren.</p><button class="btn primary" data-act="import-json" type="button">Back-up terugzetten</button></section>` + liteFoot();
+    if (!d) return h + `<section class="card"><p>Op je gsm toont de planner de samenvatting die je pc in je OneDrive zet bij elke back-up.</p><p class="muted">Schakel op je pc de OneDrive-back-up in (Back-up → OneDrive-back-up). Tik dan hier op <b>⟳</b> en kies in OneDrive het bestand <b>budgetplanner-mobiel.txt</b>.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" data-act="lite-refresh" type="button">Samenvatting kiezen</button><button class="btn" data-act="import-json" type="button">Back-up terugzetten</button></div></section>` + liteFoot();
     const k = d.k, kp = (l, v, c, cls) => `<div class="kpi" style="--k:${c}"><div class="label">${l}</div><div class="value num"><span class="${cls}">${v}</span></div></div>`;
     h += `<div class="lite-kpis">${kp("Inkomsten", eur0(k.inc), "var(--pos)", "pos")}${kp("Uitgaven", eur0(k.exp), "var(--neg)", "neg")}${kp("Gespaard", eurS(k.saved), "var(--gold)", "gold")}${kp("Netto", (k.net >= 0 ? "+" : "−") + eur0(Math.abs(k.net)), k.net >= 0 ? "var(--pos)" : "var(--neg)", k.net >= 0 ? "pos" : "neg")}</div>`;
     h += `<section class="card lite-bal"><div class="label">Saldo op rekening</div><div class="gw-amt num ${k.bal !== null && k.bal < 0 ? "neg" : ""}">${k.bal === null ? "—" : eur(k.bal)}</div>${k.uncat ? `<span class="chip warn">${k.uncat} te categoriseren</span>` : ""}</section>`;
@@ -1668,7 +1762,7 @@ if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, 
     h += `<section class="card"><div class="card-head"><h2>Laatste transacties</h2></div><div class="soon-list">${d.tx.map(x => `<div class="row-i" style="grid-template-columns:48px 1fr auto"><span class="num dt muted" style="font-size:12px">${fmtDate(x.d).slice(0, 5)}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.s)}<br><span class="muted" style="font-size:11.5px">${esc(x.c)}</span></span><span class="num ${x.a >= 0 ? "pos" : "neg"}">${signed(x.a)}</span></div>`).join("")}</div></section>`;
     return h + liteFoot();
   }
-  function liteFoot() { return `<p class="foot">Alleen bekijken · wijzigen doe je op je pc<br><button class="btn small ghost" data-act="lite-full" type="button">Volledige planner openen</button>${isStandalone() ? "" : `<br><button class="btn small ghost" data-act="install" type="button">⤓ App installeren</button>`}</p>`; }
+  function liteFoot() { return `<p class="foot">Alleen bekijken · wijzigen doe je op je pc${lite.data && lite.data.src === "bestand" ? "<br>Bijwerken: ⟳ en kies budgetplanner-mobiel.txt in OneDrive" : ""}<br><button class="btn small ghost" data-act="lite-full" type="button">Volledige planner openen</button>${isStandalone() ? "" : `<br><button class="btn small ghost" data-act="install" type="button">⤓ App installeren</button>`}</p>`; }
 
   /* ---------- pincode ---------- */
   async function sha(t) { const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join(""); }
@@ -1706,9 +1800,11 @@ if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, 
   function notices() {
     let h = "";
     if (!storageOk) h += `<div class="notice warn"><span>${storageFull ? "De opslag van je browser is vol: je laatste wijzigingen zijn niet bewaard. Exporteer meteen een back-up en maak wat ruimte vrij op je schijf." : "Deze browser laat geen opslag toe op deze pagina. Je wijzigingen verdwijnen bij het sluiten: exporteer een back-up."}</span><button class="btn small" data-act="export-json" type="button">Back-up exporteren</button></div>`;
-    else if (state.transactions.length) {
+    else if (state.folder && state.folder.enabled && ui.folderAsk) h += `<div class="notice info"><span>☁ De browser vraagt opnieuw toestemming voor je OneDrive-map. Klik om de automatische back-up te hervatten.</span><button class="btn small primary" data-act="folder-resume" type="button">Hervatten</button></div>`;
+    else if (state.folder && state.folder.enabled && state.folder.error) h += `<div class="notice warn"><span>☁ ${esc(state.folder.error)}</span><button class="btn small" data-act="folder-open" type="button">OneDrive-back-up</button></div>`;
+    else if (state.transactions.length && !(state.folder && state.folder.enabled)) {
       const days = state.lastBackup ? Math.floor((Date.now() - new Date(state.lastBackup)) / 864e5) : null;
-      if (days === null || days >= 14) h += `<div class="notice info"><span>${days === null ? "Je hebt nog geen back-up gemaakt." : `Je laatste back-up is ${days} dagen oud.`} Je gegevens staan enkel in deze browser.</span><button class="btn small" data-act="export-json" type="button">Back-up exporteren</button></div>`;
+      if (days === null || days >= 14) h += `<div class="notice info"><span>${days === null ? "Je hebt nog geen back-up gemaakt." : `Je laatste back-up is ${days} dagen oud.`} Je gegevens staan enkel in deze browser.</span><span style="display:flex;gap:8px">${canFolder() ? `<button class="btn small" data-act="folder-open" type="button">☁ Automatisch naar OneDrive</button>` : ""}<button class="btn small" data-act="export-json" type="button">Back-up exporteren</button></span></div>`;
     }
     return h;
   }
@@ -3037,7 +3133,7 @@ if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, 
     if (focusId) { const el = document.getElementById(focusId); if (el) { el.focus(); try { el.setSelectionRange(selStart, selStart); } catch (e) {} } }
   }
   window.addEventListener("hashchange", () => { render(); window.scrollTo(0, 0); });
-  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && liteMode() && lite.data && Date.now() - new Date(lite.lastTry || 0) > 60000) { lite.lastTry = Date.now(); liteRefresh(false); } });
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden" && !liteMode() && unsynced && state.folder && state.folder.enabled && !ui.folderAsk) folderBackup(false); });
 
   /* ---------- interactie ---------- */
   const rowIndex = el => +el.closest("tr").dataset.i;
@@ -3061,6 +3157,8 @@ if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, 
       case "price-ok": state.ignoredPrice = state.ignoredPrice || []; state.ignoredPrice.push(el.dataset.key); save(); render(); break;
       case "pin-open": pinDialog(); break;
       case "install": installApp(); break;
+      case "folder-open": folderDialog(); break;
+      case "folder-resume": folderBackup(true); break;
       case "export-csv": offerFile(`transacties-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(state), "text/csv"); break;
       case "reset": confirmDlg("Alles wissen?", "Alle transacties, budgetten, regels en spaardoelen in deze browser worden verwijderd. Exporteer eerst een back-up als je ze wilt bewaren.", "Alles wissen", () => { state = newState(); save(); render(); toast("Alles gewist"); }, true); break;
       case "prev-month": ui.month = shiftMonth(ui.month, -1); render(); break;
@@ -3249,6 +3347,7 @@ if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, 
   /* bestanden */
   $("#btn-import").addEventListener("click", () => $("#file-csv").click());
   $("#file-csv").addEventListener("change", e => { if (e.target.files.length) importCsvFiles([...e.target.files]); e.target.value = ""; });
+  $("#file-lite").addEventListener("change", e => { if (e.target.files[0]) liteFromFile(e.target.files[0]); e.target.value = ""; });
   $("#file-json").addEventListener("change", e => { if (e.target.files[0]) importJson(e.target.files[0]); e.target.value = ""; });
   $("#btn-backup").addEventListener("click", () => { const m = $("#backup-menu"); m.classList.toggle("open"); $("#btn-backup").setAttribute("aria-expanded", m.classList.contains("open")); });
   let dragDepth = 0;
@@ -3291,7 +3390,8 @@ if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, 
   loadState().then(st => { state = st; ui.month = state.transactions.length ? state.transactions[0].date.slice(0, 7) : todayYm();
       const start = () => {
         updateInstallUi(); if (state.transactions.length) askPersist();
-        if (liteMode()) { liteLoadCache(); render(); setTimeout(() => liteRefresh(false), 600); return; }
+        if (liteMode()) { liteLoadCache(); liteFromLocal(); return; }
+        setTimeout(() => folderAuto("open"), 1500);
         render(); };
       if (state.pin && state.pin.hash && !isUnlocked()) { $("#main").innerHTML = ""; showLock(start); } else start();
       try { const n = dueItems().length; if (n) setTimeout(() => toast(`⏰ ${n} betaling${n === 1 ? "" : "en"} binnenkort of te laat. Kijk in de Planner.`), 800); } catch (e) {} })
