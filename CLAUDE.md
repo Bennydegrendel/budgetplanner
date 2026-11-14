@@ -26,6 +26,7 @@ Doel van de standalone app: **overal installeerbaar bij iedereen** (Windows, Mac
 - `app.html` = uitzicht, bediening en grafieken (SVG met de hand). Bevat de plek `/*__CORE__*/`.
 - Bouwen: `python tools/build.py app` → `app/index.html` (app.html met core.js ingevoegd). Voor de bevroren versie: `python tools/build.py claude-versie`.
 - **Opslag:** IndexedDB, database `"budgetplanner"`, store `"kv"`, sleutel `"state"` (JSON-string), met localStorage als terugval (sleutel `budgetplanner.v1`). In de PWA blijft dit zo; de gegevens horen bij het webadres (origin) van de app.
+- **PWA (stap 3):** `app/manifest.webmanifest` (naam, iconen, kleuren), `app/sw.js` (service worker: app *network-first* met bewaarde kopie voor offline, Google Fonts *cache-first*; bewaart nooit gegevens), iconen in `app/icons/` (opnieuw maken: `node tools/iconen.js`). Manifest en service worker worden alleen geladen via http(s), niet als los bestand. Knop/menu-item **App installeren** + `navigator.storage.persist()` na de eerste gegevens.
 - Back-up exporteren/importeren = één `.json`-bestand met de volledige `state`. Hiermee zet Benny zijn gegevens over van de claude.ai-versie naar de app (stap 4).
 
 ### Stijl (cyberpunk – behouden)
@@ -73,7 +74,7 @@ Werk ze in volgorde af. Na elke stap: commit, korte uitleg, en wacht op Benny vo
 
 - [x] **Stap 0 – Opsplitsen.** v1.0 in `claude-versie/`, `tools/build.py`, dit dossier.
 - [x] **Stap 1 – Kopie zonder Claude.** Kopieer `claude-versie/app.html` en `core.js` naar `app/`. Verwijder de drie Claude-functies, de OneDrive-via-Claude-code (back-upmenu-item, automatische cloud-back-up, gsm-samenvatting uploaden/ophalen) en alle afhankelijkheid van `window.claude`. Downloads via de browser. Alles moet lokaal werken door `app/index.html` te openen. Test in de browser dat er geen fouten in de console staan.
-- [ ] **Stap 2 – Online via GitHub Pages.** Publiceer `app/` (bv. via een GitHub Actions-workflow of Pages vanuit een map). Adres: `https://bennydegrendel.github.io/budgetplanner/`. Leg Benny uit wat er gebeurt.
+- [x] **Stap 2 – Online via GitHub Pages.** Publiceer `app/` (bv. via een GitHub Actions-workflow of Pages vanuit een map). Adres: `https://bennydegrendel.github.io/budgetplanner/`. Leg Benny uit wat er gebeurt.
 - [ ] **Stap 3 – Installeerbaar (PWA).** `manifest.webmanifest` (naam "Budgetplanner", kort "Budget", zwarte achtergrond, themakleur `#00e5ff`), iconen in 192/512 px + maskable (roze €-logo), en een service worker voor offline gebruik. Test installeren op pc en gsm.
 - [ ] **Stap 4 – Gegevens overzetten.** Duidelijke import van een v1.0-back-up (`.json`), met controle en een samenvatting ("x transacties, y categorieën…"). Benny exporteert uit de claude.ai-versie en importeert in de app.
 - [ ] **Stap 5 – OneDrive-sync via Microsoft.** Benny registreert eenmalig een gratis app in Microsoft Entra (persoonlijke + werkaccounts, SPA redirect naar het Pages-adres). Gebruik MSAL.js + Microsoft Graph (`Files.ReadWrite.AppFolder` of `Files.ReadWrite`). Back-up + gsm-samenvatting zoals in v1.0, met opnieuw-proberen bij afremming. Elke gebruiker meldt zich aan met zijn eigen Microsoft-account.
