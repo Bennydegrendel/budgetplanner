@@ -12,18 +12,26 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Budget">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link id="theme-fonts" rel="stylesheet">
 <script>
   // Thema van dit toestel meteen zetten (anders flitst eerst het standaardthema)
   (function () { let t = {}; try { t = JSON.parse(localStorage.getItem("budgetplanner.v1.theme") || "{}"); } catch (e) {}
     const ok = ["cyberpunk", "synthwave", "matrix", "oceaan"];
     document.documentElement.dataset.theme = ok.includes(t.t) ? t.t : "cyberpunk";
-    document.documentElement.dataset.mode = t.m === "light" ? "light" : "dark"; })();
+    document.documentElement.dataset.mode = t.m === "light" ? "light" : "dark";
+    // lettertypes van het gekozen thema (de andere worden pas geladen als je het themavenster opent)
+    window.THEME_FONTS = {
+      cyberpunk: "https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700;800&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap",
+      synthwave: "https://fonts.googleapis.com/css2?family=Audiowide&family=Exo+2:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap",
+      matrix: "https://fonts.googleapis.com/css2?family=VT323&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap",
+      oceaan: "https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Nunito:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" };
+    document.getElementById("theme-fonts").href = window.THEME_FONTS[document.documentElement.dataset.theme]; })();
   // Het manifest ("typeplaatje" voor installeren) alleen laden als de app via een webadres draait;
   // als los bestand (file://) geeft de browser er anders een foutmelding op.
   if (/^https?:$/.test(location.protocol)) { const l = document.createElement("link"); l.rel = "manifest"; l.href = "manifest.webmanifest"; document.head.appendChild(l); }
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700;800&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
 /* Cyberpunk: nachtzwarte ondergrond met neonraster en scanlijnen, cyaan/magenta als accent, groen/rood blijven plus/min. Eén donker thema. */
 :root {
@@ -75,6 +83,7 @@
    4 thema's × donker/licht. Elk thema vult dezelfde tokens in; de rest van de stijl blijft gelijk.
    <html data-theme="…" data-mode="dark|light"> wordt gezet door het scriptje in <head> (keuze per toestel). */
 [data-theme="cyberpunk"][data-mode="dark"] {
+  --glow: 1;
   --bg: #000000; --surface: #0b0b0b; --ink: #e6f1ff; --muted: #9a9a9a; --line: #262626;
   --accent: #00e5ff; --magenta: #ff2bd6; --pos: #00ffa3; --neg: #ff2a6d; --gold: #ffc934; --warn: #f5e83b;
   --accent-rgb: 0, 229, 255; --magenta-rgb: 255, 43, 214; --pos-rgb: 0, 255, 163; --neg-rgb: 255, 42, 109;
@@ -85,6 +94,7 @@
   color-scheme: dark;
 }
 [data-theme="cyberpunk"][data-mode="light"] {
+  --glow: .5;
   --bg: #ffffff; --surface: #f7f9fb; --ink: #0a0f1a; --muted: #5c6470; --line: #dfe3e8;
   --accent: #0095b3; --magenta: #e0109b; --pos: #00a364; --neg: #e3124f; --gold: #c48a00; --warn: #857400;
   --accent-rgb: 0, 149, 179; --magenta-rgb: 224, 16, 155; --pos-rgb: 0, 163, 100; --neg-rgb: 227, 18, 79;
@@ -95,6 +105,7 @@
   color-scheme: light;
 }
 [data-theme="synthwave"][data-mode="dark"] {
+  --glow: 1.15;
   --bg: #13062b; --surface: #1b0b38; --ink: #f7ecff; --muted: #a993c9; --line: #3b2468;
   --accent: #ff8a3d; --magenta: #ff3caa; --pos: #72f1b8; --neg: #fe4450; --gold: #fede5d; --warn: #f9d71c;
   --accent-rgb: 255, 138, 61; --magenta-rgb: 255, 60, 170; --pos-rgb: 114, 241, 184; --neg-rgb: 254, 68, 80;
@@ -105,6 +116,7 @@
   color-scheme: dark;
 }
 [data-theme="synthwave"][data-mode="light"] {
+  --glow: .5;
   --bg: #fff5fb; --surface: #ffffff; --ink: #2a0f45; --muted: #7d6696; --line: #f0d6ea;
   --accent: #e8620c; --magenta: #d81b8c; --pos: #0e9a6a; --neg: #d7263d; --gold: #b8860b; --warn: #a37c00;
   --accent-rgb: 232, 98, 12; --magenta-rgb: 216, 27, 140; --pos-rgb: 14, 154, 106; --neg-rgb: 215, 38, 61;
@@ -115,6 +127,7 @@
   color-scheme: light;
 }
 [data-theme="matrix"][data-mode="dark"] {
+  --glow: 1;
   --bg: #000300; --surface: #020b02; --ink: #c6ffc6; --muted: #5e8c5e; --line: #0e2a0e;
   --accent: #00ff41; --magenta: #39ff14; --pos: #00ff41; --neg: #ff3b3b; --gold: #d4ff00; --warn: #e6ff4d;
   --accent-rgb: 0, 255, 65; --magenta-rgb: 57, 255, 20; --pos-rgb: 0, 255, 65; --neg-rgb: 255, 59, 59;
@@ -125,6 +138,7 @@
   color-scheme: dark;
 }
 [data-theme="matrix"][data-mode="light"] {
+  --glow: .4;
   --bg: #f3fbf3; --surface: #ffffff; --ink: #062b06; --muted: #4c7a4c; --line: #cfe6cf;
   --accent: #00862b; --magenta: #00a336; --pos: #00862b; --neg: #c62828; --gold: #7a8c00; --warn: #8a7d00;
   --accent-rgb: 0, 134, 43; --magenta-rgb: 0, 163, 54; --pos-rgb: 0, 134, 43; --neg-rgb: 198, 40, 40;
@@ -135,16 +149,18 @@
   color-scheme: light;
 }
 [data-theme="oceaan"][data-mode="dark"] {
+  --glow: .35;
   --bg: #03141f; --surface: #072233; --ink: #e2f3ff; --muted: #7fa2bb; --line: #12384f;
   --accent: #2ed3c6; --magenta: #3b9dff; --pos: #4ade80; --neg: #ff6b81; --gold: #ffd166; --warn: #ffe066;
   --accent-rgb: 46, 211, 198; --magenta-rgb: 59, 157, 255; --pos-rgb: 74, 222, 128; --neg-rgb: 255, 107, 129;
   --gold-rgb: 255, 209, 102; --warn-rgb: 255, 224, 102; --muted-rgb: 127, 162, 187; --ink-rgb: 226, 243, 255; --amber-rgb: 255, 170, 80;
   --bar: #2ed3c6; --bar-track: #0b2c40; --s1: #2ed3c6; --s2: #3b9dff; --s3: #ffd166; --s4: #b48cff;
-  --panel: #061d2c; --panel-rgb: 3, 20, 31; --scan: .15; --on-accent: #03141f; --gold-dark: #c99a2e; --field: rgba(3, 20, 31, .9);
+  --panel: #061d2c; --panel-rgb: 3, 20, 31; --scan: 0; --on-accent: #03141f; --gold-dark: #c99a2e; --field: rgba(3, 20, 31, .9);
   --head-top: rgba(8, 36, 54, .96); --head-bottom: rgba(4, 24, 37, .96); --grid-line: rgba(46, 211, 198, .035); --backdrop: rgba(1, 10, 18, .6); --menu-shadow: 0 8px 24px rgba(0, 0, 0, .4);
   color-scheme: dark;
 }
 [data-theme="oceaan"][data-mode="light"] {
+  --glow: .25;
   --bg: #f2f8fc; --surface: #ffffff; --ink: #0a2540; --muted: #5a7892; --line: #d3e3ef;
   --accent: #0c8f9a; --magenta: #1d6fe0; --pos: #15803d; --neg: #d92d4b; --gold: #b7791f; --warn: #9a6b00;
   --accent-rgb: 12, 143, 154; --magenta-rgb: 29, 111, 224; --pos-rgb: 21, 128, 61; --neg-rgb: 217, 45, 75;
@@ -157,11 +173,58 @@
 .theme-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0 4px; }
 .theme-tile { all: unset; box-sizing: border-box; cursor: pointer; background: var(--bg); color: var(--ink); border: 1px solid var(--line); padding: 10px; clip-path: var(--notch-sm); display: grid; gap: 8px; }
 .theme-tile .tt-card { background: var(--surface); border: 1px solid var(--line); padding: 8px 10px; }
-.theme-tile .tt-name { font-family: var(--font-display); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+.theme-tile .tt-name { font-family: var(--font-display); font-size: 12px; letter-spacing: .1em; text-transform: var(--case-ui); color: var(--accent); }
 .theme-tile .tt-amt { font-family: var(--font-mono); font-size: 15px; color: var(--pos); }
 .theme-tile .tt-dots { display: flex; gap: 5px; } .theme-tile .tt-dots i { width: 14px; height: 6px; display: block; }
 .theme-tile[aria-pressed="true"] { outline: 2px solid var(--magenta); outline-offset: -2px; box-shadow: 0 0 14px rgba(var(--magenta-rgb), .45); }
 .theme-tile:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* ---- vorm en karakter per thema (geldt voor donker én licht) ---- */
+[data-theme="synthwave"] {
+  --font-display: "Audiowide", "Segoe UI", system-ui, sans-serif; --font-body: "Exo 2", "Segoe UI", system-ui, sans-serif; --font-mono: "Space Mono", ui-monospace, monospace;
+  --font-hero: var(--font-display); --notch: none; --notch-sm: none;
+  --r-card: 12px; --r-btn: 8px; --r-field: 8px; --r-pill: 999px; --r-bar: 999px; --r-sm: 6px;
+  --case-title: uppercase; --case-ui: uppercase; --title-spacing: .08em; --corner: 0; --hero-size: 26px; --body-size: 15px; --body-weight: 400;
+}
+[data-theme="matrix"] {
+  --font-display: "IBM Plex Mono", ui-monospace, monospace; --font-body: "IBM Plex Mono", ui-monospace, monospace; --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-hero: "VT323", "IBM Plex Mono", monospace; --notch: none; --notch-sm: none;
+  --r-card: 0; --r-btn: 0; --r-field: 0; --r-pill: 0; --r-bar: 0; --r-sm: 0;
+  --case-title: lowercase; --case-ui: lowercase; --title-spacing: 0; --corner: .8; --hero-size: 40px; --body-size: 13.5px; --body-weight: 400;
+}
+[data-theme="oceaan"] {
+  --font-display: "Quicksand", "Segoe UI", system-ui, sans-serif; --font-body: "Nunito", "Segoe UI", system-ui, sans-serif; --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-hero: var(--font-display); --notch: none; --notch-sm: none;
+  --r-card: 18px; --r-btn: 12px; --r-field: 10px; --r-pill: 999px; --r-bar: 999px; --r-sm: 8px;
+  --case-title: none; --case-ui: none; --title-spacing: 0; --corner: 0; --hero-size: 30px; --body-size: 15px; --body-weight: 400;
+}
+/* Synthwave: zonsondergang in de titel, zon aan de horizon, roze randjes */
+[data-theme="synthwave"] body { background:
+    radial-gradient(900px 340px at 50% 104%, rgba(var(--accent-rgb), .22), transparent 70%),
+    radial-gradient(1400px 520px at 50% 110%, rgba(var(--magenta-rgb), .20), transparent 72%),
+    linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0 / 100% 34px,
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0 / 34px 100%, var(--bg); background-attachment: fixed; }
+[data-theme="synthwave"] .page-head h1 { background: linear-gradient(180deg, var(--gold) 15%, var(--accent) 55%, var(--magenta) 95%); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: none; filter: drop-shadow(0 0 10px rgba(var(--magenta-rgb), calc(.45 * var(--glow)))); }
+[data-theme="synthwave"] .page-head h1::after { height: 4px; border-radius: 999px; background: linear-gradient(90deg, var(--gold), var(--accent), var(--magenta)); }
+[data-theme="synthwave"] .card, [data-theme="synthwave"] .kpi { border-color: rgba(var(--magenta-rgb), .28); box-shadow: 0 10px 32px rgba(var(--magenta-rgb), calc(.10 * var(--glow))); }
+[data-theme="synthwave"] .card h2 { color: var(--magenta); }
+/* Matrix: terminal. Titel als opdrachtregel met cursor, alles monospace, compacter */
+[data-theme="matrix"] .page-head h1 { line-height: 1; }
+[data-theme="matrix"] .page-head h1::before { content: "> "; color: var(--muted); }
+[data-theme="matrix"] .page-head h1::after { content: "_"; display: inline-block; width: auto; height: auto; margin: 0 0 0 6px; background: none; box-shadow: none; color: var(--accent); }
+[data-theme="matrix"] .card h2::before { content: "// "; color: var(--muted); }
+[data-theme="matrix"] .card, [data-theme="matrix"] .kpi { border-color: rgba(var(--accent-rgb), .22); }
+[data-theme="matrix"] main { gap: 14px; } [data-theme="matrix"] .card { padding: 16px; } [data-theme="matrix"] .kpi { padding: 12px 14px; }
+[data-theme="matrix"] .kpi .value { font-family: var(--font-mono); }
+[data-theme="matrix"] .kpi .chip { font-size: 10px; letter-spacing: 0; white-space: normal; }
+/* Oceaan: zacht en rond, luchtig, rustige schaduwen in plaats van neon */
+[data-theme="oceaan"] .card, [data-theme="oceaan"] .kpi { background: var(--surface); box-shadow: 0 8px 30px rgba(var(--shade-rgb), .22); }
+[data-theme="oceaan"][data-mode="light"] .card, [data-theme="oceaan"][data-mode="light"] .kpi { box-shadow: 0 6px 24px rgba(var(--ink-rgb), .07); }
+[data-theme="oceaan"] .page-head h1 { font-weight: 700; }
+[data-theme="oceaan"] .page-head h1::after { height: 4px; border-radius: 999px; width: 48px; }
+[data-theme="oceaan"] .card h2, [data-theme="oceaan"] .kpi .label { font-size: 13.5px; letter-spacing: .01em; }
+[data-theme="oceaan"] th { letter-spacing: .02em; font-size: 12px; }
+[data-theme="oceaan"] main { gap: 24px; } [data-theme="oceaan"] .card { padding: 24px; }
+[data-theme="oceaan"] .kpi::before { border-radius: 999px; }
 /* afgeleide tokens opnieuw uitrekenen op elk element met een thema (ook de voorbeeldtegels in het themavenster) */
 [data-theme] { --accent-soft: rgba(var(--accent-rgb), .10); --pos-soft: rgba(var(--pos-rgb), .12); --neg-soft: rgba(var(--neg-rgb), .14); --warn-soft: rgba(var(--warn-rgb), .12);
   --shadow: 0 0 0 1px rgba(var(--accent-rgb), .04), 0 0 28px rgba(var(--accent-rgb), .05); }
@@ -379,7 +442,7 @@ dialog textarea { width: 100%; height: 160px; font: 12px ui-monospace, monospace
 .goals-wide { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; }
 .gw { border: 1px solid var(--line); padding: 14px 16px 12px; background: rgba(var(--gold-rgb), .025); clip-path: var(--notch-sm); position: relative; }
 .gw-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-.gw-name { font-family: var(--font-display); font-size: 13px; letter-spacing: .1em; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+.gw-name { font-family: var(--font-display); font-size: 13px; letter-spacing: .1em; text-transform: var(--case-ui); display: flex; align-items: center; gap: 8px; }
 .gw-name i { width: 9px; height: 9px; display: inline-block; }
 .gw-ref { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); }
 .gw-amt { font-family: var(--font-display); font-size: 26px; font-weight: 700; color: var(--gold); text-shadow: 0 0 10px rgba(var(--gold-rgb), .7), 0 0 24px rgba(var(--amber-rgb), .3); margin-top: 6px; }
@@ -412,11 +475,11 @@ tr.dragging td { opacity: .4; }
 tr.drop-above td { box-shadow: inset 0 2px 0 var(--magenta); }
 tr.drop-below td { box-shadow: inset 0 -2px 0 var(--magenta); }
 .pl-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-.pl-title { font-family: var(--font-display); font-size: 15px; letter-spacing: .08em; text-transform: uppercase; min-width: 210px; text-align: center; }
+.pl-title { font-family: var(--font-display); font-size: 15px; letter-spacing: .08em; text-transform: var(--case-ui); min-width: 210px; text-align: center; }
 .pl-sum { display: flex; gap: 22px; flex-wrap: wrap; font-size: 13.5px; margin-top: 12px; }
 .pl-sum b { font-family: var(--font-mono); font-weight: 400; }
 .cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
-.cal-h { font-family: var(--font-display); font-size: 10.5px; letter-spacing: .12em; color: var(--muted); text-transform: uppercase; padding: 8px 8px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.cal-h { font-family: var(--font-display); font-size: 10.5px; letter-spacing: .12em; color: var(--muted); text-transform: var(--case-ui); padding: 8px 8px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .cal-d { min-height: 104px; padding: 6px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 3px; cursor: pointer; min-width: 0; }
 .cal-d:hover { background: rgba(var(--accent-rgb), .04); }
 .cal-d.other { opacity: .38; }
@@ -456,7 +519,7 @@ tr.drop-below td { box-shadow: inset 0 -2px 0 var(--magenta); }
 body.lite header nav, body.lite .actions, body.lite > .foot { display: none; }
 body.lite main { padding: 14px 14px 30px; gap: 14px; }
 .lite-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-.lite-head h1 { font-size: 22px; font-family: var(--font-display); text-transform: uppercase; letter-spacing: .06em; text-shadow: 0 0 14px rgba(var(--accent-rgb), .45); }
+.lite-head h1 { font-size: 22px; font-family: var(--font-display); text-transform: var(--case-ui); letter-spacing: .06em; text-shadow: 0 0 14px rgba(var(--accent-rgb), .45); }
 .lite-head p { margin: 2px 0 0; font-size: 13px; }
 .lite-head .btn { font-size: 18px; padding: 6px 14px; }
 .lite-btns { display: flex; gap: 8px; }
@@ -466,7 +529,7 @@ body.lite .num { transition: filter .25s ease; }
 body.eye-off main .num:not(.dt) { filter: blur(7px); user-select: none; }
 .lite-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .lite-kpis .kpi { padding: 12px 14px; } .lite-kpis .kpi .value { font-size: 21px; }
-.lite-bal { text-align: center; } .lite-bal .label { font-family: var(--font-display); font-size: 11px; letter-spacing: .12em; color: var(--muted); text-transform: uppercase; } .lite-bal .gw-amt { font-size: 30px; }
+.lite-bal { text-align: center; } .lite-bal .label { font-family: var(--font-display); font-size: 11px; letter-spacing: .12em; color: var(--muted); text-transform: var(--case-ui); } .lite-bal .gw-amt { font-size: 30px; }
 .lite-news { position: relative; padding: 10px 34px 10px 12px; border: 1px solid var(--gold); background: rgba(var(--gold-rgb), .1); color: var(--gold); font-size: 13.5px; box-shadow: 0 0 16px rgba(var(--gold-rgb), .35); animation: litepulse 1.6s ease-in-out 3; cursor: pointer; }
 .lite-news span { position: absolute; right: 12px; top: 9px; }
 @keyframes litepulse { 50% { box-shadow: 0 0 28px rgba(var(--gold-rgb), .7); } }
@@ -1636,13 +1699,17 @@ if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, 
   const THEMES = [["cyberpunk", "Cyberpunk"], ["synthwave", "Synthwave"], ["matrix", "Matrix"], ["oceaan", "Oceaan"]];
   function getTheme() { const r = document.documentElement; return { t: r.dataset.theme || "cyberpunk", m: r.dataset.mode || "dark" }; }
   function applyTheme(th) {
-    const r = document.documentElement; r.dataset.theme = th.t; r.dataset.mode = th.m;
+    const r = document.documentElement; r.dataset.theme = th.t; r.dataset.mode = th.m; $("#theme-fonts").href = window.THEME_FONTS[th.t];
     try { localStorage.setItem(KEY + ".theme", JSON.stringify(th)); } catch (e) {}
     syncThemeColor();
   }
   // statusbalk/titelbalk in de kleur van de achtergrond van het thema
   function syncThemeColor() { const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() || "#000000"; }
+  function loadAllThemeFonts() {   // voor de voorbeeldtegels
+    for (const [id] of THEMES) if (!document.getElementById("tf-" + id)) { const l = document.createElement("link"); l.id = "tf-" + id; l.rel = "stylesheet"; l.href = window.THEME_FONTS[id]; document.head.appendChild(l); }
+  }
   function themeDialog() {
+    loadAllThemeFonts();
     const draw = () => { const cur = getTheme();
       return `<h3>Thema</h3><p class="muted" style="margin:4px 0 10px">Geldt voor dit toestel. Je gegevens veranderen niet.</p>
         <div class="seg" role="group" aria-label="Donker of licht"><button type="button" data-tm="dark" aria-pressed="${cur.m === "dark"}">☾ Donker</button><button type="button" data-tm="light" aria-pressed="${cur.m === "light"}">☀ Licht</button></div>
@@ -1898,7 +1965,7 @@ if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, 
     const k = d.k, kp = (l, v, c, cls) => `<div class="kpi" style="--k:${c}"><div class="label">${l}</div><div class="value num"><span class="${cls}">${v}</span></div></div>`;
     h += `<div class="lite-kpis">${kp("Inkomsten", eur0(k.inc), "var(--pos)", "pos")}${kp("Uitgaven", eur0(k.exp), "var(--neg)", "neg")}${kp("Gespaard", eurS(k.saved), "var(--gold)", "gold")}${kp("Netto", (k.net >= 0 ? "+" : "−") + eur0(Math.abs(k.net)), k.net >= 0 ? "var(--pos)" : "var(--neg)", k.net >= 0 ? "pos" : "neg")}</div>`;
     h += `<section class="card lite-bal"><div class="label">Saldo op rekening</div><div class="gw-amt num ${k.bal !== null && k.bal < 0 ? "neg" : ""}">${k.bal === null ? "—" : eur(k.bal)}</div>${k.uncat ? `<span class="chip warn">${k.uncat} te categoriseren</span>` : ""}</section>`;
-    if (d.price && d.price.length) h += `<div class="notice warn" style="flex-direction:column;align-items:stretch;gap:4px"><b style="font-size:12px;letter-spacing:.08em">⚠ DUURDER GEWORDEN</b>${d.price.map(p => `<span>${esc(p.t)}: <span class="num">${eur(p.o)}</span> → <b class="neg num">${eur(p.n)}</b></span>`).join("")}</div>`;
+    if (d.price && d.price.length) h += `<div class="notice warn" style="flex-direction:column;align-items:stretch;gap:4px"><b style="font-size:12px;letter-spacing:.08em;text-transform:var(--case-ui)">⚠ Duurder geworden</b>${d.price.map(p => `<span>${esc(p.t)}: <span class="num">${eur(p.o)}</span> → <b class="neg num">${eur(p.n)}</b></span>`).join("")}</div>`;
     if (d.soon.length) h += `<section class="card"><div class="card-head"><h2>Binnenkort</h2></div><div class="soon-list">${d.soon.map(x => { const late = x.d < todayS(); return `<div class="row-i" style="grid-template-columns:62px 1fr auto"><span class="num dt ${late ? "neg" : x.d <= addD(todayS(), 3) ? "gold" : "muted"}" style="font-size:12.5px">${late ? "te laat" : x.d === todayS() ? "vandaag" : fmtDate(x.d).slice(0, 5)}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.t)}${x.auto ? ' <span class="muted" style="font-size:11px">verwacht</span>' : ""}</span><span class="num ${x.k > 0 ? "pos" : "neg"}">${x.a ? (x.k > 0 ? "+" : "−") + eur0(x.a) : ""}</span></div>`; }).join("")}</div></section>`;
     if (d.fc) { const pts = d.fc.pts, W = 340, H = 80, mx = Math.max(...pts, d.fc.warn), mn = Math.min(...pts, d.fc.warn, 0), x = i => i / (pts.length - 1) * W, y = v => 4 + (mx - v) / ((mx - mn) || 1) * (H - 8);
       let p = `M0,${y(pts[0])}`; pts.forEach((v, i) => { if (i) p += `H${x(i).toFixed(1)}V${y(v).toFixed(1)}`; });
@@ -2016,7 +2083,7 @@ if (typeof module !== "undefined") module.exports = { checkBackup, cleanBackup, 
   /* ---------- prijsstijgingen ---------- */
   function priceNotice() {
     const list = priceChanges(state); if (!list.length) return "";
-    return `<div class="notice warn" style="flex-direction:column;align-items:stretch;gap:6px"><b style="font-family:var(--font-display);letter-spacing:.08em;text-transform:uppercase;font-size:12px">⚠ Duurder geworden</b>${list.slice(0, 5).map(p => `<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><span>${esc(p.title)}: <span class="num">${eur(p.old)}</span> → <b class="num neg">${eur(p.now)}</b> (+${p.pct}%) sinds ${fmtDate(p.date)}</span><button class="btn small ghost" data-act="price-ok" data-key="${esc(p.key)}" type="button">Gezien</button></div>`).join("")}</div>`;
+    return `<div class="notice warn" style="flex-direction:column;align-items:stretch;gap:6px"><b style="font-family:var(--font-display);letter-spacing:.08em;text-transform:var(--case-ui);font-size:12px">⚠ Duurder geworden</b>${list.slice(0, 5).map(p => `<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><span>${esc(p.title)}: <span class="num">${eur(p.old)}</span> → <b class="num neg">${eur(p.now)}</b> (+${p.pct}%) sinds ${fmtDate(p.date)}</span><button class="btn small ghost" data-act="price-ok" data-key="${esc(p.key)}" type="button">Gezien</button></div>`).join("")}</div>`;
   }
 
   /* ---------- saldoverwachting ---------- */
