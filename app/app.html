@@ -1378,7 +1378,7 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
       if (ing.bank === "ING") { parsed.push(ing); continue; }   // ING: zoals altijd
       // elke andere bank: een bewaard bankprofiel, of anders de koppeltool
       let prof = findProfile(state, text);
-      if (!prof) prof = await mapDialog(text, f.name, ing.bank);
+      if (!prof) { const sn = sniffCsv(text); prof = await mapDialog(text, f.name, guessBankName(sn.rows[sn.head] || [])); }
       if (!prof) { errors.push(f.name + ": niet ingelezen (koppelen geannuleerd)."); continue; }
       const r = parseWithProfile(text, prof);
       if (!r.rows.length) { errors.push(f.name + `: geen transacties gevonden met het bankprofiel “${prof.name}”.`); continue; }
@@ -3393,7 +3393,7 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
      Alle uitleg op één plaats. Komt er een knop of scherm bij: hier (en later in de tutorialballonnen) mee bijwerken. */
   const HELP_TOPICS = [
     { id: "start", show: [null, ["overzicht", "#btn-import"], null, ["profiel", "#pf-zicht"], ["regels", '[data-act="rules-analyze"]'], ["budget", '[data-act="cat-budget"]']], icon: "🚀", title: "De eerste keer starten", tab: "profiel", steps: [
-      "Download in je bankapp (Home'Bank of de ING-app, of Belfius Direct Net) je transacties als <b>CSV-bestand</b>.",
+      "Download in je bankapp je transacties als <b>CSV-bestand</b> (bij ING: Home'Bank of de ING-app).",
       "Klik bovenaan op <b>↑ CSV importeren</b> en kies het bestand, of sleep het in het venster.",
       "Nieuw rekeningnummer? Geef de rekening een naam en kies <b>zichtrekening</b> of <b>spaarrekening</b>.",
       "Ga naar <b>Profiel</b> en vul bij elke zichtrekening een <b>startsaldo</b> in: het saldo van vandaag uit je bankapp mag (zie hieronder).",
@@ -3526,7 +3526,7 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
      Aan = ballon met uitleg bij muis-over (enkel pc); op vraag van Benny geen ?-bolletjes (te druk). Keuze per toestel.
      TUT: sel = CSS-selector, t = titel, x = uitleg, topic = id uit HELP_TOPICS (stappenplan in de ballon met steps: true). */
   const TUT = [
-    { sel: '#btn-import, [data-act="pick-csv"]', t: "CSV importeren", x: "Lees de transacties van je bank in (ING of Belfius). Je kan ook een bestand in het venster slepen.", topic: "csv", steps: true },
+    { sel: '#btn-import, [data-act="pick-csv"]', t: "CSV importeren", x: "Lees de transacties van je bank in. ING wordt vanzelf herkend; voor een andere bank vraagt de app één keer welke kolom wat is. Je kan ook een bestand in het venster slepen.", topic: "csv", steps: true },
     { sel: "#btn-profile", t: "Profiel", x: "Je rekeningen, startsaldo's, kredietkaarten en alle instellingen: thema, back-up, OneDrive, pincode, tutorial…" },
     { sel: "#btn-install", t: "Installeren", x: "Zet de planner als programma op je pc of gsm. Je gegevens blijven op je toestel.", topic: "install" },
     { sel: '[data-act="close-open"]', t: "Maandafsluiting", x: "Een samenvatting van de maand: in en uit tegenover je gemiddelde, grootste uitgaven, wat opviel en hoeveel je spaarde.", topic: "afsluiting" },
