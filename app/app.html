@@ -743,6 +743,23 @@ tr.sub-cancel .sub-name { text-decoration: line-through; text-decoration-color: 
 #demo-badge span { font: 600 10px var(--font-body); letter-spacing: .08em; opacity: .9; margin-left: 8px; text-transform: none; }
 .notice.demo-note { background: var(--demo); color: var(--on-demo); }
 body.demo main { padding-bottom: 70px; }
+/* koppeltool (stap 15) */
+#dlg.wide { width: min(880px, calc(100% - 24px)); max-height: calc(100vh - 32px); overflow: auto; }
+.map-step { display: grid; grid-template-columns: 30px 1fr; gap: 12px; padding: 14px 0; border-top: 1px solid var(--line); }
+.map-step > div > b { display: block; margin-bottom: 6px; }
+.map-n { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: var(--on-accent); font: 700 13px var(--font-display); }
+.map-hint { display: block; color: var(--muted); font-size: 12.5px; margin: 0 0 8px; }
+.map-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+#dlg .map-row > .input, #dlg .map-row > select.input { width: auto; flex: 1 1 190px; min-width: 0; max-width: 100%; margin: 0; }
+#dlg .map-grid > div > select.input, #dlg #mp-name { width: 100%; margin: 0; }
+#dlg .map-inline select.input { width: auto; margin: 0; }
+.map-inline { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); }
+.map-grid { display: grid; grid-template-columns: 170px 1fr; gap: 10px 14px; align-items: start; }
+#dlg .map-grid > label { margin: 0; padding-top: 9px; font-weight: 600; font-size: 13.5px; }
+.map-sub { font-size: 12.5px; color: var(--muted); }
+.map-prev td { font-size: 13px; padding: 6px 8px; }
+.map-status { margin: 10px 0 0; font-size: 13.5px; }
+@media (max-width: 640px) { .map-grid { grid-template-columns: 1fr; gap: 4px; } .map-grid > label { padding-top: 8px; } }
 .close-lead p { margin: 0; font-size: 15.5px; line-height: 1.55; }
 .close-row { display: grid; grid-template-columns: 1fr auto auto; gap: 14px; align-items: baseline; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
 .close-row:last-child { border-bottom: 0; }
@@ -1798,7 +1815,7 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
   function emptyState() {
     return `<section class="drop" id="drop">
       <h2>Begin met je bankafschrift</h2>
-      <p>Download je transacties als CSV in Home'Bank of de ING-app, of in Belfius Direct Net, en sleep het bestand hierheen. Bekende winkels en je loon worden meteen gecategoriseerd. Bestanden die overlappen, geven geen dubbels.</p>
+      <p>Download je transacties als CSV in je bankapp (bij ING: Home'Bank of de ING-app) en sleep het bestand hierheen. Een andere bank? Dan vraagt de app één keer welke kolom wat is. Bestanden die overlappen, geven geen dubbels.</p>
       <button class="btn primary" data-act="pick-csv" type="button">CSV-bestand kiezen</button>
       <p class="muted" style="margin:14px auto 0;font-size:12.5px">Gebruikte je de Budgetplanner al op claude.ai, of heb je een back-up? Exporteer daar via <b>Back-up → Back-up exporteren</b> en zet het bestand hier terug: <button class="btn small ghost" data-act="import-json" type="button">Back-up terugzetten</button></p>
     </section>`;
@@ -3383,10 +3400,16 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
       "Ga naar <b>Regels</b> → <b>🔍 Transacties analyseren</b> en vink de voorstellen aan die kloppen.",
       "Zet in <b>Budget</b> een bedrag bij je categorieën. Klaar: het <b>Overzicht</b> vult zich." ] },
     { id: "csv", show: [null, ["", "#btn-import"], null, null], icon: "↑", title: "Transacties importeren (CSV)", tab: "transacties", steps: [
-      "Download je transacties als CSV in je bankapp. De app herkent zelf of het ING of Belfius is.",
+      "Download je transacties als CSV in je bankapp. ING herkent de app vanzelf; voor een andere bank vraagt ze één keer welke kolom wat is (zie “Een andere bank dan ING inlezen”).",
       "Klik op <b>↑ CSV importeren</b> (bovenaan) en kies één of meer bestanden.",
       "Overlappende bestanden zijn geen probleem: transacties die er al in staan, worden overgeslagen.",
       "Het venster <b>Import klaar</b> toont hoeveel er nieuw zijn en hoeveel je nog moet categoriseren." ] },
+    { id: "bank", icon: "🏦", show: [null, ["", "#btn-import"], null, null, ["profiel", "#pf-banks"]], title: "Een andere bank dan ING inlezen", tab: "profiel", steps: [
+      "Download je transacties als <b>CSV</b> in de app of website van je bank (bv. KBC Touch, Easy Banking, Belfius, Crelan…).",
+      "Klik op <b>↑ CSV importeren</b> en kies het bestand. Herkent de app het niet als ING, dan opent de <b>koppeltool</b>.",
+      "Volg de 4 stappen in de koppeltool: <b>1</b> naam van je bank · <b>2</b> de regel met de kolomnamen · <b>3</b> welke kolom de datum, het bedrag, de omschrijving en je rekeningnummer is · <b>4</b> controleer het voorbeeld (uitgaven negatief, inkomsten positief).",
+      "Klik op <b>Bankprofiel opslaan en importeren</b>. Volgende bestanden van dezelfde bank leest de app daarna vanzelf in.",
+      "Je bankprofielen staan in <b>Profiel → Bankprofielen</b>. Verwijder je er een, dan vraagt de app bij het volgende bestand opnieuw de kolommen." ] },
     { id: "saldo", show: [["profiel", "#pf-zicht"], ["profiel", '[data-act="bal-date"]'], ["profiel", '[data-act="bal-amount"]'], null, null], icon: "€", title: "Startsaldo instellen (mag ook het saldo van vandaag zijn)", tab: "profiel", steps: [
       "Ga naar <b>Profiel</b> → <b>Zichtrekeningen</b>. Elke zichtrekening heeft één startsaldo nodig.",
       "Het eenvoudigst: neem het <b>saldo van vandaag</b> uit je bankapp en kies bij <b>Startsaldo op</b> de datum van je <b>laatst ingelezen transactie</b> (of vandaag, als je CSV tot vandaag loopt).",
@@ -3570,6 +3593,8 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
     { sel: '[data-act="acc-color"]', t: "Kleur", x: "Klik om de kleur van deze rekening te wisselen. Die kleur zie je in lijsten en grafieken." },
     { sel: '[data-act="bal-date"], [data-act="bal-amount"]', t: "Startsaldo", x: "Het saldo op een gekozen dag. Dat mag gewoon <b>het saldo van vandaag</b> zijn (met de datum van je laatst ingelezen transactie): de app rekent zelf vooruit én terug.", topic: "saldo", steps: true },
     { sel: '[data-act="acc-warn"]', t: "Waarschuwen onder", x: "Komt de saldoverwachting onder dit bedrag, dan krijg je een waarschuwing." },
+    { sel: '[data-act="bp-del"]', t: "Bankprofiel verwijderen", x: "Verwijdert de koppeling van deze bank. Je transacties blijven staan; bij het volgende bestand van die bank vraagt de app opnieuw welke kolom wat is." },
+    { sel: "#pf-banks h2", t: "Bankprofielen", x: "Voor elke bank buiten ING onthoudt de app welke kolom wat is. Je maakt een profiel door gewoon een CSV van die bank te importeren.", topic: "bank" },
     { sel: '[data-act="card-add"]', t: "Kredietkaart", x: "Zolang de losse aankopen niet ingelezen worden, telt de maandelijkse afrekening als uitgave in de categorie van de kaart." },
     { sel: '[data-act="theme-open"]', t: "Thema", x: "Cyberpunk, Synthwave, Matrix of Oceaan, telkens donker of licht. Per toestel." },
     { sel: '[data-act="folder-open"]', t: "OneDrive-back-up", x: "Automatisch een back-up en gsm-samenvatting in je OneDrive-map.", topic: "onedrive", steps: true },
@@ -3705,6 +3730,7 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
     if (!sp.length) h += `<tr class="empty-row"><td colspan="5">Nog geen spaarrekening.</td></tr>`;
     h += `</tbody></table></div><div style="margin-top:12px"><button class="btn" data-act="acc-add" data-type="spaar" type="button">+ Spaarrekening toevoegen</button></div></section>`;
     const cards = state.cards || [];
+    h += bankProfilesCard();
     h += `<section class="card" id="pf-cards"><div class="card-head"><h2>Kredietkaarten</h2><span class="hint">Bv. een Visa die maandelijks in één keer van je zichtrekening gaat. De afrekening telt als uitgave in de categorie van de kaart; verdeel ze met ⑂ Splitsen over categorieën.</span></div>
       <div class="table-wrap"><table><thead><tr><th>Naam</th><th>Herkennen aan</th><th>Categorie</th><th class="r">Afrekeningen</th><th class="r">Laatste</th><th></th></tr></thead><tbody>`;
     for (const k of cards) {
@@ -3910,6 +3936,8 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
         toast(on ? (tutActive() ? "Tutorial aan: ga met je muis over een knop" : "Tutorial aan. De ballonnen werken op een toestel met muis.") : "Tutorial uit. Alle uitleg staat in het tabblad Help."); break; }
       case "acc-add": accAddDialog(el.dataset.type); break;
       case "card-add": cardAddDialog(); break;
+      case "bp-del": { const id = el.closest("tr").dataset.bp, bp = (state.bankProfiles || []).find(x => x.id === id); if (!bp) break;
+        confirmDel("Bankprofiel verwijderen?", `“${bp.name}” wordt verwijderd. Je ingelezen transacties blijven staan. Lees je later een bestand van deze bank in, dan vraagt de app opnieuw welke kolom wat is.`, "Verwijderen", "Bankprofiel verwijderd", () => { state.bankProfiles = state.bankProfiles.filter(x => x !== bp); save(); render(); }); break; }
       case "card-del": { const id = el.closest("tr").dataset.card, k = (state.cards || []).find(x => x.id === id);
         confirmDel("Kredietkaart verwijderen?", `${k ? k.name : "De kaart"} wordt uit je lijst verwijderd. Je transacties en hun categorie blijven staan.`, "Verwijderen", "Kredietkaart verwijderd", () => { state.cards = state.cards.filter(x => x.id !== id); save(); render(); }); break; }
       case "chart-view": setChartPref({ view: el.dataset.v }); render(); break;
