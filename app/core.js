@@ -854,6 +854,21 @@ function occStatus(state, plan, d) {
     (!want || Math.abs(Math.abs(t.amount) - want) <= Math.max(2, want * 0.15)));
   return tx ? { paid: true, tx } : { paid: false };
 }
+/* ---------- terugkerende betalingen: gemeenschappelijke bouwstenen (stap 16d) ----------
+   Gebruikt door de planner (detectRecurring), de prijsstijgingen (priceChanges) en de abonnementen (subscriptions). */
+// wie is de tegenpartij: het mandaatnummer van een domiciliëring, anders de winkel/persoon
+function payKey(t) { return ((t.search || "").match(/Mandaat:\s*(\d{6,})/i) || [])[1] || merchantKey(t); }
+// dagen tussen opeenvolgende datums (oud → nieuw)
+function dayGaps(dates) { const g = []; for (let i = 1; i < dates.length; i++) g.push((pd(dates[i]) - pd(dates[i - 1])) / 864e5); return g; }
+// vast ritme? → { repeat: week|month|quarter|year, tol, med } of null (60 % van de laatste 6 tussenpozen moet passen)
+function rhythm(dates) {
+  const recent = dayGaps(dates).slice(-6).sort((a, b) => a - b), med = recent[Math.floor(recent.length / 2)];
+  let repeat = null, tol = 4;
+  if (med >= 6 && med <= 8) repeat = "week", tol = 2; else if (med >= 26 && med <= 35) repeat = "month", tol = 5; else if (med >= 84 && med <= 98) repeat = "quarter", tol = 10; else if (med >= 350 && med <= 380) repeat = "year", tol = 20;
+  if (!repeat || recent.filter(g => Math.abs(g - med) <= tol).length / recent.length < 0.6) return null;
+  return { repeat, tol, med };
+}
+
 /* Tussengeheugen voor één tekenbeurt (stap 16c): zware berekeningen die tijdens het tekenen van één scherm
    meermaals gevraagd worden, gebeuren maar één keer. Buiten memoRun() wordt er niets onthouden. */
 let MEMO = null;
@@ -865,8 +880,7 @@ function detectRecurringNow(state) {
   const groups = new Map();
   for (const t of budgetTx(state)) {
     if (!t.amount || t.cat === "Opname krediet") continue;
-    const mandate = ((t.search || "").match(/Mandaat:\s*(\d{6,})/i) || [])[1];
-    const k = mandate || merchantKey(t); if (!k) continue;
+    const k = payKey(t); if (!k) continue;
     const key = k + "|" + (t.amount < 0 ? "-" : "+");
     if (!groups.has(key)) groups.set(key, []); groups.get(key).push(t);
   }
@@ -879,14 +893,8 @@ function detectRecurringNow(state) {
     // per maand maar één keer tellen (bv. twee kaartbetalingen dezelfde dag)
     const byDate = [...new Map(list.map(t => [t.date, t])).values()].sort((a, b) => a.date.localeCompare(b.date));
     if (byDate.length < 3) continue;
-    const gaps = []; for (let i = 1; i < byDate.length; i++) gaps.push((pd(byDate[i].date) - pd(byDate[i - 1].date)) / 864e5);
-    const recent = gaps.slice(-6).sort((a, b) => a - b), med = recent[Math.floor(recent.length / 2)];
-    let repeat = null, tol = 4;
-    if (med >= 6 && med <= 8) repeat = "week", tol = 2; else if (med >= 26 && med <= 35) repeat = "month", tol = 5; else if (med >= 84 && med <= 98) repeat = "quarter", tol = 10; else if (med >= 350 && med <= 380) repeat = "year", tol = 20;
-    if (!repeat) continue;
-    const ok = recent.filter(g => Math.abs(g - med) <= tol).length / recent.length;
-    if (ok < 0.6) continue;
-    const last = byDate[byDate.length - 1];
+    const rh = rhythm(byDate.map(t => t.date)); if (!rh) continue;
+    const { repeat, tol, med } = rh, last = byDate[byDate.length - 1];
     const ageDays = (pd(today) - pd(last.date)) / 864e5;
     if (ageDays > med * 2 + tol) continue;          // gestopt
     const amts = byDate.slice(-3).map(t => Math.abs(t.amount)).sort((a, b) => a - b);
@@ -911,16 +919,14 @@ function priceChangesNow(state) {
   const groups = new Map();
   for (const t of budgetTx(state)) {
     if (t.amount >= 0) continue;
-    const mandate = ((t.search || "").match(/Mandaat:\s*(\d{6,})/i) || [])[1];
-    const k = mandate || merchantKey(t); if (!k) continue;
+    const k = payKey(t); if (!k) continue;
     if (!groups.has(k)) groups.set(k, []); groups.get(k).push(t);
   }
   const ign = new Set(state.ignoredPrice || []), today = ds(new Date()), out = [];
   for (const [k, list] of groups) {
     const byDate = [...new Map(list.map(t => [t.date, t])).values()].sort((a, b) => a.date.localeCompare(b.date));
     if (byDate.length < 4) continue;
-    const gaps = []; for (let i = 1; i < byDate.length; i++) gaps.push((pd(byDate[i].date) - pd(byDate[i - 1].date)) / 864e5);
-    const g = gaps.slice(-4).sort((a, b) => a - b)[1];
+    const g = dayGaps(byDate.map(t => t.date)).slice(-4).sort((a, b) => a - b)[1];
     if (!(g >= 6 && g <= 35) && !(g >= 84 && g <= 380)) continue;            // alleen echt terugkerend
     const last = byDate[byDate.length - 1], prev = byDate.slice(-4, -1).map(t => -t.amount).sort((a, b) => a - b)[1];
     const now = -last.amount;
@@ -1053,8 +1059,7 @@ function subscriptions(state, todayStr) {
   for (const t of budgetTx(state)) {
     if (t.amount >= 0 || t.cat === "Opname krediet" || ["Sparen", "Overboeking"].includes(typeOf(state, t.cat))) continue;
     if (savKeys(state).some(k => withSav(state, k, () => isSavMove(state, t)))) continue;   // stortingen naar de spaarrekening zijn geen kost
-    const mandate = ((t.search || "").match(/Mandaat:\s*(\d{6,})/i) || [])[1];
-    const k = mandate || merchantKey(t); if (!k) continue;
+    const k = payKey(t); if (!k) continue;
     if (!groups.has(k)) groups.set(k, []); groups.get(k).push(t);
   }
   const subs = state.subs || {}, out = [];
@@ -1062,12 +1067,8 @@ function subscriptions(state, todayStr) {
     // per dag maar één keer tellen (bv. twee kaartbetalingen dezelfde dag)
     const byDate = [...list.reduce((m, t) => m.set(t.date, (m.get(t.date) || 0) + t.amount), new Map())].map(([date, amount]) => ({ date, amount: -amount })).sort((a, b) => a.date.localeCompare(b.date));
     if (byDate.length < 3) continue;
-    const gaps = []; for (let i = 1; i < byDate.length; i++) gaps.push((pd(byDate[i].date) - pd(byDate[i - 1].date)) / 864e5);
-    const recent = gaps.slice(-6).sort((a, b) => a - b), med = recent[Math.floor(recent.length / 2)];
-    let repeat = null, tol = 4;
-    if (med >= 6 && med <= 8) repeat = "week", tol = 2; else if (med >= 26 && med <= 35) repeat = "month", tol = 5; else if (med >= 84 && med <= 98) repeat = "quarter", tol = 10; else if (med >= 350 && med <= 380) repeat = "year", tol = 20;
-    if (!repeat || recent.filter(g => Math.abs(g - med) <= tol).length / recent.length < 0.6) continue;
-    const last = byDate[byDate.length - 1], lastTx = list.filter(t => t.date === last.date).pop();
+    const rh = rhythm(byDate.map(x => x.date)); if (!rh) continue;
+    const { repeat, tol, med } = rh, last = byDate[byDate.length - 1], lastTx = list.filter(t => t.date === last.date).pop();
     const active = (pd(today) - pd(last.date)) / 864e5 <= med * 2 + tol;
     // bedrag ±een jaar geleden (de betaling die het dichtst bij "een jaar voor de laatste" ligt)
     const yearAgo = ds(new Date(pd(last.date).getTime() - 365 * 864e5)), cands = byDate.filter(x => x.date <= addD0(yearAgo, 45));
@@ -1284,4 +1285,4 @@ function findProfile(state, text) {
   return null;
 }
 
-if (typeof module !== "undefined") module.exports = { memoRun, cardKey, syncCardAccounts, isCardAcc, cardTx, cardSettleMoves, cardOpen, guessBankName, sniffCsv, headerSig, parseDateFmt, parseAnyAmount, guessMap, parseWithProfile, findProfile, csvLines, demoState, filterTx, filterActive, parseAmt, subscriptions, PER_YEAR, monthClose, niceDesc, catByName, parentOf, groupOf, mainCats, subsOf, savKeys, activeSav, setSav, withSav, goalSav, savGoals, savAll, syncSavConfs, cardMatch, applyCards, transferFlows, OWN_CAT, ownTransfer, applyOwnTransfers, ownConflicts, MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
+if (typeof module !== "undefined") module.exports = { payKey, rhythm, memoRun, cardKey, syncCardAccounts, isCardAcc, cardTx, cardSettleMoves, cardOpen, guessBankName, sniffCsv, headerSig, parseDateFmt, parseAnyAmount, guessMap, parseWithProfile, findProfile, csvLines, demoState, filterTx, filterActive, parseAmt, subscriptions, PER_YEAR, monthClose, niceDesc, catByName, parentOf, groupOf, mainCats, subsOf, savKeys, activeSav, setSav, withSav, goalSav, savGoals, savAll, syncSavConfs, cardMatch, applyCards, transferFlows, OWN_CAT, ownTransfer, applyOwnTransfers, ownConflicts, MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
