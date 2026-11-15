@@ -348,12 +348,6 @@ nav a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--accen
 .btn.ghost:hover { color: var(--ink); background: var(--bar-track); }
 .btn.small { padding: 4px 9px; font-size: 13px; }
 .btn.danger { color: var(--neg); }
-.menu { position: relative; }
-.menu-list { position: absolute; right: 0; top: calc(100% + 6px); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--menu-shadow); min-width: 250px; padding: 6px; display: none; }
-.menu.open .menu-list { display: block; }
-.menu-list button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 9px 10px; border-radius: 6px; cursor: pointer; }
-.menu-list button:hover { background: var(--bar-track); }
-.menu-list small { display: block; color: var(--muted); font-size: 12px; }
 
 main { max-width: 1180px; margin: 0 auto; padding: 24px; display: grid; gap: 20px; }
 .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
@@ -803,9 +797,6 @@ body.tut [data-tut]:hover { outline: 1px dashed rgba(var(--accent-rgb), .8); out
 .toast-undo { margin-left: 10px; background: none; border: 1px solid currentColor; color: inherit; font: inherit; padding: 3px 9px; border-radius: var(--r-btn); cursor: pointer; text-transform: none; }
 .toast-undo:hover { background: rgba(var(--accent-rgb), .15); }
 .toast { background: rgba(var(--panel-rgb), .96); color: var(--accent); border: 1px solid var(--accent); border-radius: var(--r-card); box-shadow: 0 0 20px rgba(var(--accent-rgb), calc(.4 * var(--glow))); text-transform: var(--case-ui); letter-spacing: .05em; font-weight: 600; }
-.menu-list { background: var(--panel); border-color: var(--accent); border-radius: var(--r-card); box-shadow: 0 0 20px rgba(var(--accent-rgb), calc(.25 * var(--glow))); }
-.menu-list button { border-radius: var(--r-sm); }
-.menu-list button:hover { background: rgba(var(--accent-rgb), .1); color: var(--accent); }
 dialog { background: var(--panel); border: 1px solid var(--accent); border-radius: var(--r-card); clip-path: var(--notch); box-shadow: 0 0 40px rgba(var(--accent-rgb), calc(.25 * var(--glow))); }
 dialog h3 { font-family: var(--font-display); color: var(--accent); }
 dialog::backdrop { background: rgba(var(--shade-rgb), .8); }
@@ -895,7 +886,6 @@ td.desc > .acc-mini { float: left; margin-top: 7px; }
 .xfer { color: var(--ink); } td.amount.xfer { white-space: nowrap; } td.amount.xfer small { display: block; font-size: 11px; color: var(--muted); font-family: var(--font-body); }
 td.amount.xfer::first-letter { color: var(--accent); }
 /* saldoverwachting per rekening + overboekingen (stap 8c-2/3) */
-.fc-acc { display: inline-flex; align-items: center; margin-left: 8px; color: var(--ink); }
 .fc-stats { display: flex; flex-wrap: wrap; gap: 6px 22px; align-items: baseline; margin: 0 0 8px; font-size: 13.5px; }
 .fc-warn { color: var(--neg); font-weight: 600; }
 .charts .card-head { flex-wrap: wrap; gap: 10px; }
@@ -931,7 +921,6 @@ td.amount.xfer::first-letter { color: var(--accent); }
 #main.enter .chart svg, #main.enter section svg { animation: fx-reveal .8s ease-out .15s both; }
 #main.enter .fill, #main.enter .gw-bar span { transform-origin: left center; animation: fx-grow .8s cubic-bezier(.2, .8, .2, 1) .15s both; }
 dialog[open] { animation: fx-pop .18s ease-out; }
-.menu.open .menu-list { animation: fx-drop .16s ease-out; }
 .card, .kpi, .btn, .theme-tile { transition: box-shadow .2s ease, border-color .2s ease, background-color .2s ease, color .2s ease; }
 .kpi:hover { border-color: rgba(var(--accent-rgb), .45); }
 
@@ -1490,7 +1479,6 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
   const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true;
   function updateInstallUi() {
     const b = $("#btn-install"); if (b) b.style.display = installPrompt && !isStandalone() ? "" : "none";
-    const m = $("#mi-install"); if (m) m.style.display = isStandalone() ? "none" : "";
   }
   window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); installPrompt = e; updateInstallUi(); });
   window.addEventListener("appinstalled", () => { installPrompt = null; updateInstallUi(); toast("Budgetplanner is geïnstalleerd. Je vindt hem bij je programma's."); });
@@ -2315,17 +2303,6 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
 
   function niceStep(x) { const p = Math.pow(10, Math.floor(Math.log10(x || 1))); const n = x / p; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p; }
   function roundTop(x, y, w, h, r) { r = Math.min(r, h, w / 2); return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`; }
-
-  function goalsCard() {
-    let h = `<div class="card-head"><h2>Spaardoelen</h2><a class="hint" href="#spaardoelen">Beheren</a></div>`;
-    if (!state.goals.length) return h + `<p class="muted">Nog geen spaardoelen.</p>`;
-    return h + `<div class="goals">` + state.goals.map(g => {
-      const p = goalProgress(state, g);
-      return `<div class="goal"><div class="top"><b>${esc(g.name)}</b><span class="num">${eur0(p.total)}${p.target ? ` <span class="muted">/ ${eur0(p.target)}</span>` : ""}</span></div>
-        <div class="track"><div class="fill" style="width:${((p.pct || 0) * 100).toFixed(1)}%"></div></div>
-        <div class="meta">${p.target ? (p.left === 0 ? "Doel bereikt" : p.perMonth ? `Nog ${eur0(p.left)} · ${eur0(p.perMonth)} per maand tot ${fmtDate(g.deadline)}` : `Nog ${eur0(p.left)}`) : "Stel een doelbedrag in"}</div></div>`;
-    }).join("") + `</div>`;
-  }
 
   function txRow(t) {
     const open = ui.open.has(t.id);
