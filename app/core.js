@@ -135,8 +135,9 @@ function parseBankCsv(text) {
     acc: col("Rekeningnummer"), omzet: col("Omzetnummer"), date: col("Boekingsdatum"), amount: col("Bedrag"),
     desc: col("Omschrijving"), cp: col("Rekening tegenpartij"), detail: col("Detail van de omzet"), msg: col("Bericht"),
   };
+  if (!belfius && c.omzet < 0 && c.detail < 0) return { rows: [], error: "Geen ING-bestand.", bank: null, unknown: true };   // geen ING: koppeltool
   if (c.date < 0 || c.amount < 0 || (belfius ? c.tx < 0 && c.name < 0 : c.desc < 0))
-    return { rows: [], error: "Dit lijkt geen export van ING of Belfius: de kolommen Boekingsdatum, Bedrag en Omschrijving (of Transactie) ontbreken.", bank: null };
+    return { rows: [], error: "Dit lijkt geen export van ING of Belfius: de kolommen Boekingsdatum, Bedrag en Omschrijving (of Transactie) ontbreken.", bank: null, unknown: true };
   const rows = [];
   for (let i = hi + 1; i < lines.length; i++) {
     const v = splitCsvLine(lines[i], sep); const g = k => (c[k] >= 0 ? v[c[k]] || "" : "");
@@ -1162,4 +1163,88 @@ function demoState(todayStr) {
   return st;
 }
 
-if (typeof module !== "undefined") module.exports = { demoState, filterTx, filterActive, parseAmt, subscriptions, PER_YEAR, monthClose, belfiusDesc, catByName, parentOf, groupOf, mainCats, subsOf, savKeys, activeSav, setSav, withSav, goalSav, savGoals, savAll, syncSavConfs, cardMatch, applyCards, transferFlows, OWN_CAT, ownTransfer, applyOwnTransfers, ownConflicts, MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
+/* ---------- bankprofielen: kolommen koppelen (stap 15) ----------
+   Voor elke bank behalve ING: de gebruiker duidt één keer aan welke kolom wat is; dat profiel wordt bewaard in
+   state.bankProfiles en herkend aan de kopregel (sig). Profiel: { id, name, sig, sep, head (rij-index kopregel),
+   map: { date, amount, amountIn, amountOut, desc: [..], name, cp, account, ref }, twoCols, dateFmt ("dmy"|"ymd"|"mdy"), fixedAccount }. */
+function csvLines(text) { return text.replace(/^﻿/, "").replace(/\r\n?/g, "\n").split("\n").filter(l => l.trim() !== ""); }
+// scheidingsteken en kopregel raden: de eerste regel (bij de eerste 30) met de meeste velden die geen getal of datum zijn
+function sniffCsv(text) {
+  const lines = csvLines(text).slice(0, 60);
+  const count = (l, c) => splitCsvLine(l, c).length;
+  const sep = [";", ",", "\t", "|"].map(c => ({ c, n: lines.slice(0, 20).reduce((a, l) => a + (count(l, c) > 1 ? count(l, c) : 0), 0) })).sort((a, b) => b.n - a.n)[0].c;
+  const rows = lines.map(l => splitCsvLine(l, sep).map(v => v.trim()));
+  const width = Math.max(...rows.map(r => r.length));
+  let head = 0, best = -1;
+  rows.slice(0, 30).forEach((r, i) => { const text = r.filter(v => v && !/^[-+]?[\d.,\s€]+$/.test(v) && !/^\d{1,4}[\/.-]\d{1,2}[\/.-]\d{1,4}$/.test(v)).length; const sc = text + (r.length >= width - 1 ? 2 : 0); if (sc > best && r.filter(Boolean).length >= 3) { best = sc; head = i; } });
+  return { sep, head, rows };
+}
+const headerSig = h => h.map(x => String(x || "").toLowerCase().replace(/\s+/g, " ").trim()).join("|");
+function parseDateFmt(v, fmt) {
+  v = String(v || "").trim().slice(0, 10); let m;
+  if ((m = v.match(/^(\d{4})[\/.-](\d{1,2})[\/.-](\d{1,2})$/))) return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+  if (!(m = v.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2}|\d{4})$/))) return null;
+  let [, a, b, y] = m; if (y.length === 2) y = "20" + y;
+  const [d, mo] = fmt === "mdy" ? [b, a] : [a, b];
+  if (+mo < 1 || +mo > 12 || +d < 1 || +d > 31) return null;
+  return `${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}`;
+}
+// bedrag met komma of punt als decimaalteken, met of zonder duizendtallen, valuta, of min achteraan
+function parseAnyAmount(v) {
+  let x = String(v || "").replace(/[€\s ]|EUR/gi, ""); if (!x) return null;
+  let neg = false; if (/^\(.*\)$/.test(x)) { neg = true; x = x.slice(1, -1); } if (/-$/.test(x)) { neg = true; x = x.slice(0, -1); }
+  const lc = x.lastIndexOf(","), ld = x.lastIndexOf(".");
+  if (lc > ld) x = x.replace(/\./g, "").replace(",", "."); else if (ld > lc && lc >= 0) x = x.replace(/,/g, "");
+  else if (lc < 0 && ld >= 0 && /^\-?\d{1,3}(\.\d{3})+$/.test(x)) x = x.replace(/\./g, "");
+  const n = parseFloat(x); if (isNaN(n)) return null;
+  return Math.round((neg ? -Math.abs(n) : n) * 100) / 100;
+}
+// kolommen raden aan de hand van de namen (NL/FR/EN) en de inhoud; dient als voorstel in de koppeltool
+function guessMap(head, sample) {
+  const h = head.map(x => String(x || "").toLowerCase());
+  const find = (...re) => { for (const r of re) { const i = h.findIndex(x => r.test(x)); if (i >= 0) return i; } return -1; };
+  const colVals = i => sample.map(r => r[i] || "").filter(Boolean);
+  const isDateCol = i => colVals(i).length && colVals(i).every(v => parseDateFmt(v, "dmy") || parseDateFmt(v, "mdy"));
+  const isAmtCol = i => colVals(i).length && colVals(i).every(v => parseAnyAmount(v) !== null && /\d/.test(v) && !/^\d{1,4}[\/.-]\d{1,2}[\/.-]\d{1,4}$/.test(v));
+  const m = { date: find(/boekingsdatum|date de comptabilisation|^datum$|^date$|uitvoeringsdatum|transactiedatum|date d.ex|booking date/), amount: find(/^bedrag$|^montant$|^amount$|bedrag \(eur\)|montant \(eur\)/),
+    amountIn: find(/^credit|^bij$|ontvangen|crédit|^in$|^inkomsten?$/), amountOut: find(/^debet|^debit|^af$|uitgegeven|débit|^out$|^uitgaven?$/),
+    desc: [find(/omschrijving|^transactie$|libell|description|mededeling|communication|bericht|^details?$/)].filter(i => i >= 0),
+    name: find(/naam tegenpartij|nom de la contrepartie|tegenpartij naam|contrepartie|counterparty name|^naam$|^nom$|begunstigde/), cp: find(/rekening tegenpartij|compte contrepartie|compte de la contrepartie|iban tegenpartij|counterparty account|tegenrekening/),
+    account: find(/^rekening$|rekeningnummer|^compte$|numéro de compte|^iban$|eigen rekening|^account/), ref: find(/transactienummer|referentie|référence|^ref|volgnummer|numéro de transaction|^id$/) };
+  if (m.date < 0) m.date = h.findIndex((_, i) => isDateCol(i));
+  if (m.amount < 0 && !(m.amountIn >= 0 && m.amountOut >= 0)) m.amount = h.findIndex((_, i) => i !== m.date && isAmtCol(i) && !/saldo|solde|balance/.test(h[i]));
+  const msg = find(/mededeling|communication|bericht|message/); if (msg >= 0 && !m.desc.includes(msg)) m.desc.push(msg);
+  if (!m.desc.length) { const i = h.findIndex((_, k) => ![m.date, m.amount, m.account, m.cp].includes(k) && colVals(k).some(v => /[a-z]{3,}/i.test(v))); if (i >= 0) m.desc.push(i); }
+  const vals = m.date >= 0 ? colVals(m.date) : [];
+  const dateFmt = vals.some(v => /^\d{4}/.test(v)) ? "ymd" : vals.some(v => { const x = v.match(/^(\d{1,2})[\/.-](\d{1,2})/); return x && +x[2] > 12; }) ? "mdy" : "dmy";
+  return { map: m, twoCols: m.amount < 0 && m.amountIn >= 0 && m.amountOut >= 0, dateFmt };
+}
+// rijen lezen met een profiel → zelfde vorm als parseBankCsv (date, amount, account, omzet, counterparty, raw, desc, search)
+function parseWithProfile(text, pr) {
+  const rows = csvLines(text).map(l => splitCsvLine(l, pr.sep).map(v => v.trim())), m = pr.map, out = [], seen = new Map(); let bad = 0;
+  const g = (r, i) => (i >= 0 && i !== undefined && i !== null ? r[i] || "" : "");
+  for (const r of rows.slice((pr.head || 0) + 1)) {
+    if (r.every(v => !v)) continue;
+    const date = parseDateFmt(g(r, m.date), pr.dateFmt);
+    let amount = null;
+    if (pr.twoCols) { const a = parseAnyAmount(g(r, m.amountIn)), b = parseAnyAmount(g(r, m.amountOut)); if (a !== null || b !== null) amount = Math.round(((a || 0) - Math.abs(b || 0)) * 100) / 100; }
+    else amount = parseAnyAmount(g(r, m.amount));
+    if (!date || amount === null) { bad++; continue; }
+    const name = g(r, m.name), descs = (m.desc || []).map(i => g(r, i)).filter(Boolean), cp = g(r, m.cp);
+    // leesbaar zoals bij ING: "Naar/Van naam · mededeling", of de winkelnaam uit een kaartbetaling
+    const desc = (belfiusDesc(name, descs[0] || "", descs.slice(1).join(" "), amount) || "(geen omschrijving)").slice(0, 200);
+    const account = (pr.fixedAccount || g(r, m.account) || "").trim();
+    // uniek nummer: liefst uit het bestand; anders datum+bedrag+omschrijving (+ volgnummer bij identieke regels op dezelfde dag)
+    let omzet = g(r, m.ref);
+    if (omzet) omzet = "P" + omzet; else { const k = `${date}|${amount}|${desc}`; const n = (seen.get(k) || 0) + 1; seen.set(k, n); let hsh = 0; for (const ch of k) hsh = (hsh * 31 + ch.charCodeAt(0)) | 0; omzet = "H" + (hsh >>> 0).toString(36) + (n > 1 ? "-" + n : ""); }
+    out.push({ date, amount, account, omzet, counterparty: cp, raw: descs.join(" · ").slice(0, 600) || desc, desc, search: [name, ...descs, cp].join(" ") });
+  }
+  return { rows: out, bad };
+}
+function findProfile(state, text) {
+  const sn = sniffCsv(text);
+  for (const p of state.bankProfiles || []) { const r = sn.rows[p.head || 0]; if (r && headerSig(splitCsvLine(csvLines(text)[p.head || 0] || "", p.sep).map(v => v.trim())) === p.sig) return p; }
+  return null;
+}
+
+if (typeof module !== "undefined") module.exports = { sniffCsv, headerSig, parseDateFmt, parseAnyAmount, guessMap, parseWithProfile, findProfile, csvLines, demoState, filterTx, filterActive, parseAmt, subscriptions, PER_YEAR, monthClose, belfiusDesc, catByName, parentOf, groupOf, mainCats, subsOf, savKeys, activeSav, setSav, withSav, goalSav, savGoals, savAll, syncSavConfs, cardMatch, applyCards, transferFlows, OWN_CAT, ownTransfer, applyOwnTransfers, ownConflicts, MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
