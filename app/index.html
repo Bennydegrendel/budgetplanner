@@ -1202,48 +1202,36 @@ function learnedMap(state) {
 }
 
 /* Parseert een ING-CSV. Geeft {rows, error}. */
-/* Parseert een bank-CSV van ING of Belfius (stap 8f). Geeft {rows, error, bank}.
-   ING: kolomtitels op de eerste regel. Belfius: eerst enkele uitlegregels, dan de kolomtitels.
-   De titelregel wordt gezocht: de eerste regel met "Boekingsdatum" én "Bedrag". */
+/* Parseert een ING-CSV. Geeft {rows, error, bank}. Elk ander bestand (ook Belfius) → {unknown: true} → koppeltool (stap 15).
+   ING herken je aan de kopregel met Boekingsdatum + Bedrag + Omzetnummer (of "Detail van de omzet"). */
 function parseBankCsv(text) {
   const lines = text.replace(/\r\n?/g, "\n").split("\n").filter(l => l.trim() !== "");
-  if (lines.length < 2) return { rows: [], error: "Het bestand bevat geen transacties.", bank: null };
-  let hi = lines.findIndex((l, n) => n < 30 && /boekingsdatum/i.test(l) && /bedrag/i.test(l));
-  if (hi < 0) hi = 0;
+  if (lines.length < 2) return { rows: [], error: "Het bestand bevat geen transacties.", bank: null, unknown: true };
+  const hi = Math.max(0, lines.findIndex((l, n) => n < 30 && /boekingsdatum/i.test(l) && /bedrag/i.test(l)));
   const hl = lines[hi], sep = (hl.match(/;/g) || []).length >= (hl.match(/,/g) || []).length ? ";" : ",";
-  const head = splitCsvLine(hl, sep).map(h => h.toLowerCase().replace(/^﻿/, "").trim());
-  const col = (...names) => { for (const n of names) { const k = head.indexOf(n.toLowerCase()); if (k >= 0) return k; } return -1; };
-  const belfius = col("Naam tegenpartij bevat") >= 0 || col("Rekeninguittrekselnummer", "Afschriftnummer") >= 0 || (col("Rekening") >= 0 && col("Transactie") >= 0 && col("Mededelingen") >= 0);
-  const c = belfius ? {
-    acc: col("Rekening"), stmt: col("Rekeninguittrekselnummer", "Afschriftnummer", "Uittrekselnummer"), txn: col("Transactienummer"),
-    date: col("Boekingsdatum"), amount: col("Bedrag"), cp: col("Rekening tegenpartij"), name: col("Naam tegenpartij bevat", "Naam tegenpartij"),
-    tx: col("Transactie", "Omschrijving"), msg: col("Mededelingen", "Mededeling"),
-  } : {
-    acc: col("Rekeningnummer"), omzet: col("Omzetnummer"), date: col("Boekingsdatum"), amount: col("Bedrag"),
-    desc: col("Omschrijving"), cp: col("Rekening tegenpartij"), detail: col("Detail van de omzet"), msg: col("Bericht"),
-  };
-  if (!belfius && c.omzet < 0 && c.detail < 0) return { rows: [], error: "Geen ING-bestand.", bank: null, unknown: true };   // geen ING: koppeltool
-  if (c.date < 0 || c.amount < 0 || (belfius ? c.tx < 0 && c.name < 0 : c.desc < 0))
-    return { rows: [], error: "Dit lijkt geen export van ING of Belfius: de kolommen Boekingsdatum, Bedrag en Omschrijving (of Transactie) ontbreken.", bank: null, unknown: true };
+  const head = splitCsvLine(hl, sep).map(h => h.toLowerCase().replace(/^\ufeff/, "").trim());
+  const col = name => head.indexOf(name);
+  const c = { acc: col("rekeningnummer"), omzet: col("omzetnummer"), date: col("boekingsdatum"), amount: col("bedrag"),
+    desc: col("omschrijving"), cp: col("rekening tegenpartij"), detail: col("detail van de omzet"), msg: col("bericht") };
+  if (c.date < 0 || c.amount < 0 || c.desc < 0 || (c.omzet < 0 && c.detail < 0)) return { rows: [], error: "Geen ING-bestand.", bank: null, unknown: true };
   const rows = [];
   for (let i = hi + 1; i < lines.length; i++) {
     const v = splitCsvLine(lines[i], sep); const g = k => (c[k] >= 0 ? v[c[k]] || "" : "");
     const date = parseDate(g("date")), amount = parseAmount(g("amount"));
     if (!date || amount === null) continue;
-    if (belfius) {
-      const stmt = g("stmt").trim(), txn = g("txn").trim();
-      rows.push({ date, amount, account: g("acc"), omzet: stmt || txn ? `B${stmt}-${txn}` : "", counterparty: g("cp"),
-        raw: [g("tx"), g("msg")].filter(Boolean).join(" · ").slice(0, 600), desc: belfiusDesc(g("name"), g("tx"), g("msg"), amount),
-        search: [g("name"), g("tx"), g("msg"), g("cp")].join(" ") });
-    } else {
-      rows.push({ date, amount, account: g("acc"), omzet: g("omzet"), counterparty: g("cp"),
-        raw: g("desc").slice(0, 600), search: [g("desc"), g("detail"), g("msg"), g("cp")].join(" ") });
-    }
+    rows.push({ date, amount, account: g("acc"), omzet: g("omzet"), counterparty: g("cp"),
+      raw: g("desc").slice(0, 600), search: [g("desc"), g("detail"), g("msg"), g("cp")].join(" ") });
   }
-  return { rows, error: null, bank: belfius ? "Belfius" : "ING" };
+  return { rows, error: null, bank: "ING" };
 }
-/* Leesbare omschrijving voor Belfius, in dezelfde stijl als bij ING: "Van/Naar naam · mededeling" of de winkelnaam. */
-function belfiusDesc(name, tx, msg, amount) {
+// naam van de bank voorstellen in de koppeltool (enkel een gemak; het profiel bepaalt de kolommen)
+function guessBankName(head) {
+  const h = head.map(x => String(x || "").toLowerCase());
+  if (h.includes("naam tegenpartij bevat") || h.some(x => /rekeninguittrekselnummer/.test(x))) return "Belfius";
+  return "";
+}
+/* Leesbare omschrijving in dezelfde stijl als bij ING: "Van/Naar naam · mededeling", of de winkelnaam uit een kaartbetaling. */
+function niceDesc(name, tx, msg, amount) {
   name = (name || "").trim(); msg = (msg || "").replace(/\s+/g, " ").trim(); tx = (tx || "").replace(/\s+/g, " ").trim();
   if (name) return ((/overschrijving|storting|instantoverschrijving/i.test(tx) || !/betaling|aankoop|bancontact|maestro|domicili/i.test(tx)) ? (amount < 0 ? "Naar " : "Van ") : "") + name + (msg && msg.length < 60 ? " · " + msg : "");
   if (/betaling|aankoop|debetkaart|bancontact|maestro/i.test(tx)) {
@@ -1455,6 +1443,7 @@ function accName(state, acc) { const a = state.accounts && state.accounts[accKey
    maar een verplaatsing. Geeft de sleutel van die andere rekening terug, of null. */
 const OWN_CAT = "Eigen rekeningen";
 function ownTransfer(state, t) {
+  if (t && t.amount < 0 && (state.cards || []).length && !isCardAcc(state, t.account)) { const k = cardMatch(state, t); if (k && cardSettleMoves(state, k, t)) return cardKey(k); }
   if (!t || !t.counterparty || !t.account) return null;
   const cp = normIban(t.counterparty); if (!cp || cp === normIban(t.account)) return null;
   return zichtList(state).find(k => normIban(k) === cp) || null;
@@ -1480,9 +1469,39 @@ function cardMatch(state, t) {
   return (state.cards || []).find(k => k.keyword && x.includes(k.keyword.toLowerCase())) || null;
 }
 function applyCards(state) {
-  let n = 0;
-  for (const t of budgetTx(state)) if (t.cat === UNCAT && !(t.splits && t.splits.length)) { const k = cardMatch(state, t); if (k && k.cat) { t.cat = k.cat; n++; } }
+  let n = 0; syncCardAccounts(state);
+  for (const t of budgetTx(state)) {
+    if (t.splits && t.splits.length) continue;
+    const k = cardMatch(state, t); if (!k) continue;
+    if (cardSettleMoves(state, k, t)) {   // losse aankopen ingelezen → de afrekening is een verplaatsing zicht → kaart
+      if (t.cat === UNCAT || t.cat === k.cat) { if (!state.categories.some(x => x.name === OWN_CAT)) state.categories.push({ name: OWN_CAT, type: "Overboeking", budget: null }); t.cat = OWN_CAT; n++; }
+    } else if (t.cat === UNCAT || (t.cat === OWN_CAT && k.cat)) { if (k.cat) { t.cat = k.cat; n++; } }
+  }
   return n;
+}
+/* ---------- kredietkaart als virtuele rekening (stap 8g) ----------
+   Elke kaart heeft een eigen rekening "KAART-<id>" (type "kaart"). Aankopen daarop (ingelezen via de koppeltool of
+   manueel) tellen als uitgave op de dag van de aankoop. Zodra er aankopen zijn in de 40 dagen vóór een afrekening,
+   is die afrekening op de zichtrekening een verplaatsing (anders telt alles dubbel). */
+const cardKey = k => "KAART-" + k.id;
+function syncCardAccounts(state) {
+  state.accounts = state.accounts || {};
+  for (const k of state.cards || []) { const key = cardKey(k), a = state.accounts[key]; if (!a) state.accounts[key] = { type: "kaart", name: k.name, card: k.id }; else { a.type = "kaart"; a.name = k.name; a.card = k.id; } }
+  for (const key of Object.keys(state.accounts)) if (state.accounts[key].type === "kaart" && !(state.cards || []).some(k => cardKey(k) === key)) delete state.accounts[key];
+}
+const isCardAcc = (state, acc) => !!(acc && state.accounts && state.accounts[acc] && state.accounts[acc].type === "kaart");
+function cardTx(state, k) { const key = cardKey(k); return state.transactions.filter(t => t.account === key); }
+function cardSettleMoves(state, k, t) {
+  const from = addD0(t.date, -40);
+  return state.transactions.some(x => x.account === cardKey(k) && x.date >= from && x.date <= t.date);
+}
+// wat er nog op de kaart staat: aankopen (min terugbetalingen) sinds de laatste afrekening, tot "end"
+function cardOpen(state, k, end) {
+  end = end || ds(new Date()); const tx = cardTx(state, k); if (!tx.length) return null;
+  const settles = budgetTx(state).filter(t => t.date <= end && cardMatch(state, t) === k).map(t => t.date).sort();
+  const last = settles.length ? settles[settles.length - 1] : "";
+  const open = tx.filter(t => t.date > last && t.date <= end), amt = -open.reduce((a, t) => a + t.amount, 0);
+  return { open: Math.round(amt * 100) / 100, count: open.length, since: last, next: last ? stepDate(last, "month", 1) : null };
 }
 /* Stromen tussen eigen zichtrekeningen in een maand: [{from, to, total, count}] (stap 8c-2).
    Telt de uitgaande kant; een inkomende enkel als de verzendende rekening die maand niet ingelezen is. */
@@ -2185,7 +2204,7 @@ function demoState(todayStr) {
     ["ethias", "Verzekering"], ["netflix", "Abonnementen"], ["spotify", "Abonnementen"], ["game pass", "Abonnementen"], ["discord", "Abonnementen"],
     ["colruyt", "Boodschappen"], ["delhaize", "Boodschappen"], ["steam", "Games"], ["playstation", "Games"], ["nintendo", "Games"],
     ["deliveroo", "Eten & drinken"], ["takeaway", "Eten & drinken"], ["zooplus", "Kat Pixel"], ["dierenarts", "Kat Pixel"], ["zalando", "Kleding & cosplay"], ["cosplay", "Kleding & cosplay"], ["anime figures", "Kleding & cosplay"], ["basic-fit", "Sport"],
-    ["nmbs", "Uitstapjes"], ["kinepolis", "Uitstapjes"], ["facts", "Uitstapjes"], ["coolblue", "Hardware"], ["alternate", "Hardware"]].map(([keyword, cat]) => ({ keyword, cat }));
+    ["nmbs", "Uitstapjes"], ["kinepolis", "Uitstapjes"], ["facts", "Uitstapjes"], ["coolblue", "Hardware"], ["alternate", "Hardware"], ["visa afrekening", "Uitstapjes"]].map(([keyword, cat]) => ({ keyword, cat }));
   const end = today.slice(0, 7), start = addMonths(end, -23), first = start + "-01";
   st.goals = [{ name: "Gaming-pc", target: 4500, start: 0, deadline: addMonths(end, 4) + "-01" }, { name: "Japan-reis", target: 9000, start: 0, deadline: addMonths(end, 14) + "-01" }, { name: "Noodfonds", target: 8000, start: 0, deadline: "" }];
   ensureGoalRefs(st);
@@ -2218,6 +2237,7 @@ function demoState(todayStr) {
     if (i === 8) tx(d(18), -649, "COOLBLUE · grafische kaart");
     if (i === 19) tx(d(12), -119, "ALTERNATE · gaming headset");
     if (i === 14) tx(d(9), -85, "DIERENARTS DE POOT · Pixel");
+    tx(d(5), -between(60, 180), "Domiciliëring VISA afrekening");   // kredietkaart: één afrekening per maand
     // sparen: elke maand naar de spaarrekening, met de referentie van een doel
     const g = st.goals[i % 3];
     tx(d(26), -(g.name === "Noodfonds" ? 400 : 500), `Naar Spaarrekening ${g.ref}`, SPAAR, { goal: g.name, savChecked: true });
@@ -2239,6 +2259,7 @@ function demoState(todayStr) {
     { id: "demo2", title: "Verjaardag Milan (cadeau)", amount: 40, kind: "uitgave", date: addD0(today, 6), repeat: "none", account: ZICHT, cat: "Uitstapjes", remind: 3 },
     { id: "demo3", title: "Nieuwe controller", amount: 70, kind: "uitgave", date: addD0(today, 30), repeat: "none", account: ZICHT, cat: "Games", remind: 3 },
   ];
+  st.cards = [{ id: "demovisa", name: "Visa", keyword: "visa afrekening", cat: "Uitstapjes" }];
   st.rolloverFrom = addMonths(end, -5);
   st.lastBackup = today + "T08:00:00.000Z";
   // enkel echte prijsstijgingen tonen (huur, Netflix, Game Pass), niet de wisselende winkelbedragen
@@ -2317,9 +2338,10 @@ function parseWithProfile(text, pr) {
     if (pr.twoCols) { const a = parseAnyAmount(g(r, m.amountIn)), b = parseAnyAmount(g(r, m.amountOut)); if (a !== null || b !== null) amount = Math.round(((a || 0) - Math.abs(b || 0)) * 100) / 100; }
     else amount = parseAnyAmount(g(r, m.amount));
     if (!date || amount === null) { bad++; continue; }
+    if (pr.flip) amount = -amount;   // bv. kredietkaarten: aankopen staan als positief getal
     const name = g(r, m.name), descs = (m.desc || []).map(i => g(r, i)).filter(Boolean), cp = g(r, m.cp);
     // leesbaar zoals bij ING: "Naar/Van naam · mededeling", of de winkelnaam uit een kaartbetaling
-    const desc = (belfiusDesc(name, descs[0] || "", descs.slice(1).join(" "), amount) || "(geen omschrijving)").slice(0, 200);
+    const desc = (niceDesc(name, descs[0] || "", descs.slice(1).join(" "), amount) || "(geen omschrijving)").slice(0, 200);
     const account = (pr.fixedAccount || g(r, m.account) || "").trim();
     // uniek nummer: liefst uit het bestand; anders datum+bedrag+omschrijving (+ volgnummer bij identieke regels op dezelfde dag)
     let omzet = g(r, m.ref);
@@ -2334,7 +2356,7 @@ function findProfile(state, text) {
   return null;
 }
 
-if (typeof module !== "undefined") module.exports = { sniffCsv, headerSig, parseDateFmt, parseAnyAmount, guessMap, parseWithProfile, findProfile, csvLines, demoState, filterTx, filterActive, parseAmt, subscriptions, PER_YEAR, monthClose, belfiusDesc, catByName, parentOf, groupOf, mainCats, subsOf, savKeys, activeSav, setSav, withSav, goalSav, savGoals, savAll, syncSavConfs, cardMatch, applyCards, transferFlows, OWN_CAT, ownTransfer, applyOwnTransfers, ownConflicts, MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
+if (typeof module !== "undefined") module.exports = { cardKey, syncCardAccounts, isCardAcc, cardTx, cardSettleMoves, cardOpen, guessBankName, sniffCsv, headerSig, parseDateFmt, parseAnyAmount, guessMap, parseWithProfile, findProfile, csvLines, demoState, filterTx, filterActive, parseAmt, subscriptions, PER_YEAR, monthClose, niceDesc, catByName, parentOf, groupOf, mainCats, subsOf, savKeys, activeSav, setSav, withSav, goalSav, savGoals, savAll, syncSavConfs, cardMatch, applyCards, transferFlows, OWN_CAT, ownTransfer, applyOwnTransfers, ownConflicts, MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
 
 </script>
 <script>
@@ -2364,6 +2386,7 @@ if (typeof module !== "undefined") module.exports = { sniffCsv, headerSig, parse
     savConf(st); ensureGoalRefs(st);
     if (!st.splitRules) st.splitRules = [];
     if (!st.plans) st.plans = []; if (!st.ignoredRecurring) st.ignoredRecurring = []; if (!st.ignoredPrice) st.ignoredPrice = [];
+    syncCardAccounts(st);   // kredietkaarten = virtuele rekeningen (stap 8g)
     for (const t of st.transactions) if (t.account && !st.accounts[t.account]) st.accounts[t.account] = { type: "zicht", name: "" };
     for (const c of st.credits) {
       if (!c.keywords && c.entries) { const keys = [...new Set(c.entries.filter(e => e.txId).map(e => st.transactions.find(t => t.id === e.txId)).filter(Boolean).map(txRefKey))]; if (keys.length) c.keywords = keys.join(", "); }
@@ -2562,14 +2585,15 @@ if (typeof module !== "undefined") module.exports = { sniffCsv, headerSig, parse
       let sep = sn.sep, head = sn.head, rows = sn.rows;
       const first = () => rows[head] || [];
       const g0 = guessMap(first(), rows.slice(head + 1, head + 12));
-      const cfg = { name: knownBank || "", map: g0.map, twoCols: g0.twoCols, dateFmt: g0.dateFmt, fixedAccount: "" };
+      const cfg = { name: knownBank || "", map: g0.map, twoCols: g0.twoCols, dateFmt: g0.dateFmt, fixedAccount: "", target: "", flip: false }, cards = state.cards || [];
       const reread = () => { rows = csvLines(text).map(l => splitCsvLine(l, sep).map(v => v.trim())); };
       const colOpts = (sel, optional) => `${optional ? `<option value="-1"${sel < 0 ? " selected" : ""}>— ${optional} —</option>` : `<option value="-1"${sel < 0 ? " selected" : ""}>— kies een kolom —</option>`}` +
         first().map((hname, i) => { const ex = (rows.slice(head + 1).find(r => r[i]) || [])[i] || ""; return `<option value="${i}"${i === sel ? " selected" : ""}>${esc(hname || "kolom " + (i + 1))}${ex ? ` — bv. ${esc(ex.slice(0, 28))}` : ""}</option>`; }).join("");
-      const profile = () => ({ id: "bp" + Date.now().toString(36), name: cfg.name.trim(), sig: headerSig(first()), sep, head, map: cfg.map, twoCols: cfg.twoCols, dateFmt: cfg.dateFmt, fixedAccount: cfg.map.account < 0 ? cfg.fixedAccount.trim() : "", created: todayS() });
+      const profile = () => ({ id: "bp" + Date.now().toString(36), name: cfg.name.trim(), sig: headerSig(first()), sep, head, map: cfg.map, twoCols: cfg.twoCols, dateFmt: cfg.dateFmt, flip: cfg.flip, card: cfg.target || "",
+        fixedAccount: cfg.target ? "KAART-" + cfg.target : cfg.map.account < 0 ? cfg.fixedAccount.trim() : "", created: todayS() });
       const draw = () => {
         const m = cfg.map, pr = profile(), res = parseWithProfile(text, pr), total = res.rows.length + res.bad;
-        const missing = [!cfg.name.trim() && "de naam van je bank", m.date < 0 && "de datum", (cfg.twoCols ? m.amountIn < 0 || m.amountOut < 0 : m.amount < 0) && "het bedrag", !(m.desc || []).length && "de omschrijving", m.account < 0 && !cfg.fixedAccount.trim() && "je rekeningnummer"].filter(Boolean);
+        const missing = [!cfg.name.trim() && "de naam van je bank", m.date < 0 && "de datum", (cfg.twoCols ? m.amountIn < 0 || m.amountOut < 0 : m.amount < 0) && "het bedrag", !(m.desc || []).length && "de omschrijving", !cfg.target && m.account < 0 && !cfg.fixedAccount.trim() && "je rekeningnummer"].filter(Boolean);
         const status = missing.length ? `<span class="neg">Nog aan te duiden: ${missing.join(", ")}.</span>` : !res.rows.length ? `<span class="neg">Met deze keuzes herkent de app geen enkele transactie. Kijk de datum, de datumnotatie en het bedrag na.</span>`
           : `<span class="pos">✓ ${res.rows.length} transactie${res.rows.length === 1 ? "" : "s"} herkend</span>${res.bad ? ` <span class="muted">· ${res.bad} regel${res.bad === 1 ? "" : "s"} overgeslagen (geen geldige datum of bedrag, bv. een totaalregel)</span>` : ""}`;
         const sel = (k, optional) => `<select class="input" data-m="${k}">${colOpts(cfg.map[k], optional)}</select>`;
@@ -2582,16 +2606,18 @@ if (typeof module !== "undefined") module.exports = { sniffCsv, headerSig, parse
             <label class="map-inline">Scheidingsteken <select class="input" id="mp-sep">${[[";", "puntkomma ;"], [",", "komma ,"], ["\t", "tab"], ["|", "streep |"]].map(([v, n]) => `<option value="${esc(v)}"${v === sep ? " selected" : ""}>${n}</option>`).join("")}</select></label></div></div></div>
           <div class="map-step"><span class="map-n">3</span><div><b>Welke kolom is wat?</b><span class="map-hint">Kies bij elke vraag de juiste kolom. Achter elke kolom staat een voorbeeld uit je bestand. Velden met * zijn nodig.</span>
             <div class="map-grid">
+              <label>Dit bestand is van</label><div><select class="input" id="mp-target"><option value="">een bankrekening</option>${cards.map(k => `<option value="${esc(k.id)}"${cfg.target === k.id ? " selected" : ""}>💳 kredietkaart: ${esc(k.name)}</option>`).join("")}</select>${cards.length ? "" : `<span class="map-hint">Een kredietkaart? Voeg ze eerst toe in Profiel → Kredietkaarten; dan kan je ze hier kiezen.</span>`}</div>
               <label>Datum *</label><div class="map-row">${sel("date")}<select class="input" id="mp-fmt">${[["dmy", "dag/maand/jaar"], ["mdy", "maand/dag/jaar"], ["ymd", "jaar-maand-dag"]].map(([v, n]) => `<option value="${v}"${v === cfg.dateFmt ? " selected" : ""}>${n}</option>`).join("")}</select></div>
               <label>Bedrag *</label><div><div class="seg" role="group"><button type="button" data-two="0" aria-pressed="${!cfg.twoCols}">Eén kolom met + en −</button><button type="button" data-two="1" aria-pressed="${cfg.twoCols}">Twee kolommen (bij en af)</button></div>
-                <div class="map-row" style="margin-top:6px">${cfg.twoCols ? `<span class="map-sub">Bij (ontvangen)</span>${sel("amountIn")}<span class="map-sub">Af (betaald)</span>${sel("amountOut")}` : sel("amount")}</div></div>
+                <div class="map-row" style="margin-top:6px">${cfg.twoCols ? `<span class="map-sub">Bij (ontvangen)</span>${sel("amountIn")}<span class="map-sub">Af (betaald)</span>${sel("amountOut")}` : sel("amount")}</div>
+                <label class="fcheck" style="margin-top:8px"><input type="checkbox" id="mp-flip"${cfg.flip ? " checked" : ""}> Uitgaven staan als <b>positief</b> getal in dit bestand (tekens omdraaien) — vaak zo bij kredietkaarten</label></div>
               <label>Omschrijving *</label><div class="map-row">${descSel(0)}${descSel(1)}${descSel(2)}</div>
               <label>Naam tegenpartij</label><div>${sel("name", "niet in het bestand")}</div>
               <label>Rekening tegenpartij</label><div>${sel("cp", "niet in het bestand")}</div>
-              <label>Jouw rekeningnummer *</label><div class="map-row">${sel("account", "niet in het bestand, ik typ het")}${cfg.map.account < 0 ? `<input class="input" id="mp-acc" value="${esc(cfg.fixedAccount)}" placeholder="bv. BE12 3456 7890 1234" autocomplete="off">` : ""}</div>
+              ${cfg.target ? "" : `<label>Jouw rekeningnummer *</label><div class="map-row">${sel("account", "niet in het bestand, ik typ het")}${cfg.map.account < 0 ? `<input class="input" id="mp-acc" value="${esc(cfg.fixedAccount)}" placeholder="bv. BE12 3456 7890 1234" autocomplete="off">` : ""}</div>`}
               <label>Uniek nummer</label><div>${sel("ref", "niet in het bestand")}<span class="map-hint">Optioneel: een transactie- of volgnummer helpt om dubbels te vermijden als je hetzelfde bestand twee keer inleest.</span></div>
             </div></div></div>
-          <div class="map-step"><span class="map-n">4</span><div><b>Klopt dit?</b><span class="map-hint">Zo leest de app de eerste transacties. Uitgaven moeten negatief (rood) zijn, inkomsten positief.</span>
+          <div class="map-step"><span class="map-n">4</span><div><b>Klopt dit?</b><span class="map-hint">Zo leest de app de eerste transacties. Uitgaven moeten negatief zijn (met −), inkomsten en terugbetalingen positief.</span>
             <div class="table-wrap"><table class="map-prev"><thead><tr><th>Datum</th><th>Omschrijving</th><th class="r">Bedrag</th></tr></thead><tbody>${res.rows.slice(0, 6).map(r => `<tr><td class="num">${fmtDate(r.date)}</td><td>${esc(r.desc)}</td><td class="r num ${r.amount < 0 ? "neg" : "pos"}">${signed(r.amount)}</td></tr>`).join("") || `<tr class="empty-row"><td colspan="3">Nog geen transacties herkend.</td></tr>`}</tbody></table></div>
             <p class="map-status">${status}${total ? ` <span class="muted">(${total} regels in het bestand)</span>` : ""}</p></div></div>
           <div class="row"><button class="btn" id="mp-cancel" type="button">Annuleren</button><button class="btn primary" id="mp-ok" type="button"${missing.length || !res.rows.length ? " disabled" : ""}>Bankprofiel opslaan en importeren</button></div>`;
@@ -2607,6 +2633,10 @@ if (typeof module !== "undefined") module.exports = { sniffCsv, headerSig, parse
           if (t.id === "mp-head") { head = +t.value; const g = guessMap(first(), rows.slice(head + 1, head + 12)); Object.assign(cfg, { map: g.map, twoCols: g.twoCols, dateFmt: g.dateFmt }); }
           else if (t.id === "mp-sep") { sep = t.value; reread(); const g = guessMap(first(), rows.slice(head + 1, head + 12)); Object.assign(cfg, { map: g.map, twoCols: g.twoCols, dateFmt: g.dateFmt }); }
           else if (t.id === "mp-fmt") cfg.dateFmt = t.value;
+          else if (t.id === "mp-flip") cfg.flip = t.checked;
+          else if (t.id === "mp-target") { cfg.target = t.value; const k = cards.find(x => x.id === t.value);
+            if (k) { if (!cfg.name.trim()) cfg.name = k.name;   // kaartbestand: meestal staan aankopen als positief getal
+              const r = parseWithProfile(text, Object.assign(profile(), { flip: false })).rows; cfg.flip = r.length > 0 && r.filter(x => x.amount > 0).length / r.length > 0.6; } else cfg.flip = false; }
           else if (t.dataset.m === "desc") { const n = +t.dataset.n, l = (cfg.map.desc || []).slice(); l[n] = +t.value; cfg.map.desc = l.filter((v, i) => v >= 0 && l.indexOf(v) === i); }
           else if (t.dataset.m) cfg.map[t.dataset.m] = +t.value;
           else return;
@@ -2628,7 +2658,7 @@ if (typeof module !== "undefined") module.exports = { sniffCsv, headerSig, parse
       if (ing.bank === "ING") { parsed.push(ing); continue; }   // ING: zoals altijd
       // elke andere bank: een bewaard bankprofiel, of anders de koppeltool
       let prof = findProfile(state, text);
-      if (!prof) prof = await mapDialog(text, f.name, ing.bank);
+      if (!prof) { const sn = sniffCsv(text); prof = await mapDialog(text, f.name, guessBankName(sn.rows[sn.head] || [])); }
       if (!prof) { errors.push(f.name + ": niet ingelezen (koppelen geannuleerd)."); continue; }
       const r = parseWithProfile(text, prof);
       if (!r.rows.length) { errors.push(f.name + `: geen transacties gevonden met het bankprofiel “${prof.name}”.`); continue; }
@@ -3083,8 +3113,9 @@ if (typeof module !== "undefined") module.exports = { sniffCsv, headerSig, parse
     const rate = s.income > 0 ? Math.round(s.saved / s.income * 100) : null;
     const kpi = (label, value, color, sub) => `<div class="kpi" style="--k:${color}"><div class="label">${label}</div><div class="value num">${value}</div><div class="sub">${sub}</div></div>`;
     let h = `<div class="page-head"><div><h1>Overzicht</h1><p>${s.count} transacties in ${esc(monthName(ui.month))}</p></div><div class="actions"><button class="btn" data-act="close-open" type="button">📋 Maandafsluiting</button>${periodSeg()}${monthSwitch()}</div></div>${closeNotice()}${notices()}${priceNotice()}`;
-    const dense = zichtList(state).length >= 4;   // 8+ kaders op één lijn: compacter
-    h += `<section class="kpis${multiAcc() ? " acc-row" : ""}${dense ? " dense" : ""}">
+    const cardK = (state.cards || []).map(k => ({ k, o: cardOpen(state, k) })).filter(x => x.o);
+    const dense = zichtList(state).length + cardK.length >= 4;   // 8+ kaders op één lijn: compacter
+    h += `<section class="kpis${multiAcc() || cardK.length ? " acc-row" : ""}${dense ? " dense" : ""}">
       ${kpi("Inkomsten", `<span class="pos">${eur0(s.income)}</span>`, "var(--pos)", budget("Inkomen") ? "gepland " + eur0(budget("Inkomen")) : "&nbsp;")}
       ${kpi("Uitgaven", `<span class="neg">${eur0(s.expenses)}</span>`, "var(--neg)", bExp ? `${Math.round(s.expenses / bExp * 100)}% van budget ${eur0(bExp)}` : `vast ${eur0(s.fixed)} · variabel ${eur0(s.variable)}`)}
       ${(() => {
@@ -3100,6 +3131,8 @@ if (typeof module !== "undefined") module.exports = { sniffCsv, headerSig, parse
         const lbl = multiAcc() ? "Saldo alle rekeningen" : "Saldo op rekening";
         return b.set ? kpi(lbl, `<span class="${b.total >= 0 ? "gold" : "neg"}">${b.total < 0 ? "−" : ""}${fmt.format(Math.abs(b.total))}</span>`, b.total >= 0 ? "var(--gold)" : "var(--neg)", `op ${fmtDate(endOfMonth(ui.month))}${b.per.some(p => p.before) ? " · teruggerekend" : ""}`)
           : kpi(lbl, `<span class="muted">—</span>`, "var(--line)", `<button class="btn small" data-act="goto-balance" type="button">Startsaldo ingeven</button>`); })()}
+      ${cardK.map(({ k, o }) => kpi(`💳 ${esc(k.name)}`, `<span class="${o.open > 0 ? "neg" : "pos"}">${o.open > 0 ? "−" : ""}${(dense ? fmt0 : fmt).format(Math.abs(o.open))}</span>`, "var(--neg)",
+          `nog te betalen · ${o.count} aankop${o.count === 1 ? "" : "en"}${o.since ? ` sinds ${fmtDate(o.since).slice(0, 5)}` : ""}${o.next ? ` · afrekening ±${fmtDate(o.next).slice(0, 5)}` : ""} · <button class="linkbtn" data-act="acc-open" data-acc="${esc(cardKey(k))}" type="button">aankopen</button>`)).join("")}
     </section>`;
     const uncatHtml = s.uncatCount ? uncatCard(ui.month) : "";
     h += goalsWide();
@@ -3340,6 +3373,7 @@ if (typeof module !== "undefined") module.exports = { sniffCsv, headerSig, parse
     for (const l of state.loans || []) { const st = loanStatus(state, l); if (!st.ok) continue; const pts = st.schedule.filter(p => p.ym <= ym); loans += pts.length ? pts[pts.length - 1].balance : st.schedule[0].balance; }
     let credits = 0;
     for (const c of state.credits || []) { const st = creditStatus(state, c); if (!st.ok) continue; const pts = st.timeline.filter(p => p.date <= end); credits += pts.length ? pts[pts.length - 1].used : st.timeline[0].used; }
+    for (const k of state.cards || []) { const o = cardOpen(state, k, end); if (o) credits += o.open; }   // nog te betalen op kredietkaarten
     return { zicht, spaar, loans, credits, total: Math.round((zicht + spaar - loans - credits) * 100) / 100 };
   }
   function netWorthBody() {
@@ -3357,7 +3391,7 @@ if (typeof module !== "undefined") module.exports = { sniffCsv, headerSig, parse
     series.forEach((p, i) => g += `<rect x="${x(i) - iw / 26}" y="${T}" width="${iw / 13}" height="${ih}" fill="transparent" data-tip="${esc(`<b>${i === series.length - 1 ? "Vandaag" : monthName(p.date.slice(0, 7))}</b><br>Vermogen: ${eur(p.v)}`)}"/>`);
     g += `<text x="${L}" y="${H - 4}">${monthShort(months[0].slice(0, 7))}</text><text x="${W - R}" y="${H - 4}" text-anchor="end">nu</text>`;
     return `<div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap"><span class="gw-amt num" style="margin:0;color:${col};text-shadow:0 0 12px ${col}">${now.total < 0 ? "−" : ""}${eur0(Math.abs(now.total))}</span><span class="num ${delta >= 0 ? "pos" : "neg"}">${delta >= 0 ? "▲ +" : "▼ −"}${eur0(Math.abs(delta))}</span><span class="muted" style="font-size:12.5px">t.o.v. 12 maanden geleden</span></div>
-      <div class="pl-sum" style="margin:6px 0 4px"><span>Rekening <b class="${now.zicht < 0 ? "neg" : ""}">${eur0(now.zicht)}</b></span><span>Spaar <b class="gold">${eur0(now.spaar)}</b></span><span>Leningen <b class="neg">−${eur0(now.loans)}</b></span><span>Kredieten <b class="neg">−${eur0(now.credits)}</b></span></div>
+      <div class="pl-sum" style="margin:6px 0 4px"><span>Rekening <b class="${now.zicht < 0 ? "neg" : ""}">${eur0(now.zicht)}</b></span><span>Spaar <b class="gold">${eur0(now.spaar)}</b></span><span>Leningen <b class="neg">−${eur0(now.loans)}</b></span><span>Kredieten${(state.cards || []).length ? " + kaarten" : ""} <b class="neg">−${eur0(now.credits)}</b></span></div>
       <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Vermogen over 12 maanden">${g}</svg>
       <div class="legend"><span class="muted">Rekening + spaar − leningen − kredieten · laatste 12 maanden</span></div>`;
   }
@@ -4643,7 +4677,7 @@ if (typeof module !== "undefined") module.exports = { sniffCsv, headerSig, parse
      Alle uitleg op één plaats. Komt er een knop of scherm bij: hier (en later in de tutorialballonnen) mee bijwerken. */
   const HELP_TOPICS = [
     { id: "start", show: [null, ["overzicht", "#btn-import"], null, ["profiel", "#pf-zicht"], ["regels", '[data-act="rules-analyze"]'], ["budget", '[data-act="cat-budget"]']], icon: "🚀", title: "De eerste keer starten", tab: "profiel", steps: [
-      "Download in je bankapp (Home'Bank of de ING-app, of Belfius Direct Net) je transacties als <b>CSV-bestand</b>.",
+      "Download in je bankapp je transacties als <b>CSV-bestand</b> (bij ING: Home'Bank of de ING-app).",
       "Klik bovenaan op <b>↑ CSV importeren</b> en kies het bestand, of sleep het in het venster.",
       "Nieuw rekeningnummer? Geef de rekening een naam en kies <b>zichtrekening</b> of <b>spaarrekening</b>.",
       "Ga naar <b>Profiel</b> en vul bij elke zichtrekening een <b>startsaldo</b> in: het saldo van vandaag uit je bankapp mag (zie hieronder).",
@@ -4660,6 +4694,11 @@ if (typeof module !== "undefined") module.exports = { sniffCsv, headerSig, parse
       "Volg de 4 stappen in de koppeltool: <b>1</b> naam van je bank · <b>2</b> de regel met de kolomnamen · <b>3</b> welke kolom de datum, het bedrag, de omschrijving en je rekeningnummer is · <b>4</b> controleer het voorbeeld (uitgaven negatief, inkomsten positief).",
       "Klik op <b>Bankprofiel opslaan en importeren</b>. Volgende bestanden van dezelfde bank leest de app daarna vanzelf in.",
       "Je bankprofielen staan in <b>Profiel → Bankprofielen</b>. Verwijder je er een, dan vraagt de app bij het volgende bestand opnieuw de kolommen." ] },
+    { id: "kaart", icon: "💳", show: [["profiel", '[data-act="card-add"]'], ["", "#btn-import"], ["profiel", '[data-act="card-buy"]'], ["overzicht", '[data-act="acc-open"]']], title: "Een kredietkaart opvolgen", tab: "profiel", steps: [
+      "Ga naar <b>Profiel → Kredietkaarten</b> → <b>+ Kredietkaart toevoegen</b>. Geef een naam en het woord waaraan de maandelijkse afrekening herkend wordt (bv. VISA). Elke kaart wordt een <b>virtuele rekening</b>.",
+      "Heb je een afschrift als CSV? Lees het in met <b>↑ CSV importeren</b>. Kies in de koppeltool bij <b>Dit bestand is van</b> je kaart; staan aankopen als positief getal, vink dan <b>tekens omdraaien</b> aan.",
+      "Geen bestand? Voeg aankopen zelf toe met <b>+ Aankoop</b> bij de kaart.",
+      "Aankopen tellen in je budget op de <b>dag van de aankoop</b>. De afrekening op je zichtrekening wordt dan vanzelf een verplaatsing (⇄), zodat niets dubbel telt. Op het <b>Overzicht</b> zie je per kaart wat er <b>nog te betalen</b> is." ] },
     { id: "saldo", show: [["profiel", "#pf-zicht"], ["profiel", '[data-act="bal-date"]'], ["profiel", '[data-act="bal-amount"]'], null, null], icon: "€", title: "Startsaldo instellen (mag ook het saldo van vandaag zijn)", tab: "profiel", steps: [
       "Ga naar <b>Profiel</b> → <b>Zichtrekeningen</b>. Elke zichtrekening heeft één startsaldo nodig.",
       "Het eenvoudigst: neem het <b>saldo van vandaag</b> uit je bankapp en kies bij <b>Startsaldo op</b> de datum van je <b>laatst ingelezen transactie</b> (of vandaag, als je CSV tot vandaag loopt).",
@@ -4776,7 +4815,7 @@ if (typeof module !== "undefined") module.exports = { sniffCsv, headerSig, parse
      Aan = ballon met uitleg bij muis-over (enkel pc); op vraag van Benny geen ?-bolletjes (te druk). Keuze per toestel.
      TUT: sel = CSS-selector, t = titel, x = uitleg, topic = id uit HELP_TOPICS (stappenplan in de ballon met steps: true). */
   const TUT = [
-    { sel: '#btn-import, [data-act="pick-csv"]', t: "CSV importeren", x: "Lees de transacties van je bank in (ING of Belfius). Je kan ook een bestand in het venster slepen.", topic: "csv", steps: true },
+    { sel: '#btn-import, [data-act="pick-csv"]', t: "CSV importeren", x: "Lees de transacties van je bank in. ING wordt vanzelf herkend; voor een andere bank vraagt de app één keer welke kolom wat is. Je kan ook een bestand in het venster slepen.", topic: "csv", steps: true },
     { sel: "#btn-profile", t: "Profiel", x: "Je rekeningen, startsaldo's, kredietkaarten en alle instellingen: thema, back-up, OneDrive, pincode, tutorial…" },
     { sel: "#btn-install", t: "Installeren", x: "Zet de planner als programma op je pc of gsm. Je gegevens blijven op je toestel.", topic: "install" },
     { sel: '[data-act="close-open"]', t: "Maandafsluiting", x: "Een samenvatting van de maand: in en uit tegenover je gemiddelde, grootste uitgaven, wat opviel en hoeveel je spaarde.", topic: "afsluiting" },
@@ -4845,6 +4884,8 @@ if (typeof module !== "undefined") module.exports = { sniffCsv, headerSig, parse
     { sel: '[data-act="acc-warn"]', t: "Waarschuwen onder", x: "Komt de saldoverwachting onder dit bedrag, dan krijg je een waarschuwing." },
     { sel: '[data-act="bp-del"]', t: "Bankprofiel verwijderen", x: "Verwijdert de koppeling van deze bank. Je transacties blijven staan; bij het volgende bestand van die bank vraagt de app opnieuw welke kolom wat is." },
     { sel: "#pf-banks h2", t: "Bankprofielen", x: "Voor elke bank buiten ING onthoudt de app welke kolom wat is. Je maakt een profiel door gewoon een CSV van die bank te importeren.", topic: "bank" },
+    { sel: '[data-act="card-buy"]', t: "Aankoop met de kaart", x: "Voeg zelf een aankoop toe op de virtuele rekening van deze kaart. Ze telt in je budget op de dag van de aankoop.", topic: "kaart" },
+    { sel: '#mp-target', t: "Dit bestand is van", x: "Kies je kredietkaart als dit een kaartafschrift is: de aankopen komen dan op de virtuele rekening van die kaart." },
     { sel: '[data-act="card-add"]', t: "Kredietkaart", x: "Zolang de losse aankopen niet ingelezen worden, telt de maandelijkse afrekening als uitgave in de categorie van de kaart." },
     { sel: '[data-act="theme-open"]', t: "Thema", x: "Cyberpunk, Synthwave, Matrix of Oceaan, telkens donker of licht. Per toestel." },
     { sel: '[data-act="folder-open"]', t: "OneDrive-back-up", x: "Automatisch een back-up en gsm-samenvatting in je OneDrive-map.", topic: "onedrive", steps: true },
@@ -4942,7 +4983,7 @@ if (typeof module !== "undefined") module.exports = { sniffCsv, headerSig, parse
     const l = state.bankProfiles || [];
     return `<section class="card" id="pf-banks"><div class="card-head"><h2>Bankprofielen</h2><span class="hint">Voor banken buiten ING. Een nieuw profiel maak je door gewoon een CSV van die bank te importeren: de app vraagt dan één keer welke kolom wat is.</span></div>
       ${l.length ? `<div class="table-wrap"><table><thead><tr><th>Bank</th><th>Gekoppelde kolommen</th><th>Aangemaakt</th><th></th></tr></thead><tbody>${l.map(p => { const m = p.map, n = [m.date, p.twoCols ? m.amountIn : m.amount, p.twoCols ? m.amountOut : -1, m.name, m.cp, m.account, m.ref].filter(i => i >= 0).length + (m.desc || []).length;
-        return `<tr data-bp="${esc(p.id)}"><td><b>${esc(p.name)}</b></td><td class="muted">${n} kolommen${p.fixedAccount ? ` · rekening ${esc(p.fixedAccount)}` : ""}</td><td class="muted num">${p.created ? fmtDate(p.created) : "—"}</td><td class="r"><button class="btn small ghost" data-act="bp-del" type="button" title="Bankprofiel verwijderen" aria-label="Bankprofiel verwijderen">✕</button></td></tr>`; }).join("")}</tbody></table></div>`
+        return `<tr data-bp="${esc(p.id)}"><td><b>${esc(p.name)}</b></td><td class="muted">${n} kolommen${p.card ? ` · 💳 ${esc(((state.cards || []).find(k => k.id === p.card) || { name: "kaart" }).name)}` : p.fixedAccount ? ` · rekening ${esc(p.fixedAccount)}` : ""}${p.flip ? " · tekens omgedraaid" : ""}</td><td class="muted num">${p.created ? fmtDate(p.created) : "—"}</td><td class="r"><button class="btn small ghost" data-act="bp-del" type="button" title="Bankprofiel verwijderen" aria-label="Bankprofiel verwijderen">✕</button></td></tr>`; }).join("")}</tbody></table></div>`
       : `<p class="muted" style="margin:0">Nog geen bankprofielen. ING wordt altijd vanzelf herkend.</p>`}</section>`;
   }
   function viewProfileReal() {
@@ -4981,17 +5022,18 @@ if (typeof module !== "undefined") module.exports = { sniffCsv, headerSig, parse
     h += `</tbody></table></div><div style="margin-top:12px"><button class="btn" data-act="acc-add" data-type="spaar" type="button">+ Spaarrekening toevoegen</button></div></section>`;
     const cards = state.cards || [];
     h += bankProfilesCard();
-    h += `<section class="card" id="pf-cards"><div class="card-head"><h2>Kredietkaarten</h2><span class="hint">Bv. een Visa die maandelijks in één keer van je zichtrekening gaat. De afrekening telt als uitgave in de categorie van de kaart; verdeel ze met ⑂ Splitsen over categorieën.</span></div>
-      <div class="table-wrap"><table><thead><tr><th>Naam</th><th>Herkennen aan</th><th>Categorie</th><th class="r">Afrekeningen</th><th class="r">Laatste</th><th></th></tr></thead><tbody>`;
+    h += `<section class="card" id="pf-cards"><div class="card-head"><h2>Kredietkaarten</h2><span class="hint">Bv. een Visa die maandelijks in één keer van je zichtrekening gaat. Elke kaart is een <b>virtuele rekening</b>: lees de losse aankopen in (CSV via de koppeltool) of voeg ze zelf toe. Zonder aankopen telt de afrekening als uitgave in de categorie van de kaart.</span></div>
+      <div class="table-wrap"><table><thead><tr><th>Naam</th><th>Herkennen aan</th><th>Categorie</th><th class="r">Afrekeningen</th><th class="r">Laatste</th><th class="r">Nog te betalen</th><th></th></tr></thead><tbody>`;
     for (const k of cards) {
       const hits = budgetTx(state).filter(t => cardMatch(state, t) === k), last = hits[0];
       h += `<tr data-card="${esc(k.id)}"><td><input class="cell wide" data-act="card-name" value="${esc(k.name)}" aria-label="Naam van de kaart"></td>
         <td><input class="cell" data-act="card-kw" value="${esc(k.keyword)}" aria-label="Herkennen aan"></td>
         <td><select class="cat" data-act="card-cat" aria-label="Categorie">${catOptions(k.cat || UNCAT)}</select></td>
         <td class="r num muted">${hits.length}</td><td class="r num">${last ? `${eur(Math.abs(last.amount))} <span class="muted">${fmtDate(last.date)}</span>` : `<span class="muted">—</span>`}</td>
-        <td class="r"><button class="btn small ghost" data-act="card-del" type="button" title="Verwijderen" aria-label="Kaart verwijderen">✕</button></td></tr>`;
+        <td class="r num">${(() => { const o = cardOpen(state, k); return o ? `<b class="neg">${eur(o.open)}</b> <span class="muted">${o.count} aankop${o.count === 1 ? "" : "en"}</span>` : `<span class="muted">geen aankopen</span>`; })()}</td>
+        <td class="r" style="white-space:nowrap"><button class="btn small" data-act="card-buy" type="button" title="Aankoop met deze kaart zelf toevoegen">+ Aankoop</button><button class="btn small ghost" data-act="card-del" type="button" title="Verwijderen" aria-label="Kaart verwijderen">✕</button></td></tr>`;
     }
-    if (!cards.length) h += `<tr class="empty-row"><td colspan="6">Nog geen kredietkaarten. Een debetkaart (zoals Bancontact of Mastercard in je zichtrekening) hoef je hier niet toe te voegen.</td></tr>`;
+    if (!cards.length) h += `<tr class="empty-row"><td colspan="7">Nog geen kredietkaarten. Een debetkaart (zoals Bancontact of Mastercard in je zichtrekening) hoef je hier niet toe te voegen.</td></tr>`;
     h += `</tbody></table></div><div style="margin-top:12px"><button class="btn" data-act="card-add" type="button">+ Kredietkaart toevoegen</button></div></section>`;
     const items = [["theme-open", "🎨", "Thema", "Cyberpunk, Synthwave, Matrix of Oceaan · donker of licht"], ["folder-open", "☁", "OneDrive-back-up", "Automatisch een kopie + gsm-samenvatting"],
       ["export-json", "↓", "Back-up exporteren", "Alles in één .json-bestand"], ["import-json", "↑", "Back-up terugzetten", "Een eerder geëxporteerd bestand laden"],
@@ -5022,9 +5064,10 @@ if (typeof module !== "undefined") module.exports = { sniffCsv, headerSig, parse
   const multiAcc = () => zichtList(state).length >= 2;
   const sameAcc = (a, b) => normIban(a) === normIban(b);
   function accPicker() {
-    if (!multiAcc()) return "";
-    const z = zichtList(state); if (ui.acc && !z.some(a => sameAcc(a, ui.acc))) ui.acc = "";
-    return `<div class="acc-pick" role="group" aria-label="Rekening"><button type="button" data-act="acc-pick" data-acc="" aria-pressed="${!ui.acc}">Alle rekeningen</button>${z.map(a => `<button type="button" data-act="acc-pick" data-acc="${esc(a)}" aria-pressed="${sameAcc(ui.acc, a)}" style="--c:${accColor(a)}"><i></i>${esc(accName(state, a))}</button>`).join("")}</div>`;
+    const cards = (state.cards || []).map(cardKey).filter(key => state.transactions.some(t => t.account === key));
+    if (!multiAcc() && !cards.length) return "";
+    const z = [...zichtList(state), ...cards]; if (ui.acc && !z.some(a => sameAcc(a, ui.acc))) ui.acc = "";
+    return `<div class="acc-pick" role="group" aria-label="Rekening"><button type="button" data-act="acc-pick" data-acc="" aria-pressed="${!ui.acc}">Alle rekeningen</button>${z.map(a => `<button type="button" data-act="acc-pick" data-acc="${esc(a)}" aria-pressed="${sameAcc(ui.acc, a)}" style="--c:${accColor(a)}"><i></i>${isCardAcc(state, a) ? "💳 " : ""}${esc(accName(state, a))}</button>`).join("")}</div>`;
   }
   function accDot(t) { return multiAcc() && !ui.acc && t.account ? `<i class="acc-mini" style="--c:${accColor(accKey(state, t.account))}" title="${esc(accName(state, t.account))}"></i>` : ""; }
   // per rekening: saldo op het einde van de maand + wat er deze maand in/uit ging
@@ -5186,10 +5229,12 @@ if (typeof module !== "undefined") module.exports = { sniffCsv, headerSig, parse
         toast(on ? (tutActive() ? "Tutorial aan: ga met je muis over een knop" : "Tutorial aan. De ballonnen werken op een toestel met muis.") : "Tutorial uit. Alle uitleg staat in het tabblad Help."); break; }
       case "acc-add": accAddDialog(el.dataset.type); break;
       case "card-add": cardAddDialog(); break;
+      case "card-buy": { const k = (state.cards || []).find(x => x.id === el.closest("tr").dataset.card); if (k) addTxDialog(cardKey(k)); break; }
       case "bp-del": { const id = el.closest("tr").dataset.bp, bp = (state.bankProfiles || []).find(x => x.id === id); if (!bp) break;
         confirmDel("Bankprofiel verwijderen?", `“${bp.name}” wordt verwijderd. Je ingelezen transacties blijven staan. Lees je later een bestand van deze bank in, dan vraagt de app opnieuw welke kolom wat is.`, "Verwijderen", "Bankprofiel verwijderd", () => { state.bankProfiles = state.bankProfiles.filter(x => x !== bp); save(); render(); }); break; }
       case "card-del": { const id = el.closest("tr").dataset.card, k = (state.cards || []).find(x => x.id === id);
-        confirmDel("Kredietkaart verwijderen?", `${k ? k.name : "De kaart"} wordt uit je lijst verwijderd. Je transacties en hun categorie blijven staan.`, "Verwijderen", "Kredietkaart verwijderd", () => { state.cards = state.cards.filter(x => x.id !== id); save(); render(); }); break; }
+        const nTx = k ? cardTx(state, k).length : 0;
+        confirmDel("Kredietkaart verwijderen?", `${k ? k.name : "De kaart"} wordt uit je lijst verwijderd.${nTx ? ` Ook de ${nTx} aankopen op deze kaart worden verwijderd.` : ""} De afrekeningen op je zichtrekening blijven staan.`, "Verwijderen", "Kredietkaart verwijderd", () => { if (k) state.transactions = state.transactions.filter(t => t.account !== cardKey(k)); state.cards = state.cards.filter(x => x.id !== id); applyCards(state); save(); render(); }); break; }
       case "chart-view": setChartPref({ view: el.dataset.v }); render(); break;
       case "chart-acc": { const h = new Set(chartPref().hide || ["*"]), k = el.dataset.acc; h.has(k) ? h.delete(k) : h.add(k); setChartPref({ hide: [...h] }); render(); break; }
       case "chart-catmode": setChartPref({ catMode: el.dataset.v }); render(); break;
@@ -5403,9 +5448,10 @@ if (typeof module !== "undefined") module.exports = { sniffCsv, headerSig, parse
       });
     });
   }
-  function addTxDialog() {
-    const today = new Date().toISOString().slice(0, 10);
-    dialog(`<h3>Transactie toevoegen</h3><p>Bijvoorbeeld een cashbetaling. Uitgaven geef je in als negatief bedrag.</p>
+  function addTxDialog(preAcc) {
+    const today = new Date().toISOString().slice(0, 10), accs = [...zichtList(state), ...(state.cards || []).map(cardKey)];
+    dialog(`<h3>${preAcc ? "Aankoop met de kredietkaart" : "Transactie toevoegen"}</h3><p>${preAcc ? "Een aankoop of terugbetaling op de kaart. Ze telt in je budget op de dag van de aankoop." : "Bijvoorbeeld een cashbetaling."} Uitgaven geef je in als negatief bedrag.</p>
+      ${accs.length > 1 || preAcc ? `<label for="a-acc">Rekening</label><select class="input" id="a-acc">${accs.map(a => `<option value="${esc(a)}"${a === (preAcc || ui.acc || accs[0]) ? " selected" : ""}>${isCardAcc(state, a) ? "💳 " : ""}${esc(accName(state, a))}</option>`).join("")}</select>` : ""}
       <label for="a-date">Datum</label><input class="input" type="date" id="a-date" value="${today}">
       <label for="a-desc">Omschrijving</label><input class="input" id="a-desc">
       <label for="a-amt">Bedrag (bv. -12,50)</label><input class="input" id="a-amt" inputmode="decimal">
@@ -5416,8 +5462,9 @@ if (typeof module !== "undefined") module.exports = { sniffCsv, headerSig, parse
       d.querySelector("#a-ok").addEventListener("click", () => {
         const date = d.querySelector("#a-date").value, desc = d.querySelector("#a-desc").value.trim(), amt = num(d.querySelector("#a-amt").value);
         if (!date || !desc || amt === null) { d.querySelector("#a-err").textContent = "Vul datum, omschrijving en bedrag in."; return; }
-        state.transactions.push({ id: "m" + Date.now().toString(36), date, desc, cat: d.querySelector("#a-cat").value, amount: Math.round(amt * 100) / 100, account: "", omzet: "", counterparty: "", raw: "", search: desc });
-        sortTx(state); save(); d.close(); ui.month = date.slice(0, 7); render(); toast("Transactie toegevoegd");
+        const ac = d.querySelector("#a-acc"), account = ac ? ac.value : "";
+        state.transactions.push({ id: "m" + Date.now().toString(36), date, desc, cat: d.querySelector("#a-cat").value, amount: Math.round(amt * 100) / 100, account, omzet: "", counterparty: "", raw: "", search: desc });
+        sortTx(state); applyCards(state); save(); d.close(); ui.month = date.slice(0, 7); render(); toast(isCardAcc(state, account) ? "Aankoop op de kaart toegevoegd" : "Transactie toegevoegd");
       });
     });
   }
