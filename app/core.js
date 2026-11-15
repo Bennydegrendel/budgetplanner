@@ -356,6 +356,7 @@ function accName(state, acc) { const a = state.accounts && state.accounts[accKey
    maar een verplaatsing. Geeft de sleutel van die andere rekening terug, of null. */
 const OWN_CAT = "Eigen rekeningen";
 function ownTransfer(state, t) {
+  if (t && t.amount < 0 && (state.cards || []).length && !isCardAcc(state, t.account)) { const k = cardMatch(state, t); if (k && cardSettleMoves(state, k, t)) return cardKey(k); }
   if (!t || !t.counterparty || !t.account) return null;
   const cp = normIban(t.counterparty); if (!cp || cp === normIban(t.account)) return null;
   return zichtList(state).find(k => normIban(k) === cp) || null;
@@ -381,9 +382,39 @@ function cardMatch(state, t) {
   return (state.cards || []).find(k => k.keyword && x.includes(k.keyword.toLowerCase())) || null;
 }
 function applyCards(state) {
-  let n = 0;
-  for (const t of budgetTx(state)) if (t.cat === UNCAT && !(t.splits && t.splits.length)) { const k = cardMatch(state, t); if (k && k.cat) { t.cat = k.cat; n++; } }
+  let n = 0; syncCardAccounts(state);
+  for (const t of budgetTx(state)) {
+    if (t.splits && t.splits.length) continue;
+    const k = cardMatch(state, t); if (!k) continue;
+    if (cardSettleMoves(state, k, t)) {   // losse aankopen ingelezen → de afrekening is een verplaatsing zicht → kaart
+      if (t.cat === UNCAT || t.cat === k.cat) { if (!state.categories.some(x => x.name === OWN_CAT)) state.categories.push({ name: OWN_CAT, type: "Overboeking", budget: null }); t.cat = OWN_CAT; n++; }
+    } else if (t.cat === UNCAT || (t.cat === OWN_CAT && k.cat)) { if (k.cat) { t.cat = k.cat; n++; } }
+  }
   return n;
+}
+/* ---------- kredietkaart als virtuele rekening (stap 8g) ----------
+   Elke kaart heeft een eigen rekening "KAART-<id>" (type "kaart"). Aankopen daarop (ingelezen via de koppeltool of
+   manueel) tellen als uitgave op de dag van de aankoop. Zodra er aankopen zijn in de 40 dagen vóór een afrekening,
+   is die afrekening op de zichtrekening een verplaatsing (anders telt alles dubbel). */
+const cardKey = k => "KAART-" + k.id;
+function syncCardAccounts(state) {
+  state.accounts = state.accounts || {};
+  for (const k of state.cards || []) { const key = cardKey(k), a = state.accounts[key]; if (!a) state.accounts[key] = { type: "kaart", name: k.name, card: k.id }; else { a.type = "kaart"; a.name = k.name; a.card = k.id; } }
+  for (const key of Object.keys(state.accounts)) if (state.accounts[key].type === "kaart" && !(state.cards || []).some(k => cardKey(k) === key)) delete state.accounts[key];
+}
+const isCardAcc = (state, acc) => !!(acc && state.accounts && state.accounts[acc] && state.accounts[acc].type === "kaart");
+function cardTx(state, k) { const key = cardKey(k); return state.transactions.filter(t => t.account === key); }
+function cardSettleMoves(state, k, t) {
+  const from = addD0(t.date, -40);
+  return state.transactions.some(x => x.account === cardKey(k) && x.date >= from && x.date <= t.date);
+}
+// wat er nog op de kaart staat: aankopen (min terugbetalingen) sinds de laatste afrekening, tot "end"
+function cardOpen(state, k, end) {
+  end = end || ds(new Date()); const tx = cardTx(state, k); if (!tx.length) return null;
+  const settles = budgetTx(state).filter(t => t.date <= end && cardMatch(state, t) === k).map(t => t.date).sort();
+  const last = settles.length ? settles[settles.length - 1] : "";
+  const open = tx.filter(t => t.date > last && t.date <= end), amt = -open.reduce((a, t) => a + t.amount, 0);
+  return { open: Math.round(amt * 100) / 100, count: open.length, since: last, next: last ? stepDate(last, "month", 1) : null };
 }
 /* Stromen tussen eigen zichtrekeningen in een maand: [{from, to, total, count}] (stap 8c-2).
    Telt de uitgaande kant; een inkomende enkel als de verzendende rekening die maand niet ingelezen is. */
@@ -1086,7 +1117,7 @@ function demoState(todayStr) {
     ["ethias", "Verzekering"], ["netflix", "Abonnementen"], ["spotify", "Abonnementen"], ["game pass", "Abonnementen"], ["discord", "Abonnementen"],
     ["colruyt", "Boodschappen"], ["delhaize", "Boodschappen"], ["steam", "Games"], ["playstation", "Games"], ["nintendo", "Games"],
     ["deliveroo", "Eten & drinken"], ["takeaway", "Eten & drinken"], ["zooplus", "Kat Pixel"], ["dierenarts", "Kat Pixel"], ["zalando", "Kleding & cosplay"], ["cosplay", "Kleding & cosplay"], ["anime figures", "Kleding & cosplay"], ["basic-fit", "Sport"],
-    ["nmbs", "Uitstapjes"], ["kinepolis", "Uitstapjes"], ["facts", "Uitstapjes"], ["coolblue", "Hardware"], ["alternate", "Hardware"]].map(([keyword, cat]) => ({ keyword, cat }));
+    ["nmbs", "Uitstapjes"], ["kinepolis", "Uitstapjes"], ["facts", "Uitstapjes"], ["coolblue", "Hardware"], ["alternate", "Hardware"], ["visa afrekening", "Uitstapjes"]].map(([keyword, cat]) => ({ keyword, cat }));
   const end = today.slice(0, 7), start = addMonths(end, -23), first = start + "-01";
   st.goals = [{ name: "Gaming-pc", target: 4500, start: 0, deadline: addMonths(end, 4) + "-01" }, { name: "Japan-reis", target: 9000, start: 0, deadline: addMonths(end, 14) + "-01" }, { name: "Noodfonds", target: 8000, start: 0, deadline: "" }];
   ensureGoalRefs(st);
@@ -1119,6 +1150,7 @@ function demoState(todayStr) {
     if (i === 8) tx(d(18), -649, "COOLBLUE · grafische kaart");
     if (i === 19) tx(d(12), -119, "ALTERNATE · gaming headset");
     if (i === 14) tx(d(9), -85, "DIERENARTS DE POOT · Pixel");
+    tx(d(5), -between(60, 180), "Domiciliëring VISA afrekening");   // kredietkaart: één afrekening per maand
     // sparen: elke maand naar de spaarrekening, met de referentie van een doel
     const g = st.goals[i % 3];
     tx(d(26), -(g.name === "Noodfonds" ? 400 : 500), `Naar Spaarrekening ${g.ref}`, SPAAR, { goal: g.name, savChecked: true });
@@ -1140,6 +1172,7 @@ function demoState(todayStr) {
     { id: "demo2", title: "Verjaardag Milan (cadeau)", amount: 40, kind: "uitgave", date: addD0(today, 6), repeat: "none", account: ZICHT, cat: "Uitstapjes", remind: 3 },
     { id: "demo3", title: "Nieuwe controller", amount: 70, kind: "uitgave", date: addD0(today, 30), repeat: "none", account: ZICHT, cat: "Games", remind: 3 },
   ];
+  st.cards = [{ id: "demovisa", name: "Visa", keyword: "visa afrekening", cat: "Uitstapjes" }];
   st.rolloverFrom = addMonths(end, -5);
   st.lastBackup = today + "T08:00:00.000Z";
   // enkel echte prijsstijgingen tonen (huur, Netflix, Game Pass), niet de wisselende winkelbedragen
@@ -1218,6 +1251,7 @@ function parseWithProfile(text, pr) {
     if (pr.twoCols) { const a = parseAnyAmount(g(r, m.amountIn)), b = parseAnyAmount(g(r, m.amountOut)); if (a !== null || b !== null) amount = Math.round(((a || 0) - Math.abs(b || 0)) * 100) / 100; }
     else amount = parseAnyAmount(g(r, m.amount));
     if (!date || amount === null) { bad++; continue; }
+    if (pr.flip) amount = -amount;   // bv. kredietkaarten: aankopen staan als positief getal
     const name = g(r, m.name), descs = (m.desc || []).map(i => g(r, i)).filter(Boolean), cp = g(r, m.cp);
     // leesbaar zoals bij ING: "Naar/Van naam · mededeling", of de winkelnaam uit een kaartbetaling
     const desc = (niceDesc(name, descs[0] || "", descs.slice(1).join(" "), amount) || "(geen omschrijving)").slice(0, 200);
@@ -1235,4 +1269,4 @@ function findProfile(state, text) {
   return null;
 }
 
-if (typeof module !== "undefined") module.exports = { guessBankName, sniffCsv, headerSig, parseDateFmt, parseAnyAmount, guessMap, parseWithProfile, findProfile, csvLines, demoState, filterTx, filterActive, parseAmt, subscriptions, PER_YEAR, monthClose, niceDesc, catByName, parentOf, groupOf, mainCats, subsOf, savKeys, activeSav, setSav, withSav, goalSav, savGoals, savAll, syncSavConfs, cardMatch, applyCards, transferFlows, OWN_CAT, ownTransfer, applyOwnTransfers, ownConflicts, MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
+if (typeof module !== "undefined") module.exports = { cardKey, syncCardAccounts, isCardAcc, cardTx, cardSettleMoves, cardOpen, guessBankName, sniffCsv, headerSig, parseDateFmt, parseAnyAmount, guessMap, parseWithProfile, findProfile, csvLines, demoState, filterTx, filterActive, parseAmt, subscriptions, PER_YEAR, monthClose, niceDesc, catByName, parentOf, groupOf, mainCats, subsOf, savKeys, activeSav, setSav, withSav, goalSav, savGoals, savAll, syncSavConfs, cardMatch, applyCards, transferFlows, OWN_CAT, ownTransfer, applyOwnTransfers, ownConflicts, MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
