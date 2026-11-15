@@ -3687,7 +3687,7 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
      Loopt het tekenen van een scherm mis, dan nooit een leeg scherm: een melding met uitwegen. De gegevens zelf worden niet aangeraakt.
      Test: sessionStorage "budgetplanner.v1.testfout" = naam van een tabblad → dat tabblad gooit bewust een fout (enkel voor de tests). */
   function render() {
-    try { renderInner(); }
+    try { memoRun(renderInner); }
     catch (e) {
       console.error(e);
       try { document.body.classList.remove("lite", "eye-off"); } catch (x) {}

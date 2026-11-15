@@ -730,26 +730,34 @@ function makeRef(name, taken) {
   return ref;
 }
 function ensureGoalRefs(state) { const taken = new Set(state.goals.map(g => g.ref).filter(Boolean)); for (const g of state.goals) if (!g.ref) { g.ref = makeRef(g.name, taken); taken.add(g.ref); } }
-function txText(t) { return ((t.search || "") + " " + (t.raw || "") + " " + (t.desc || "")).toUpperCase(); }
+// tekst van een transactie in hoofdletters; onthouden per transactie zolang de tekst niet verandert (stap 16c: sneller)
+const TXT = new WeakMap();
+function txTextInfo(t) {
+  const k = (t.search || "") + " " + (t.raw || "") + " " + (t.desc || ""); let c = TXT.get(t);
+  if (!c || c.k !== k) { const up = k.toUpperCase(); c = { k, up, flat: up.replace(/\s/g, "") }; TXT.set(t, c); }
+  return c;
+}
+function txText(t) { return txTextInfo(t).up; }
+/* Herkent bewegingen van/naar de actieve spaarrekening. De voorbereiding (rekeningnummer, doelen, referenties)
+   gebeurt één keer per lijst i.p.v. per transactie (stap 16c). */
+function savMatcher(state) {
+  const sc = savConf(state), ib = normIban(sc.iban), gs = savGoals(state);
+  const refs = gs.filter(g => g.ref).map(g => [g.ref.toUpperCase(), g.name]), names = new Set(gs.map(g => g.name));
+  return {
+    is: t => { if (ib && normIban(t.counterparty) === ib) return true; const x = txTextInfo(t); if (ib && x.flat.includes(ib)) return true;
+      return refs.some(([r]) => x.up.includes(r)) || names.has(t.cat); },
+    goal: t => { if (t.goal !== undefined && t.goal !== null && t.goal !== "") return t.goal; if (t.goal === "") return null;
+      const up = txTextInfo(t).up, r = refs.find(([ref]) => up.includes(ref)); return r ? r[1] : names.has(t.cat) ? t.cat : null; },
+  };
+}
 function refGoal(state, t) { const s = txText(t); const g = state.goals.find(g => g.ref && s.includes(g.ref.toUpperCase())); return g ? g.name : null; }
-function isSavMove(state, t) {
-  const sc = savConf(state), ib = normIban(sc.iban);
-  if (ib && normIban(t.counterparty) === ib) return true;
-  if (ib && txText(t).replace(/\s/g, "").includes(ib)) return true;
-  const gs = savGoals(state), s = txText(t);
-  if (gs.some(g => g.ref && s.includes(g.ref.toUpperCase()))) return true;
-  return gs.some(g => g.name === t.cat);
-}
-function moveGoal(state, t) {
-  if (t.goal !== undefined && t.goal !== null && t.goal !== "") return t.goal;
-  if (t.goal === "") return null;               // bewust niet toegewezen
-  const gs = savGoals(state), s = txText(t), r = gs.find(g => g.ref && s.includes(g.ref.toUpperCase()));
-  return r ? r.name : gs.some(g => g.name === t.cat) ? t.cat : null;
-}
+function isSavMove(state, t) { return savMatcher(state).is(t); }
+function moveGoal(state, t) { return savMatcher(state).goal(t); }   // "" = bewust niet toegewezen
 /* Alle bewegingen op de spaarrekening: uit je zichtrekening (effect = −bedrag) en manuele ingaven (rente, premies, correcties). */
 function savMoves(state) {
   const sc = savConf(state);
-  const bank = budgetTx(state).filter(t => isSavMove(state, t)).map(t => ({ date: t.date, effect: -t.amount, goal: moveGoal(state, t), src: "bank", t, checked: !!t.savChecked, auto: !(t.goal) }));
+  const sm = savMatcher(state);
+  const bank = budgetTx(state).filter(sm.is).map(t => ({ date: t.date, effect: -t.amount, goal: sm.goal(t), src: "bank", t, checked: !!t.savChecked, auto: !(t.goal) }));
   const man = sc.entries.map(e => ({ date: e.date, effect: +e.amount, goal: e.goal || null, src: "manueel", e, checked: true, auto: false }));
   // verplaatsingen tussen spaardoelen: twee delen die samen 0 zijn, het saldo verandert niet
   const tr = sc.transfers.flatMap(x => [{ date: x.date, effect: -x.amount, goal: x.from, src: "transfer", leg: "out", e: x, checked: true, auto: false }, { date: x.date, effect: +x.amount, goal: x.to, src: "transfer", leg: "in", e: x, checked: true, auto: false }]);
@@ -846,8 +854,14 @@ function occStatus(state, plan, d) {
     (!want || Math.abs(Math.abs(t.amount) - want) <= Math.max(2, want * 0.15)));
   return tx ? { paid: true, tx } : { paid: false };
 }
+/* Tussengeheugen voor één tekenbeurt (stap 16c): zware berekeningen die tijdens het tekenen van één scherm
+   meermaals gevraagd worden, gebeuren maar één keer. Buiten memoRun() wordt er niets onthouden. */
+let MEMO = null;
+function memoRun(fn) { const prev = MEMO; MEMO = new Map(); try { return fn(); } finally { MEMO = prev; } }
+function memo(key, fn) { if (!MEMO) return fn(); if (!MEMO.has(key)) MEMO.set(key, fn()); return MEMO.get(key); }
 /* Herkent terugkerende uitgaven (en inkomsten) in je transacties. */
-function detectRecurring(state) {
+function detectRecurring(state) { return memo("detectRecurring", () => detectRecurringNow(state)); }
+function detectRecurringNow(state) {
   const groups = new Map();
   for (const t of budgetTx(state)) {
     if (!t.amount || t.cat === "Opname krediet") continue;
@@ -892,7 +906,8 @@ function agenda(state, from, to, withDetected) {
   return items.sort((a, b) => a.date.localeCompare(b.date) || (a.plan.title || "").localeCompare(b.plan.title || ""));
 }
 /* Prijsstijgingen bij terugkerende betalingen (abonnementen, domiciliëringen). */
-function priceChanges(state) {
+function priceChanges(state) { return memo("priceChanges", () => priceChangesNow(state)); }
+function priceChangesNow(state) {
   const groups = new Map();
   for (const t of budgetTx(state)) {
     if (t.amount >= 0) continue;
@@ -1269,4 +1284,4 @@ function findProfile(state, text) {
   return null;
 }
 
-if (typeof module !== "undefined") module.exports = { cardKey, syncCardAccounts, isCardAcc, cardTx, cardSettleMoves, cardOpen, guessBankName, sniffCsv, headerSig, parseDateFmt, parseAnyAmount, guessMap, parseWithProfile, findProfile, csvLines, demoState, filterTx, filterActive, parseAmt, subscriptions, PER_YEAR, monthClose, niceDesc, catByName, parentOf, groupOf, mainCats, subsOf, savKeys, activeSav, setSav, withSav, goalSav, savGoals, savAll, syncSavConfs, cardMatch, applyCards, transferFlows, OWN_CAT, ownTransfer, applyOwnTransfers, ownConflicts, MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
+if (typeof module !== "undefined") module.exports = { memoRun, cardKey, syncCardAccounts, isCardAcc, cardTx, cardSettleMoves, cardOpen, guessBankName, sniffCsv, headerSig, parseDateFmt, parseAnyAmount, guessMap, parseWithProfile, findProfile, csvLines, demoState, filterTx, filterActive, parseAmt, subscriptions, PER_YEAR, monthClose, niceDesc, catByName, parentOf, groupOf, mainCats, subsOf, savKeys, activeSav, setSav, withSav, goalSav, savGoals, savAll, syncSavConfs, cardMatch, applyCards, transferFlows, OWN_CAT, ownTransfer, applyOwnTransfers, ownConflicts, MAX_ZICHT, accKey, zichtList, spaarList, fmtIban, accName, checkBackup, cleanBackup, suggestRules, ruleKeyword, RULE_HINTS, setTxCat, splitRuleMatches, applySplitRule, undoSplitRule, applyAllSplitRules, inAnchor, expandTx, priceChanges, REPEATS, stepDate, planOccurrences, occStatus, detectRecurring, agenda, plansToIcs, monthlyBudget, yearlyBudget, rolloverStart, savingsBalance, savingsSummary, savMoves, savConf, ensureGoalRefs, resolvePending, isSavMove, hasSavings, isSav, budgetTx, txKey, txRefKey, creditMovements, creditKeywords, creditStatus, CREDIT_TYPES, impliedRate, loanStatus, loanPayments, detectLoans, addMonths, envelopes, yearSummary, rolls, firstMonth, merchantKey, learnedMap, uncatGroups, balanceAt, accounts, endOfMonth, newState, decodeBytes, parseBankCsv, mergeRows, applyRules, monthSummary, goalProgress, cleanDescription, toCsv, UNCAT };
