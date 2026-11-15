@@ -760,6 +760,7 @@ body.demo main { padding-bottom: 70px; }
 .map-prev td { font-size: 13px; padding: 6px 8px; }
 .map-status { margin: 10px 0 0; font-size: 13.5px; }
 @media (max-width: 640px) { .map-grid { grid-template-columns: 1fr; gap: 4px; } .map-grid > label { padding-top: 8px; } }
+.crash-detail { white-space: pre-wrap; font: 11.5px/1.4 var(--font-mono); color: var(--muted); max-height: 220px; overflow: auto; margin: 8px 0 0; }
 .close-lead p { margin: 0; font-size: 15.5px; line-height: 1.55; }
 .close-row { display: grid; grid-template-columns: 1fr auto auto; gap: 14px; align-items: baseline; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
 .close-row:last-child { border-bottom: 0; }
@@ -3682,7 +3683,25 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
 
   const VIEWS = { abonnementen: viewSubs, afsluiting: viewClose, help: viewHelp, overzicht: viewOverview, transacties: viewTransactions, budget: viewBudget, regels: viewRules, spaardoelen: viewGoals, spaar: viewSavings, planner: viewPlanner, leningen: viewLoans, profiel: viewProfile };
   const route = () => { const r = location.hash.slice(1); return VIEWS[r] ? r : "overzicht"; };
+  /* ---------- vangnet (stap 16a) ----------
+     Loopt het tekenen van een scherm mis, dan nooit een leeg scherm: een melding met uitwegen. De gegevens zelf worden niet aangeraakt.
+     Test: sessionStorage "budgetplanner.v1.testfout" = naam van een tabblad → dat tabblad gooit bewust een fout (enkel voor de tests). */
   function render() {
+    try { renderInner(); }
+    catch (e) {
+      console.error(e);
+      try { document.body.classList.remove("lite", "eye-off"); } catch (x) {}
+      const r = route();
+      try { document.querySelectorAll("#nav a").forEach(a => { if (a.getAttribute("href") === "#" + r) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); }); } catch (x) {}
+      $("#main").innerHTML = `<div class="page-head"><div><h1>Oei</h1><p>Er liep iets mis bij het tonen van dit scherm.</p></div></div>
+        <section class="card crash"><p><b>Je gegevens zijn veilig</b>: er werd niets gewijzigd of gewist. Kies hieronder hoe je verder wil. Blijft het gebeuren, maak dan een back-up en meld wat je deed vlak voordien.</p>
+          <div class="row" style="justify-content:flex-start;margin-top:12px">${r !== "overzicht" ? `<button class="btn primary" data-act="goto-overview" type="button">← Naar Overzicht</button>` : `<button class="btn primary" data-act="crash-tx" type="button">→ Naar Transacties</button>`}
+            <button class="btn" data-act="goto-profile" type="button">Naar Profiel</button><button class="btn" data-act="export-json" type="button">⤓ Back-up exporteren</button><button class="btn" data-act="crash-reload" type="button">⟳ App herladen</button></div>
+          <details style="margin-top:14px"><summary class="muted" style="cursor:pointer;font-size:12.5px">Technische details (voor wie de fout zoekt)</summary><pre class="crash-detail">${esc(String(e && (e.stack || e.message) || e)).slice(0, 2000)}</pre></details></section>`;
+    }
+  }
+  function renderInner() {
+    try { const tf = sessionStorage.getItem(KEY + ".testfout"); if (tf && tf === route()) throw new Error("Testfout (bewust) op " + tf); } catch (e) { if (/Testfout/.test(e.message)) throw e; }
     setSav(ui.sav);   // de spaarfuncties rekenen voor de spaarrekening die op het tabblad Spaar gekozen is
     const r = route(), focusId = document.activeElement && document.activeElement.id, selStart = document.activeElement && document.activeElement.selectionStart;
     if (liteMode()) { document.body.classList.add("lite"); document.body.classList.toggle("eye-off", liteHidden()); $("#main").innerHTML = viewLite(); afterRender("lite"); tutPaint(); return; }
@@ -3950,6 +3969,8 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
         if (nv) state.subs[key] = { review: nv }; else delete state.subs[key]; save(); render(); break; }
       case "close-later": ui.closeLater = true; render(); break;
       case "goto-overview": location.hash = "overzicht"; break;
+      case "crash-tx": location.hash = "transacties"; break;
+      case "crash-reload": location.reload(); break;
       case "help-open": location.hash = "help"; window.scrollTo(0, 0); break;
       case "help-show": helpShow(el.dataset.topic, +el.dataset.i); break;
       case "help-topic": { const id = el.dataset.topic; location.hash = "help"; setTimeout(() => { const d = $("#help-" + id); if (d) { d.open = true; d.scrollIntoView({ block: "center" }); } }, 150); break; }
@@ -4222,6 +4243,12 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
     if (tr) { const r = tr.getBoundingClientRect(); let to = +tr.dataset.i + (e.clientY < r.top + r.height / 2 ? 0 : 1); const [c] = state.categories.splice(dragFrom, 1); if (to > dragFrom) to--; state.categories.splice(to, 0, c); save(); }
     dragFrom = null; render(); }, true);
   document.addEventListener("dragend", () => { if (dragFrom !== null) { dragFrom = null; render(); } });
+
+  /* fouten buiten het tekenen (bv. tijdens een import of in een venster): een melding i.p.v. stilte */
+  let lastErrToast = 0;
+  const errToast = e => { console.error(e); if (Date.now() - lastErrToast < 3000) return; lastErrToast = Date.now(); try { toast("⚠ Er liep iets mis: " + String((e && e.message) || e).slice(0, 120) + ". Je gegevens zijn niet gewijzigd."); } catch (x) {} };
+  addEventListener("error", ev => { if (ev.error) errToast(ev.error); });
+  addEventListener("unhandledrejection", ev => errToast(ev.reason));
 
   /* tutorialballon */
   document.addEventListener("mousemove", e => {
