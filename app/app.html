@@ -348,12 +348,6 @@ nav a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--accen
 .btn.ghost:hover { color: var(--ink); background: var(--bar-track); }
 .btn.small { padding: 4px 9px; font-size: 13px; }
 .btn.danger { color: var(--neg); }
-.menu { position: relative; }
-.menu-list { position: absolute; right: 0; top: calc(100% + 6px); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--menu-shadow); min-width: 250px; padding: 6px; display: none; }
-.menu.open .menu-list { display: block; }
-.menu-list button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 9px 10px; border-radius: 6px; cursor: pointer; }
-.menu-list button:hover { background: var(--bar-track); }
-.menu-list small { display: block; color: var(--muted); font-size: 12px; }
 
 main { max-width: 1180px; margin: 0 auto; padding: 24px; display: grid; gap: 20px; }
 .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
@@ -760,6 +754,7 @@ body.demo main { padding-bottom: 70px; }
 .map-prev td { font-size: 13px; padding: 6px 8px; }
 .map-status { margin: 10px 0 0; font-size: 13.5px; }
 @media (max-width: 640px) { .map-grid { grid-template-columns: 1fr; gap: 4px; } .map-grid > label { padding-top: 8px; } }
+.crash-detail { white-space: pre-wrap; font: 11.5px/1.4 var(--font-mono); color: var(--muted); max-height: 220px; overflow: auto; margin: 8px 0 0; }
 .close-lead p { margin: 0; font-size: 15.5px; line-height: 1.55; }
 .close-row { display: grid; grid-template-columns: 1fr auto auto; gap: 14px; align-items: baseline; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
 .close-row:last-child { border-bottom: 0; }
@@ -802,9 +797,6 @@ body.tut [data-tut]:hover { outline: 1px dashed rgba(var(--accent-rgb), .8); out
 .toast-undo { margin-left: 10px; background: none; border: 1px solid currentColor; color: inherit; font: inherit; padding: 3px 9px; border-radius: var(--r-btn); cursor: pointer; text-transform: none; }
 .toast-undo:hover { background: rgba(var(--accent-rgb), .15); }
 .toast { background: rgba(var(--panel-rgb), .96); color: var(--accent); border: 1px solid var(--accent); border-radius: var(--r-card); box-shadow: 0 0 20px rgba(var(--accent-rgb), calc(.4 * var(--glow))); text-transform: var(--case-ui); letter-spacing: .05em; font-weight: 600; }
-.menu-list { background: var(--panel); border-color: var(--accent); border-radius: var(--r-card); box-shadow: 0 0 20px rgba(var(--accent-rgb), calc(.25 * var(--glow))); }
-.menu-list button { border-radius: var(--r-sm); }
-.menu-list button:hover { background: rgba(var(--accent-rgb), .1); color: var(--accent); }
 dialog { background: var(--panel); border: 1px solid var(--accent); border-radius: var(--r-card); clip-path: var(--notch); box-shadow: 0 0 40px rgba(var(--accent-rgb), calc(.25 * var(--glow))); }
 dialog h3 { font-family: var(--font-display); color: var(--accent); }
 dialog::backdrop { background: rgba(var(--shade-rgb), .8); }
@@ -894,7 +886,6 @@ td.desc > .acc-mini { float: left; margin-top: 7px; }
 .xfer { color: var(--ink); } td.amount.xfer { white-space: nowrap; } td.amount.xfer small { display: block; font-size: 11px; color: var(--muted); font-family: var(--font-body); }
 td.amount.xfer::first-letter { color: var(--accent); }
 /* saldoverwachting per rekening + overboekingen (stap 8c-2/3) */
-.fc-acc { display: inline-flex; align-items: center; margin-left: 8px; color: var(--ink); }
 .fc-stats { display: flex; flex-wrap: wrap; gap: 6px 22px; align-items: baseline; margin: 0 0 8px; font-size: 13.5px; }
 .fc-warn { color: var(--neg); font-weight: 600; }
 .charts .card-head { flex-wrap: wrap; gap: 10px; }
@@ -930,7 +921,6 @@ td.amount.xfer::first-letter { color: var(--accent); }
 #main.enter .chart svg, #main.enter section svg { animation: fx-reveal .8s ease-out .15s both; }
 #main.enter .fill, #main.enter .gw-bar span { transform-origin: left center; animation: fx-grow .8s cubic-bezier(.2, .8, .2, 1) .15s both; }
 dialog[open] { animation: fx-pop .18s ease-out; }
-.menu.open .menu-list { animation: fx-drop .16s ease-out; }
 .card, .kpi, .btn, .theme-tile { transition: box-shadow .2s ease, border-color .2s ease, background-color .2s ease, color .2s ease; }
 .kpi:hover { border-color: rgba(var(--accent-rgb), .45); }
 
@@ -1489,7 +1479,6 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
   const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true;
   function updateInstallUi() {
     const b = $("#btn-install"); if (b) b.style.display = installPrompt && !isStandalone() ? "" : "none";
-    const m = $("#mi-install"); if (m) m.style.display = isStandalone() ? "none" : "";
   }
   window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); installPrompt = e; updateInstallUi(); });
   window.addEventListener("appinstalled", () => { installPrompt = null; updateInstallUi(); toast("Budgetplanner is geïnstalleerd. Je vindt hem bij je programma's."); });
@@ -2314,17 +2303,6 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
 
   function niceStep(x) { const p = Math.pow(10, Math.floor(Math.log10(x || 1))); const n = x / p; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p; }
   function roundTop(x, y, w, h, r) { r = Math.min(r, h, w / 2); return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`; }
-
-  function goalsCard() {
-    let h = `<div class="card-head"><h2>Spaardoelen</h2><a class="hint" href="#spaardoelen">Beheren</a></div>`;
-    if (!state.goals.length) return h + `<p class="muted">Nog geen spaardoelen.</p>`;
-    return h + `<div class="goals">` + state.goals.map(g => {
-      const p = goalProgress(state, g);
-      return `<div class="goal"><div class="top"><b>${esc(g.name)}</b><span class="num">${eur0(p.total)}${p.target ? ` <span class="muted">/ ${eur0(p.target)}</span>` : ""}</span></div>
-        <div class="track"><div class="fill" style="width:${((p.pct || 0) * 100).toFixed(1)}%"></div></div>
-        <div class="meta">${p.target ? (p.left === 0 ? "Doel bereikt" : p.perMonth ? `Nog ${eur0(p.left)} · ${eur0(p.perMonth)} per maand tot ${fmtDate(g.deadline)}` : `Nog ${eur0(p.left)}`) : "Stel een doelbedrag in"}</div></div>`;
-    }).join("") + `</div>`;
-  }
 
   function txRow(t) {
     const open = ui.open.has(t.id);
@@ -3682,7 +3660,25 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
 
   const VIEWS = { abonnementen: viewSubs, afsluiting: viewClose, help: viewHelp, overzicht: viewOverview, transacties: viewTransactions, budget: viewBudget, regels: viewRules, spaardoelen: viewGoals, spaar: viewSavings, planner: viewPlanner, leningen: viewLoans, profiel: viewProfile };
   const route = () => { const r = location.hash.slice(1); return VIEWS[r] ? r : "overzicht"; };
+  /* ---------- vangnet (stap 16a) ----------
+     Loopt het tekenen van een scherm mis, dan nooit een leeg scherm: een melding met uitwegen. De gegevens zelf worden niet aangeraakt.
+     Test: sessionStorage "budgetplanner.v1.testfout" = naam van een tabblad → dat tabblad gooit bewust een fout (enkel voor de tests). */
   function render() {
+    try { memoRun(renderInner); }
+    catch (e) {
+      console.error(e);
+      try { document.body.classList.remove("lite", "eye-off"); } catch (x) {}
+      const r = route();
+      try { document.querySelectorAll("#nav a").forEach(a => { if (a.getAttribute("href") === "#" + r) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); }); } catch (x) {}
+      $("#main").innerHTML = `<div class="page-head"><div><h1>Oei</h1><p>Er liep iets mis bij het tonen van dit scherm.</p></div></div>
+        <section class="card crash"><p><b>Je gegevens zijn veilig</b>: er werd niets gewijzigd of gewist. Kies hieronder hoe je verder wil. Blijft het gebeuren, maak dan een back-up en meld wat je deed vlak voordien.</p>
+          <div class="row" style="justify-content:flex-start;margin-top:12px">${r !== "overzicht" ? `<button class="btn primary" data-act="goto-overview" type="button">← Naar Overzicht</button>` : `<button class="btn primary" data-act="crash-tx" type="button">→ Naar Transacties</button>`}
+            <button class="btn" data-act="goto-profile" type="button">Naar Profiel</button><button class="btn" data-act="export-json" type="button">⤓ Back-up exporteren</button><button class="btn" data-act="crash-reload" type="button">⟳ App herladen</button></div>
+          <details style="margin-top:14px"><summary class="muted" style="cursor:pointer;font-size:12.5px">Technische details (voor wie de fout zoekt)</summary><pre class="crash-detail">${esc(String(e && (e.stack || e.message) || e)).slice(0, 2000)}</pre></details></section>`;
+    }
+  }
+  function renderInner() {
+    try { const tf = sessionStorage.getItem(KEY + ".testfout"); if (tf && tf === route()) throw new Error("Testfout (bewust) op " + tf); } catch (e) { if (/Testfout/.test(e.message)) throw e; }
     setSav(ui.sav);   // de spaarfuncties rekenen voor de spaarrekening die op het tabblad Spaar gekozen is
     const r = route(), focusId = document.activeElement && document.activeElement.id, selStart = document.activeElement && document.activeElement.selectionStart;
     if (liteMode()) { document.body.classList.add("lite"); document.body.classList.toggle("eye-off", liteHidden()); $("#main").innerHTML = viewLite(); afterRender("lite"); tutPaint(); return; }
@@ -3950,6 +3946,8 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
         if (nv) state.subs[key] = { review: nv }; else delete state.subs[key]; save(); render(); break; }
       case "close-later": ui.closeLater = true; render(); break;
       case "goto-overview": location.hash = "overzicht"; break;
+      case "crash-tx": location.hash = "transacties"; break;
+      case "crash-reload": location.reload(); break;
       case "help-open": location.hash = "help"; window.scrollTo(0, 0); break;
       case "help-show": helpShow(el.dataset.topic, +el.dataset.i); break;
       case "help-topic": { const id = el.dataset.topic; location.hash = "help"; setTimeout(() => { const d = $("#help-" + id); if (d) { d.open = true; d.scrollIntoView({ block: "center" }); } }, 150); break; }
@@ -4222,6 +4220,12 @@ try { if (sessionStorage.getItem("budgetplanner.v1.splash")) document.getElement
     if (tr) { const r = tr.getBoundingClientRect(); let to = +tr.dataset.i + (e.clientY < r.top + r.height / 2 ? 0 : 1); const [c] = state.categories.splice(dragFrom, 1); if (to > dragFrom) to--; state.categories.splice(to, 0, c); save(); }
     dragFrom = null; render(); }, true);
   document.addEventListener("dragend", () => { if (dragFrom !== null) { dragFrom = null; render(); } });
+
+  /* fouten buiten het tekenen (bv. tijdens een import of in een venster): een melding i.p.v. stilte */
+  let lastErrToast = 0;
+  const errToast = e => { console.error(e); if (Date.now() - lastErrToast < 3000) return; lastErrToast = Date.now(); try { toast("⚠ Er liep iets mis: " + String((e && e.message) || e).slice(0, 120) + ". Je gegevens zijn niet gewijzigd."); } catch (x) {} };
+  addEventListener("error", ev => { if (ev.error) errToast(ev.error); });
+  addEventListener("unhandledrejection", ev => errToast(ev.reason));
 
   /* tutorialballon */
   document.addEventListener("mousemove", e => {
